@@ -1,0 +1,1649 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#101216">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hierro">
+<meta name="color-scheme" content="dark">
+<title>Hierro — tu registro de gimnasio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+<style>
+  :root{
+    --bg:#101216;
+    --panel:#181b21;
+    --panel-2:#1f232b;
+    --line:#2a2f3a;
+    --ink:#eae6dc;
+    --mut:#8e94a0;
+    --acc:#f5c242;
+    --acc-ink:#1a1608;
+    --good:#6cc283;
+    --warn:#e2984a;
+    --bad:#e25c5c;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px;line-height:1.45;
+    overscroll-behavior-y:contain;
+  }
+  #app{
+    max-width:560px;margin:0 auto;min-height:100dvh;
+    display:flex;flex-direction:column;
+    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  }
+  main{flex:1;padding:16px 16px 24px}
+
+  /* ---------- tipografía utilitaria ---------- */
+  .eyebrow{
+    font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--mut);
+  }
+  h1{font-size:26px;font-weight:800;letter-spacing:-.01em}
+  h2{font-size:19px;font-weight:750;letter-spacing:-.01em}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ---------- header ---------- */
+  header.app{
+    padding:18px 16px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  }
+  header.app .brand{display:flex;flex-direction:column;gap:2px}
+
+  /* ---------- cards / listas ---------- */
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .stack{display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;align-items:center;gap:10px}
+  .row > input{min-width:0}
+  .grow{flex:1;min-width:0}
+  .clickable{cursor:pointer;transition:border-color .12s ease, transform .05s ease}
+  .clickable:active{transform:scale(.985)}
+  .clickable:hover{border-color:#3a4150}
+  .muted{color:var(--mut);font-size:13.5px}
+  .tiny{font-size:12px;color:var(--mut)}
+  .linkish{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+
+  /* ---------- botones ---------- */
+  button{
+    font:inherit;color:inherit;background:none;border:none;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .clickable:focus-visible{
+    outline:2px solid var(--acc);outline-offset:2px;border-radius:8px;
+  }
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    border-radius:12px;padding:13px 18px;font-weight:700;font-size:15.5px;
+    background:var(--panel-2);border:1px solid var(--line);width:100%;
+    transition:transform .05s ease;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn-acc{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+  .btn-danger{color:var(--bad);border-color:#4a2f33}
+  .btn-ghost{background:transparent}
+  .iconbtn{
+    width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    color:var(--mut);font-size:18px;flex:none;
+  }
+  .iconbtn:hover{color:var(--ink);background:var(--panel-2)}
+
+  /* ---------- inputs ---------- */
+  input[type=text], input[type=number], select, textarea{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+    color:var(--ink);padding:11px 12px;font:inherit;width:100%;
+  }
+  textarea{resize:vertical;min-height:64px}
+  input::placeholder, textarea::placeholder{color:#5b6170}
+  input[type=number]{text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+  /* placeholders de sugerencia = "shadow text" dorado */
+  input.sugg::placeholder{color:#8a7a45}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field > span{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+
+  /* ---------- nav inferior ---------- */
+  nav.tabs{
+    position:fixed;bottom:0;left:0;right:0;z-index:40;
+    background:rgba(16,18,22,.92);backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav.tabs .inner{max-width:560px;margin:0 auto;display:flex}
+  nav.tabs button{
+    flex:1;padding:11px 0 9px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.04em;
+  }
+  nav.tabs button .ic{font-size:19px;line-height:1}
+  nav.tabs button.on{color:var(--acc)}
+
+  /* ---------- barra de sesión (cronómetro + descanso) ---------- */
+  .sessionbar{
+    position:sticky;top:0;z-index:30;
+    background:linear-gradient(180deg,#15181d 0%, rgba(16,18,22,.97) 100%);
+    border-bottom:1px solid var(--line);
+    margin:-16px -16px 16px;padding:12px 16px;
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .clock{
+    font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.01em;
+    line-height:1;
+  }
+  .dot{
+    width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none;
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){ .dot{animation:none} }
+  .restchip{
+    width:100%;padding:9px;border:1px dashed var(--line);border-radius:10px;
+    color:var(--mut);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;
+  }
+  .restchip.on{border-style:solid;border-color:var(--acc);color:var(--acc);background:#241f10}
+  .restchip.done{border-style:solid;border-color:var(--good);color:var(--good);background:#132015}
+
+  /* ---------- sugerencia del coach ---------- */
+  .coach{
+    border-left:3px solid var(--acc);
+    background:#1d1f22;
+    border-radius:8px;padding:9px 12px;margin-top:8px;
+    font-size:13.5px;
+  }
+  .coach b{color:var(--acc)}
+  .coach.good{border-left-color:var(--good)} .coach.good b{color:var(--good)}
+  .coach.warn{border-left-color:var(--warn)} .coach.warn b{color:var(--warn)}
+  .coach .why{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+
+  /* ---------- filas de series ---------- */
+  .sethead, .setrow{display:grid;grid-template-columns:24px 1.15fr 1fr .95fr 32px;gap:7px;align-items:center}
+  .sethead{margin-top:12px}
+  .sethead span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;text-align:center;font-weight:700}
+  .setrow{margin-top:8px}
+  .setrow .idx{
+    text-align:center;color:var(--mut);font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;
+  }
+  .setrow input{padding:11px 6px}
+  .addset{
+    margin-top:10px;width:100%;padding:9px;border:1px dashed var(--line);border-radius:10px;
+    color:var(--mut);font-weight:600;font-size:14px;
+  }
+  .addset:hover{color:var(--acc);border-color:var(--acc)}
+
+  /* ---------- autocompletado de ejercicios ---------- */
+  .acwrap{position:relative;flex:1;min-width:0}
+  .aclist{
+    position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:45;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.5);
+  }
+  .aclist button{
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    width:100%;text-align:left;padding:11px 14px;font-size:14.5px;
+    border-bottom:1px solid #232833;
+  }
+  .aclist button:last-child{border-bottom:none}
+  .aclist button:hover, .aclist button:focus-visible{background:#262b35}
+  .aclist b{color:var(--acc)}
+  .aclist .from{color:var(--mut);font-size:11px;white-space:nowrap;flex:none}
+
+  /* ---------- gráfica ---------- */
+  .chartwrap{margin-top:10px}
+  .chartwrap canvas{display:block;width:100%;touch-action:pan-y;border-radius:8px}
+  .bignum{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  .bignum small{font-size:15px;font-weight:600;color:var(--mut)}
+
+  /* ---------- modal ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:50;background:rgba(8,9,12,.72);
+    display:flex;align-items:flex-end;justify-content:center;
+  }
+  @media(min-width:480px){ .overlay{align-items:center} }
+  .modal{
+    background:var(--panel);border:1px solid var(--line);
+    border-radius:18px 18px 0 0;width:100%;max-width:480px;
+    max-height:86dvh;overflow-y:auto;
+    padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+  }
+  @media(min-width:480px){ .modal{border-radius:18px;padding-bottom:22px} }
+  .modal h2{margin-bottom:6px}
+  .modal .muted{margin-bottom:16px}
+
+  /* ---------- opciones tipo tarjeta (objetivo, tipo de ejercicio) ---------- */
+  .goal-opt{
+    display:flex;flex-direction:column;gap:2px;text-align:left;width:100%;
+    background:var(--panel-2);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;
+  }
+  .goal-opt.on{border-color:var(--acc);background:#242113}
+  .goal-opt b{font-size:15px}
+  .goal-opt span{font-size:12.5px;color:var(--mut)}
+
+  .empty{text-align:center;padding:44px 20px;color:var(--mut)}
+  .empty .big{font-size:40px;margin-bottom:10px}
+
+  .pill{
+    display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:99px;
+    padding:2px 9px;color:var(--mut);white-space:nowrap;
+  }
+  .pill.acc{color:var(--acc-ink);background:var(--acc);border-color:var(--acc)}
+
+  details.hist{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+  details.hist summary{
+    list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;
+  }
+  details.hist summary::-webkit-details-marker{display:none}
+  details.hist .body{border-top:1px solid var(--line);padding:12px 16px 14px;font-size:14px}
+  details.hist .exline{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #232833}
+  details.hist .exline:last-child{border-bottom:none}
+  details.hist .exline .sets{color:var(--mut);font-variant-numeric:tabular-nums;text-align:right}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="app" id="topbar"></header>
+  <main id="main"></main>
+</div>
+<nav class="tabs" id="tabs"></nav>
+<div id="modalhost"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Hierro — registro de entrenamiento con progresión basada en evidencia
+   Motor: doble progresión (reps → peso) con RIR, incrementos adaptativos
+   por ejercicio, tipos normal / asistido / peso corporal, 1RM estimado
+   (Epley) y progresión de volumen ante estancamiento.
+   Referencias: Pelland 2025 (volumen), Robinson 2024 (cercanía al fallo),
+   Kassiano 2026 (sobrecarga progresiva), NMA 2025 (autorregulación).
+   ===================================================================== */
+
+const LS_KEY = 'hierro.v1';
+
+const GOALS = {
+  hipertrofia: { label:'Hipertrofia', lo:8,  hi:12, rest:90,  desc:'Ganar músculo · series de 8–12 reps' },
+  fuerza:      { label:'Fuerza',      lo:4,  hi:6,  rest:180, desc:'Levantar más pesado · series de 4–6 reps' },
+  ambas:       { label:'Ambas',       lo:6,  hi:10, rest:120, desc:'Fuerza y músculo · series de 6–10 reps' },
+};
+const INC_START = 0.025, INC_MIN = 0.0125, INC_MAX = 0.06;
+const MAX_SETS_SUGG = 5;
+const TYPE_LABEL = { normal:'', asistido:'Asistido', corporal:'Peso corporal' };
+
+/* ---------- estado ---------- */
+let db = load();
+let view = { name:'home' };
+let timerInt = null;
+let restUntil = null;
+let audioCtx = null;
+
+function normalize(d){
+  d = (d && typeof d === 'object') ? d : {};
+  d.settings = (d.settings && typeof d.settings === 'object') ? d.settings : {};
+  if(d.settings.goal === undefined) d.settings.goal = null;
+  if(d.settings.rest === undefined) d.settings.rest = 'auto';
+  d.routines = Array.isArray(d.routines) ? d.routines : [];
+  d.history  = Array.isArray(d.history)  ? d.history  : [];
+  d.progress = (d.progress && typeof d.progress === 'object') ? d.progress : {};
+  d.exmeta   = (d.exmeta   && typeof d.exmeta   === 'object') ? d.exmeta   : {};
+  d.active   = d.active || null;
+  return d;
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw) return normalize(JSON.parse(raw));
+  }catch(e){}
+  return normalize(null);
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function exKey(name){
+  return name.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+}
+function fmtDate(iso){
+  return new Date(iso).toLocaleDateString('es', { weekday:'short', day:'numeric', month:'short' });
+}
+function fmtDateShort(iso){
+  return new Date(iso).toLocaleDateString('es', { day:'numeric', month:'short' });
+}
+function fmtDur(sec){
+  const m = Math.floor(sec/60), s = sec%60;
+  return m >= 60 ? `${Math.floor(m/60)} h ${m%60} min` : `${m} min ${s} s`;
+}
+function fmtW(w){ return (Math.round(w*100)/100).toString().replace('.',','); }
+function fmtClock(sec){ return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`; }
+
+/* =====================================================================
+   MOTOR DE SUGERENCIAS
+   ===================================================================== */
+function goalRange(){ return GOALS[db.settings.goal || 'ambas']; }
+
+function prog(key){
+  if(!db.progress[key]) db.progress[key] = { inc:INC_START, fail:0, stall:0 };
+  return db.progress[key];
+}
+
+/* metadatos por ejercicio: tipo, rango de reps propio, salto de kg, notas */
+function exMeta(key){
+  if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'' };
+  return db.exmeta[key];
+}
+function effRange(key){
+  const m = exMeta(key), g = goalRange();
+  let lo = parseInt(m.lo,10), hi = parseInt(m.hi,10);
+  if(isNaN(lo) || lo < 1) lo = g.lo;
+  if(isNaN(hi) || hi < 1) hi = g.hi;
+  if(hi <= lo) hi = lo + 1;
+  return { lo, hi };
+}
+function effStep(key, w){
+  const st = parseFloat(exMeta(key).step);
+  return (!isNaN(st) && st > 0) ? st : roundStep(w);
+}
+
+/* 1RM estimado — fórmula de Epley: peso × (1 + reps/30) */
+function epley(w, r){ return (r > 0 && w > 0) ? w * (1 + r/30) : 0; }
+function bestE1RM(sets){ return Math.max(0, ...sets.map(s => epley(s.w, s.r))); }
+function avgRIR(sets){
+  const rs = sets.map(s => s.rir).filter(x => x !== undefined && x !== null && !isNaN(x));
+  return rs.length ? rs.reduce((a,b) => a+b, 0) / rs.length : null;
+}
+
+/* último registro histórico de un ejercicio (opcional: solo antes de una fecha) */
+function lastEntry(key, beforeISO){
+  let best = null;
+  for(const s of db.history){
+    if(beforeISO && s.date >= beforeISO) continue;
+    const e = s.entries.find(x => x.key === key);
+    if(e && e.sets.length && (!best || s.date > best.session.date)) best = { entry:e, session:s };
+  }
+  return best;
+}
+
+/* peso "de trabajo": el más usado en la sesión; empate → el mayor */
+function workWeight(sets){
+  const count = {};
+  for(const s of sets) count[s.w] = (count[s.w]||0) + 1;
+  let best = null, n = 0;
+  for(const w in count){
+    const wn = parseFloat(w);
+    if(count[w] > n || (count[w] === n && wn > best)){ best = wn; n = count[w]; }
+  }
+  return best;
+}
+function roundStep(w){ return w >= 20 ? 2.5 : (w >= 10 ? 1 : 0.5); }
+function roundToStep(w, st){ st = st || roundStep(w); return Math.round(w/st)*st; }
+
+/*  computeSuggestion(key) → null (primera vez) o
+    { w, reps, sets, type, msg, why }                                   */
+function computeSuggestion(key){
+  const last = lastEntry(key);
+  if(!last) return null;
+
+  const meta = exMeta(key);
+  const { lo, hi } = effRange(key);
+  const p = prog(key);
+  const sets = last.entry.sets;
+  const w = workWeight(sets);
+  const atW = sets.filter(s => s.w === w);
+  const minR = Math.min(...atW.map(s => s.r));
+  const maxR = Math.max(...atW.map(s => s.r));
+  const nSets = sets.length;
+  const rir = avgRIR(atW);
+  const step = effStep(key, w);
+  let sugg;
+
+  if(meta.type === 'asistido' && w > 0){
+    /* asistido: los kg son AYUDA → progresar = bajar kg */
+    if(minR >= hi){
+      const nw = Math.max(0, roundToStep(w - step, step));
+      sugg = (nw <= 0 || w <= 2.5)
+        ? { w:0, reps:lo, type:'up',
+            msg:`¡Prueba <b>sin asistencia</b>!`,
+            why:`Llegaste a ${hi} reps con solo ${fmtW(w)} kg de ayuda. Intenta la versión libre y registra 0 kg.` }
+        : { w:nw, reps:lo, type:'up',
+            msg:`Baja la ayuda: <b>${fmtW(nw)} kg × ${lo}</b>`,
+            why:`En asistidos, menos kg de ayuda = más difícil = progreso. Llegaste a ${hi} reps con ${fmtW(w)} kg de ayuda.` };
+    } else if(minR < lo){
+      if(p.fail >= 2){
+        sugg = { w:w + step, reps:lo, type:'deload',
+          msg:`Sube la ayuda a <b>${fmtW(w + step)} kg</b> y reconstruye`,
+          why:`Van ${p.fail} sesiones sin sostener el rango (${lo}–${hi}). Con un poco más de asistencia vuelves a progresar.` };
+      } else {
+        sugg = { w, reps:lo, type:'hold',
+          msg:`Misma ayuda (<b>${fmtW(w)} kg</b>): busca al menos ${lo} reps`,
+          why:`Consolida el rango (${lo}–${hi}) antes de bajar la asistencia.` };
+      }
+    } else {
+      const target = Math.min(hi, maxR + 1);
+      sugg = { w, reps:target, type:'reps',
+        msg:`Misma ayuda (<b>${fmtW(w)} kg</b>), apunta a <b>${target} reps</b>`,
+        why:`Cuando llegues a ${hi} reps en todas las series, te sugeriré bajar la ayuda.` };
+    }
+  } else if(meta.type === 'corporal' || w === 0){
+    /* peso corporal (o sin peso externo): progresar = más reps / series / lastre */
+    if(minR >= hi){
+      sugg = { w, reps:maxR + 1, type:'up',
+        msg:`Suma reps: apunta a <b>${maxR + 1}</b> por serie`,
+        why:`Sin peso externo progresas sumando reps o series. Si ya es muy fácil, agrega lastre (peso extra, ej. mochila o disco) y registra esos kg.` };
+    } else if(minR < lo){
+      sugg = { w, reps:lo, type:'hold',
+        msg:`Busca al menos <b>${lo} reps</b> por serie`,
+        why:`Consolida el rango (${lo}–${hi}); si no llegas, usa una variante más fácil o la versión asistida.` };
+    } else {
+      sugg = { w, reps:Math.min(hi, maxR + 1), type:'reps',
+        msg:`Apunta a <b>${Math.min(hi, maxR + 1)} reps</b>`,
+        why:`Una rep más que la última vez ya es progreso.` };
+    }
+  } else {
+    /* normal: doble progresión reps → peso, modulada por RIR si lo registras */
+    if(minR >= hi){
+      const boost = (rir !== null && rir >= 3) ? 1.7 : 1;
+      let nw = roundToStep(w * (1 + p.inc * boost), step);
+      if(nw <= w) nw = w + step;
+      sugg = { w:nw, reps:lo, type:'up',
+        msg:`Sube el peso: <b>${fmtW(nw)} kg × ${lo}</b>`,
+        why:`Llegaste a ${hi} reps en todas las series con ${fmtW(w)} kg.` +
+            (boost > 1 ? ` Además te sobraban reps (RIR ${Math.round(rir)}), así que el salto es un poco mayor.`
+                       : ` Toca progresar la carga (~${(p.inc*100).toFixed(1)} %).`) };
+    } else if(minR < lo){
+      if(p.fail >= 2){
+        let nw = roundToStep(w * 0.95, step);
+        if(nw >= w) nw = w - step;
+        if(nw <= 0) nw = w;
+        sugg = { w:nw, reps:lo, type:'deload',
+          msg:`Baja un poco: <b>${fmtW(nw)} kg × ${lo}</b>`,
+          why:`Van ${p.fail} sesiones sin sostener el rango con ${fmtW(w)} kg. Retroceder ~5 % y volver a construir es lo que mejor funciona.` };
+      } else {
+        sugg = { w, reps:lo, type:'hold',
+          msg:`Consolida <b>${fmtW(w)} kg</b>: busca al menos ${lo} reps por serie`,
+          why:`La última vez alguna serie quedó bajo el rango (${lo}–${hi}). Repite el peso dejando 1–3 reps en reserva antes de subir.` };
+      }
+    } else if(rir !== null && rir >= 4){
+      let nw = roundToStep(w * (1 + p.inc), step);
+      if(nw <= w) nw = w + step;
+      sugg = { w:nw, reps:lo, type:'up',
+        msg:`Sube ya el peso: <b>${fmtW(nw)} kg × ${lo}</b>`,
+        why:`Registraste RIR ${Math.round(rir)} (te sobraban ~${Math.round(rir)} reps): ese peso te queda liviano, no hace falta esperar al tope del rango.` };
+    } else {
+      const target = Math.min(hi, maxR + 1);
+      sugg = { w, reps:target, type:'reps',
+        msg:`Mismo peso (<b>${fmtW(w)} kg</b>), apunta a <b>${target} reps</b>`,
+        why:`Doble progresión: primero llena el rango de reps (${lo}–${hi}), después sube el peso.` };
+    }
+  }
+
+  sugg.sets = nSets;
+  if(p.stall >= 3 && nSets < MAX_SETS_SUGG && sugg.type !== 'up' && sugg.type !== 'deload'){
+    sugg.sets = nSets + 1;
+    sugg.msg += ` · y suma una serie extra (${nSets + 1} en total)`;
+    sugg.why = `Varias sesiones sin avanzar: más volumen semanal también genera progreso (con retornos decrecientes). ` + sugg.why;
+  }
+  return sugg;
+}
+
+/* actualizar el estado adaptativo tras guardar una sesión */
+function updateProgress(key, newSets, dateISO){
+  const p = prog(key);
+  const prev = lastEntry(key, dateISO);
+  if(!prev || !newSets.length) return;
+
+  const meta = exMeta(key);
+  const { lo, hi } = effRange(key);
+  const dir = meta.type === 'asistido' ? -1 : 1;   /* asistido: menos kg = progreso */
+  const wNow = workWeight(newSets);
+  const atW = newSets.filter(s => s.w === wNow);
+  const minR = Math.min(...atW.map(s => s.r));
+  const maxR = Math.max(...atW.map(s => s.r));
+  const wPrev = workWeight(prev.entry.sets);
+  const prevAtW = prev.entry.sets.filter(s => s.w === wPrev);
+  const maxRPrev = Math.max(...prevAtW.map(s => s.r));
+
+  if(wNow * dir > wPrev * dir){
+    if(minR >= lo){                       /* progresó la carga y aguantó el rango */
+      p.fail = 0; p.stall = 0;
+      if(minR >= hi) p.inc = Math.min(INC_MAX, p.inc * 1.15);
+    } else {                              /* progresó la carga y no llegó al rango */
+      p.fail++; p.stall = 0;
+      p.inc = Math.max(INC_MIN, p.inc * 0.7);
+    }
+  } else if(wNow === wPrev){
+    p.fail = (minR < lo) ? p.fail + 1 : 0;
+    p.stall = (maxR <= maxRPrev && minR < hi) ? p.stall + 1 : 0;
+  } else {                                /* retrocedió la carga (deload propio) */
+    p.fail = 0; p.stall = 0;
+    p.inc = Math.max(INC_MIN, p.inc * 0.85);
+  }
+  save();
+}
+
+/* =====================================================================
+   NAVEGACIÓN / RENDER
+   ===================================================================== */
+function go(v){ view = v; render(); window.scrollTo(0,0); }
+
+function render(){
+  clearInterval(timerInt); timerInt = null;
+  renderTop(); renderTabs();
+  const m = document.getElementById('main');
+  if(db.active && view.name === 'session') m.innerHTML = viewSession();
+  else if(view.name === 'routine')         m.innerHTML = viewRoutine();
+  else if(view.name === 'exercise')        m.innerHTML = viewExercise();
+  else if(view.name === 'history')         m.innerHTML = viewHistory();
+  else if(view.name === 'settings')        m.innerHTML = viewSettings();
+  else                                     m.innerHTML = viewHome();
+  afterRender();
+}
+
+function renderTop(){
+  const t = document.getElementById('topbar');
+  if((view.name === 'session' && db.active) || view.name === 'exercise'){
+    t.innerHTML = ''; t.style.display = 'none'; return;
+  }
+  t.style.display = '';
+  const goal = db.settings.goal ? GOALS[db.settings.goal].label : null;
+  t.innerHTML = `
+    <div class="brand">
+      <span class="eyebrow">Hierro</span>
+      <h1>${view.name==='history' ? 'Historial' : view.name==='settings' ? 'Ajustes' : 'Tus rutinas'}</h1>
+    </div>
+    ${goal ? `<span class="pill">${goal}</span>` : ''}`;
+}
+
+function renderTabs(){
+  const inSession = !!db.active;
+  const rutinasOn = ['home','routine','exercise'].includes(view.name);
+  document.getElementById('tabs').innerHTML = `
+    <div class="inner">
+      <button onclick="go({name:'home'})" class="${rutinasOn?'on':''}">
+        <span class="ic">🏋️</span>Rutinas</button>
+      ${inSession ? `<button onclick="go({name:'session'})" class="${view.name==='session'?'on':''}">
+        <span class="ic">⏱️</span>Sesión</button>` : ''}
+      <button onclick="go({name:'history'})" class="${view.name==='history'?'on':''}">
+        <span class="ic">📅</span>Historial</button>
+      <button onclick="go({name:'settings'})" class="${view.name==='settings'?'on':''}">
+        <span class="ic">⚙️</span>Ajustes</button>
+    </div>`;
+}
+
+/* ---------- HOME ---------- */
+function viewHome(){
+  let cards = db.routines.map(r => {
+    const lastS = [...db.history].reverse().find(h => h.routineId === r.id || h.routineName === r.name);
+    return `
+    <div class="card clickable" role="button" tabindex="0" onclick="go({name:'routine', id:'${r.id}'})"
+         onkeydown="if(event.key==='Enter')go({name:'routine', id:'${r.id}'})">
+      <div class="row">
+        <div class="grow">
+          <h2>${esc(r.name)}</h2>
+          <div class="muted">${r.exercises.length} ejercicio${r.exercises.length===1?'':'s'}
+            ${lastS ? ` · última vez: ${fmtDate(lastS.date)}` : ''}</div>
+        </div>
+        <span style="color:var(--mut);font-size:20px">›</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  if(!db.routines.length){
+    cards = `<div class="empty">
+      <div class="big">🏋️</div>
+      <p><b>Todavía no tienes rutinas.</b></p>
+      <p class="muted">Crea la primera — por ejemplo “Torso”, “Pierna” o “Full body”.</p>
+    </div>`;
+  }
+  const resume = db.active ? `
+    <button class="btn btn-acc" onclick="go({name:'session'})">
+      ⏱️ Continuar sesión en curso — ${esc(db.active.routineName)}
+    </button>` : '';
+
+  return `<div class="stack">
+    ${resume}
+    ${cards}
+    <button class="btn" onclick="promptNewRoutine()">＋ Nueva rutina</button>
+  </div>`;
+}
+
+/* ---------- RUTINA ---------- */
+function typePill(key){
+  const t = exMeta(key).type;
+  return TYPE_LABEL[t] ? `<span class="pill">${TYPE_LABEL[t]}</span>` : '';
+}
+
+function viewRoutine(){
+  const r = db.routines.find(x => x.id === view.id);
+  if(!r) return viewHome();
+  const goal = goalRange();
+
+  const items = r.exercises.map(ex => {
+    const sugg = computeSuggestion(ex.key);
+    const last = lastEntry(ex.key);
+    const notes = exMeta(ex.key).notes;
+    return `
+    <div class="card clickable" role="button" tabindex="0" onclick="openExercise('${r.id}','${ex.id}')"
+         onkeydown="if(event.key==='Enter')openExercise('${r.id}','${ex.id}')">
+      <div class="row">
+        <div class="grow">
+          <div class="row" style="gap:8px"><b>${esc(ex.name)}</b>${typePill(ex.key)}</div>
+          <div class="tiny">${ last
+            ? `Última vez: ${last.entry.sets.map(s=>`${fmtW(s.w)}×${s.r}`).join(' · ')}`
+            : 'Sin registros todavía — toca para configurar' }</div>
+          ${notes ? `<div class="tiny">📝 ${esc(notes)}</div>` : ''}
+        </div>
+        <span style="color:var(--mut);font-size:18px">›</span>
+        <button class="iconbtn" aria-label="Eliminar ejercicio"
+          onclick="event.stopPropagation(); removeExercise('${r.id}','${ex.id}')">✕</button>
+      </div>
+      ${ sugg ? `<div class="coach ${sugg.type==='up'?'good':(sugg.type==='deload'?'warn':'')}">
+          ${sugg.msg}<span class="why">${sugg.why}</span></div>` : '' }
+    </div>`;
+  }).join('');
+
+  return `<div class="stack">
+    <button class="btn-ghost row" style="color:var(--mut);font-weight:600;width:auto" onclick="go({name:'home'})">‹ Rutinas</button>
+    <div class="row">
+      <h2 class="grow">${esc(r.name)}</h2>
+      <button class="iconbtn" aria-label="Eliminar rutina" onclick="deleteRoutine('${r.id}')">🗑️</button>
+    </div>
+    ${items || `<div class="empty"><p class="muted">Agrega los ejercicios de esta rutina.</p></div>`}
+    <form class="row" onsubmit="addExercise(event,'${r.id}')" autocomplete="off">
+      <div class="acwrap">
+        <input type="text" id="newex" placeholder="Nombre del ejercicio (ej. Press banca)" autocomplete="off"
+          oninput="acUpdate('${r.id}')" onfocus="acUpdate('${r.id}')" onblur="acHide()">
+        <div class="aclist" id="aclist" style="display:none" role="listbox"></div>
+      </div>
+      <button class="btn" style="width:auto;flex:none" type="submit">Agregar</button>
+    </form>
+    ${ r.exercises.length ? `
+      <button class="btn btn-acc" style="font-size:17px;padding:16px" onclick="startSession('${r.id}')">▶ &nbsp;Empezar sesión</button>
+      <p class="tiny" style="text-align:center">Rango objetivo según tu meta: ${goal.lo}–${goal.hi} reps por serie, dejando 1–3 en reserva.
+        Toca un ejercicio para ver su progreso y ajustes.</p>` : '' }
+  </div>`;
+}
+
+/* ---------- FICHA DE EJERCICIO (progreso + ajustes) ---------- */
+function openExercise(rid, exid){
+  const r = db.routines.find(x => x.id === rid);
+  const ex = r && r.exercises.find(e => e.id === exid);
+  if(!ex) return;
+  go({ name:'exercise', key:ex.key, exname:ex.name, rid });
+}
+
+function exerciseHistory(key){
+  const out = [];
+  for(const h of db.history){
+    const e = h.entries.find(x => x.key === key);
+    if(e && e.sets.length) out.push({ date:h.date, sets:e.sets });
+  }
+  out.sort((a,b) => a.date < b.date ? -1 : 1);
+  return out;
+}
+
+function viewExercise(){
+  const key = view.key, meta = exMeta(key);
+  const g = goalRange();
+  const hist = exerciseHistory(key);
+  const corporal = meta.type === 'corporal';
+  const pts = hist.map(h => ({
+    date: h.date,
+    v: corporal ? Math.max(...h.sets.map(s => s.r)) : Math.round(bestE1RM(h.sets)*10)/10
+  })).filter(p => p.v > 0);
+  window.__chartPts = pts;
+  window.__chartUnit = corporal ? 'reps' : 'kg';
+  const best = pts.length ? Math.max(...pts.map(p => p.v)) : 0;
+
+  const recent = [...hist].reverse().slice(0, 6).map(h => `
+    <div class="exline" style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #232833">
+      <span class="tiny">${fmtDate(h.date)}</span>
+      <span class="tiny num" style="text-align:right">${h.sets.map(s => `${fmtW(s.w)}×${s.r}${s.rir!=null?`@${s.rir}`:''}`).join(' · ')}</span>
+    </div>`).join('');
+
+  return `<div class="stack" style="padding-top:16px">
+    <button class="btn-ghost row" style="color:var(--mut);font-weight:600;width:auto"
+      onclick="go({name:'routine', id:'${view.rid}'})">‹ Volver</button>
+    <div class="row" style="gap:8px"><h2 class="grow">${esc(view.exname)}</h2>${typePill(key)}</div>
+
+    <div class="card">
+      <p class="eyebrow">Progreso</p>
+      ${ pts.length ? `
+        <div class="row" style="margin-top:8px;align-items:baseline">
+          <div class="bignum grow">${fmtW(best)} <small>${corporal ? 'reps (tu récord)' : 'kg'}</small></div>
+        </div>
+        <p class="tiny">${corporal
+          ? 'Tus mejores reps en una serie.'
+          : `Tu récord de <span class="linkish" role="button" tabindex="0" onclick="e1rmInfo()">1RM estimado ⓘ</span> — el peso máximo que podrías levantar una sola vez, calculado desde tus series.`}</p>
+        ${ pts.length >= 2 ? `
+          <div class="chartwrap"><canvas id="exchart" height="190"></canvas></div>
+          <p class="tiny" id="charttip" style="text-align:center;margin-top:6px">Toca la gráfica para ver cada sesión</p>`
+          : `<p class="tiny" style="margin-top:8px">Registra al menos 2 sesiones para ver la gráfica.</p>` }`
+        : `<p class="muted" style="margin-top:8px">Todavía no hay registros de este ejercicio. Cuando entrenes, aquí verás tu progreso.</p>` }
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:8px">¿Cómo se progresa en este ejercicio?</p>
+      <div class="stack">
+        <button class="goal-opt ${meta.type==='normal'?'on':''}" onclick="setExType('${key}','normal')">
+          <b>Normal ${meta.type==='normal'?'✓':''}</b>
+          <span>Levantas el peso tú. Progresar = subir kg. (La mayoría: press, remo, sentadilla…)</span>
+        </button>
+        <button class="goal-opt ${meta.type==='asistido'?'on':''}" onclick="setExType('${key}','asistido')">
+          <b>Asistido ${meta.type==='asistido'?'✓':''}</b>
+          <span>Una máquina o banda te AYUDA (dominadas/fondos asistidos). Los kg que anotas son la ayuda, no la carga: progresar = usar MENOS kg.</span>
+        </button>
+        <button class="goal-opt ${meta.type==='corporal'?'on':''}" onclick="setExType('${key}','corporal')">
+          <b>Peso corporal ${meta.type==='corporal'?'✓':''}</b>
+          <span>Sin peso externo (flexiones, dominadas libres). Progresar = más reps o series. Puedes dejar los kg en blanco; si usas lastre, anota esos kg.</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:10px">Ajustes finos (opcional)</p>
+      <div class="row" style="align-items:flex-end">
+        <div class="field grow"><span>Reps mín.</span>
+          <input type="number" inputmode="numeric" min="1" placeholder="${g.lo}" value="${meta.lo ?? ''}"
+            oninput="setExRange('${key}','lo',this.value)"></div>
+        <div class="field grow"><span>Reps máx.</span>
+          <input type="number" inputmode="numeric" min="2" placeholder="${g.hi}" value="${meta.hi ?? ''}"
+            oninput="setExRange('${key}','hi',this.value)"></div>
+        <div class="field grow"><span>Salto de kg</span>
+          <select onchange="setExStep('${key}',this.value)">
+            ${['auto','0.5','1','2','2.5','5'].map(v => `
+              <option value="${v}" ${String(meta.step ?? 'auto')===v?'selected':''}>${v==='auto'?'Auto':v.replace('.',',')+' kg'}</option>`).join('')}
+          </select></div>
+      </div>
+      <p class="tiny" style="margin-top:8px">
+        El rango de reps viene de tu objetivo (${g.lo}–${g.hi}); cámbialo solo para casos especiales
+        (ej. abdominales 15–25). “Salto de kg” = el aumento mínimo posible en tu gimnasio
+        (mancuernas suelen ir de 2 en 2 kg; barra, de 2,5 en 2,5).
+      </p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:8px">Notas</p>
+      <textarea placeholder="Ej. agarre ancho, asiento en 4, bajar lento…"
+        oninput="setExNotes('${key}',this.value)">${esc(meta.notes || '')}</textarea>
+      <p class="tiny" style="margin-top:6px">Las verás durante la sesión, debajo del nombre del ejercicio.</p>
+    </div>
+
+    ${ recent ? `<div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Últimas sesiones</p>${recent}
+      <p class="tiny" style="margin-top:6px">Formato: kg×reps. El “@2” es tu RIR (reps que te quedaban).</p>
+    </div>` : '' }
+  </div>`;
+}
+
+function setExType(key, t){ exMeta(key).type = t; save(); render(); }
+function setExRange(key, which, val){
+  const v = parseInt(val,10);
+  exMeta(key)[which] = isNaN(v) ? null : v;
+  save();
+}
+function setExStep(key, val){
+  exMeta(key).step = (val === 'auto') ? null : parseFloat(val);
+  save();
+}
+function setExNotes(key, val){ exMeta(key).notes = val.slice(0,300); save(); }
+
+/* ---------- SESIÓN ACTIVA ---------- */
+function viewSession(){
+  const s = db.active;
+  const blocks = s.exercises.map((ex, xi) => {
+    const meta = exMeta(ex.key);
+    const corp = meta.type === 'corporal';
+    const { lo, hi } = effRange(ex.key);
+    const firstTime = !ex.sugg;
+    let firstMsg = '';
+    if(firstTime){
+      if(corp) firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). Los kg puedes dejarlos en blanco; si usas lastre, anótalo.`;
+      else if(meta.type === 'asistido') firstMsg = `Primera vez. Anota en kg la AYUDA de la máquina/banda. Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
+      else firstMsg = `Primera vez con este ejercicio. Elige un peso con el que puedas hacer ${lo}–${hi} reps quedándote 1–3 en reserva (sin llegar al fallo). Desde la próxima, te sugiero la progresión.`;
+    }
+    return `
+    <div class="card" id="exb-${xi}">
+      <div class="row" style="gap:8px"><b style="font-size:16px" class="grow">${esc(ex.name)}</b>${typePill(ex.key)}</div>
+      ${ meta.notes ? `<div class="tiny">📝 ${esc(meta.notes)}</div>` : '' }
+      ${ ex.sugg ? `<div class="coach ${ex.sugg.type==='up'?'good':(ex.sugg.type==='deload'?'warn':'')}">
+          Hoy: ${ex.sugg.msg}<span class="why">${ex.sugg.why}</span></div>`
+        : `<div class="coach">${firstMsg}</div>` }
+      <div class="sethead"><span>#</span><span>${corp ? 'lastre' : (meta.type==='asistido' ? 'ayuda' : 'kg')}</span><span>reps</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
+      <div id="sets-${xi}">
+        ${ ex.sets.map((st, si) => setRowHTML(xi, si, st, ex.sugg, corp)).join('') }
+      </div>
+      <button class="addset" onclick="addSet(${xi})">＋ Agregar serie</button>
+    </div>`;
+  }).join('');
+
+  const rest = restSecs();
+  return `
+    <div class="sessionbar">
+      <div class="row" style="width:100%">
+        <span class="dot" aria-hidden="true"></span>
+        <div class="grow">
+          <div class="clock num" id="clock">0:00</div>
+          <div class="tiny">${esc(s.routineName)} · en curso</div>
+        </div>
+        <button class="btn btn-danger" style="width:auto;padding:10px 16px" onclick="askFinish()">Terminar</button>
+      </div>
+      ${ rest ? `<button class="restchip" id="restchip" onclick="toggleRest()">▶ Descanso (${fmtClock(rest)})</button>` : '' }
+    </div>
+    <div class="stack">${blocks}</div>`;
+}
+
+function setRowHTML(xi, si, st, sugg, corp){
+  const pw = sugg ? fmtW(sugg.w) : (corp ? '0' : 'kg');
+  const pr = sugg ? sugg.reps : 'reps';
+  const cls = sugg ? 'class="sugg"' : '';
+  return `
+  <div class="setrow" id="set-${xi}-${si}">
+    <span class="idx">${si+1}</span>
+    <input type="number" inputmode="decimal" step="any" min="0" ${cls}
+      placeholder="${pw}" value="${st.w ?? ''}"
+      aria-label="Peso serie ${si+1}"
+      oninput="setVal(${xi},${si},'w',this.value)">
+    <input type="number" inputmode="numeric" step="1" min="0" ${cls}
+      placeholder="${pr}" value="${st.r ?? ''}"
+      aria-label="Reps serie ${si+1}"
+      oninput="setVal(${xi},${si},'r',this.value)">
+    <input type="number" inputmode="numeric" step="1" min="0" max="9"
+      placeholder="1–3" value="${st.rir ?? ''}"
+      aria-label="Reps en reserva serie ${si+1}"
+      oninput="setVal(${xi},${si},'rir',this.value)">
+    <button class="iconbtn" aria-label="Quitar serie" onclick="removeSet(${xi},${si})">✕</button>
+  </div>`;
+}
+
+/* ---------- HISTORIAL ---------- */
+function viewHistory(){
+  if(!db.history.length) return `<div class="empty">
+    <div class="big">📅</div>
+    <p><b>Sin sesiones todavía.</b></p>
+    <p class="muted">Cuando termines tu primera sesión, la verás aquí.</p></div>`;
+
+  const items = [...db.history].reverse().map(h => {
+    const nSets = h.entries.reduce((a,e) => a + e.sets.length, 0);
+    const vol = h.entries.reduce((a,e) => a + e.sets.reduce((b,s) => b + s.w*s.r, 0), 0);
+    return `
+    <details class="hist">
+      <summary>
+        <div class="grow">
+          <b>${esc(h.routineName)}</b>
+          <div class="tiny">${fmtDate(h.date)}${h.duration ? ` · ${fmtDur(h.duration)}` : ''} · ${nSets} series${vol ? ` · ${fmtW(Math.round(vol))} kg movidos` : ''}</div>
+        </div>
+        <span style="color:var(--mut)">▾</span>
+      </summary>
+      <div class="body">
+        ${h.entries.map(e => `
+          <div class="exline">
+            <span>${esc(e.name)}</span>
+            <span class="sets num">${e.sets.map(s=>`${fmtW(s.w)}×${s.r}`).join(' · ')}</span>
+          </div>`).join('')}
+      </div>
+    </details>`;
+  }).join('');
+  return `<div class="stack">${items}</div>`;
+}
+
+/* ---------- AJUSTES ---------- */
+function viewSettings(){
+  const g = db.settings.goal;
+  const rest = db.settings.rest;
+  return `<div class="stack">
+    <p class="eyebrow" style="margin-top:4px">Tu objetivo</p>
+    ${Object.entries(GOALS).map(([k,v]) => `
+      <button class="goal-opt ${g===k?'on':''}" onclick="setGoal('${k}')">
+        <b>${v.label} ${g===k?'✓':''}</b><span>${v.desc}</span>
+      </button>`).join('')}
+
+    <div class="card" style="margin-top:8px">
+      <p class="eyebrow" style="margin-bottom:8px">Descanso entre series</p>
+      <select onchange="setRest(this.value)">
+        <option value="auto" ${rest==='auto'?'selected':''}>Automático según objetivo (recomendado)</option>
+        ${[60,90,120,150,180,240].map(s => `
+          <option value="${s}" ${String(rest)===String(s)?'selected':''}>${fmtClock(s)} min</option>`).join('')}
+        <option value="off" ${rest==='off'?'selected':''}>Sin timer de descanso</option>
+      </select>
+      <p class="tiny" style="margin-top:8px">
+        El timer arranca solo al anotar las reps de una serie, y te avisa con sonido y vibración.
+        Automático: Fuerza 3:00 · Hipertrofia 1:30 · Ambas 2:00 — lo que la evidencia recomienda para cada meta.
+      </p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:8px">Guía rápida (para empezar sin dudas)</p>
+      <div class="stack">
+        <button class="btn" onclick="rirInfo()">¿Qué es el RIR?</button>
+        <button class="btn" onclick="e1rmInfo()">¿Qué es el 1RM estimado?</button>
+        <button class="btn" onclick="asistInfo()">¿Qué son los ejercicios asistidos?</button>
+        <button class="btn" onclick="coachInfo()">¿Cómo me sugiere progresar el coach?</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:8px">Respaldo de tus datos</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
+        Tus datos viven solo en este navegador. Descarga un respaldo de vez en cuando
+        (o antes de cambiar de teléfono) y restáuralo donde quieras.
+      </p>
+      <div class="stack">
+        <button class="btn" onclick="exportBackup()">⬇️ Descargar respaldo (.json)</button>
+        <button class="btn" onclick="document.getElementById('backupfile').click()">⬆️ Restaurar respaldo</button>
+        <input type="file" id="backupfile" accept=".json,application/json" style="display:none"
+          onchange="importBackup(this.files[0]); this.value=''">
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:8px">Importar desde Hevy</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
+        Sube la exportación CSV de Hevy (en Hevy: Perfil → Ajustes → Export data).
+        Se agregan las sesiones a tu historial, se crean las rutinas que falten y las
+        sugerencias se recalculan con todo tu historial. Importar dos veces no duplica nada.
+      </p>
+      <button class="btn" onclick="document.getElementById('hevyfile').click()">📥 Elegir archivo CSV</button>
+      <input type="file" id="hevyfile" accept=".csv,text/csv" style="display:none"
+        onchange="importHevy(this.files[0]); this.value=''">
+    </div>
+
+    <button class="btn btn-danger" onclick="askWipe()">Borrar todos los datos</button>
+    <p class="tiny" style="text-align:center">Hierro v2 · datos guardados en este dispositivo.</p>
+  </div>`;
+}
+
+/* =====================================================================
+   ACCIONES
+   ===================================================================== */
+function promptNewRoutine(){
+  openModal(`
+    <h2>Nueva rutina</h2>
+    <p class="muted">Ponle un nombre, después le agregas los ejercicios.</p>
+    <form onsubmit="createRoutine(event)" class="stack">
+      <input type="text" id="newroutine" placeholder="Ej. Torso, Pierna, Full body" autocomplete="off">
+      <button class="btn btn-acc" type="submit">Crear rutina</button>
+      <button class="btn btn-ghost" type="button" onclick="closeModal()">Cancelar</button>
+    </form>`);
+  setTimeout(() => document.getElementById('newroutine')?.focus(), 60);
+}
+function createRoutine(ev){
+  ev.preventDefault();
+  const name = document.getElementById('newroutine').value.trim();
+  if(!name) return;
+  const r = { id:uid(), name, exercises:[] };
+  db.routines.push(r); save(); closeModal();
+  go({name:'routine', id:r.id});
+}
+function deleteRoutine(id){
+  const r = db.routines.find(x => x.id === id);
+  confirmModal(`¿Eliminar “${esc(r.name)}”?`,
+    'El historial de sesiones ya guardadas no se borra.',
+    'Eliminar rutina', () => {
+      db.routines = db.routines.filter(x => x.id !== id);
+      save(); go({name:'home'});
+    });
+}
+function addExercise(ev, rid){
+  ev.preventDefault();
+  const inp = document.getElementById('newex');
+  const name = inp.value.trim();
+  if(!name) return;
+  const r = db.routines.find(x => x.id === rid);
+  const key = exKey(name);
+  if(r.exercises.some(e => e.key === key)){
+    inp.value = ''; acHide();
+    infoModal('Ya está en la rutina', `“${esc(name)}” ya es parte de esta rutina.`);
+    return;
+  }
+  /* si ya existe en otra rutina/historial, reusar su nombre exacto para unir historiales */
+  const known = allExerciseNames().get(key);
+  r.exercises.push({ id:uid(), name: known ? known.name : name, key });
+  if(/assisted|asistid/i.test(name)) exMeta(key).type = 'asistido';
+  save(); render();
+  setTimeout(() => { const i = document.getElementById('newex'); if(i){ i.focus(); } }, 30);
+}
+
+/* ---------- autocompletado de ejercicios ---------- */
+function allExerciseNames(){
+  const seen = new Map();   /* key → { name, src } */
+  for(const r of db.routines) for(const ex of r.exercises)
+    if(!seen.has(ex.key)) seen.set(ex.key, { name: ex.name, src: r.name });
+  for(const h of db.history) for(const e of h.entries)
+    if(!seen.has(e.key)) seen.set(e.key, { name: e.name, src: 'historial' });
+  return seen;
+}
+function acNorm(s){
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+/* resalta la coincidencia sobre el nombre original (ignora acentos/mayúsculas) */
+function acHighlight(name, q){
+  const map = []; let norm = '';
+  for(let i = 0; i < name.length; i++){
+    const c = acNorm(name[i]);
+    for(const ch of c){ norm += ch; map.push(i); }
+  }
+  const idx = norm.indexOf(q);
+  if(idx < 0 || !q) return esc(name);
+  const a = map[idx], b = map[idx + q.length - 1] + 1;
+  return esc(name.slice(0,a)) + '<b>' + esc(name.slice(a,b)) + '</b>' + esc(name.slice(b));
+}
+function acUpdate(rid){
+  const inp = document.getElementById('newex');
+  const list = document.getElementById('aclist');
+  if(!inp || !list) return;
+  const q = acNorm(inp.value.trim());
+  if(!q){ list.style.display = 'none'; return; }
+  const r = db.routines.find(x => x.id === rid);
+  const inRoutine = new Set(r ? r.exercises.map(e => e.key) : []);
+  const cands = [];
+  for(const [key, info] of allExerciseNames()){
+    if(inRoutine.has(key)) continue;
+    const idx = acNorm(info.name).indexOf(q);
+    if(idx < 0) continue;
+    /* ranking: empieza igual < empieza una palabra < contiene */
+    const norm = acNorm(info.name);
+    const rank = idx === 0 ? 0 : (norm[idx-1] === ' ' || norm[idx-1] === '(' ? 1 : 2);
+    cands.push({ key, name: info.name, src: info.src, rank });
+  }
+  cands.sort((a,b) => a.rank - b.rank || a.name.localeCompare(b.name));
+  const top = cands.slice(0, 6);
+  window.__ac = top;
+  if(!top.length){ list.style.display = 'none'; return; }
+  list.innerHTML = top.map((c, i) => `
+    <button type="button" role="option" onmousedown="event.preventDefault(); acPick('${rid}',${i})">
+      <span>${acHighlight(c.name, q)}</span>
+      <span class="from">${esc(c.src)}</span>
+    </button>`).join('');
+  list.style.display = '';
+}
+function acPick(rid, i){
+  const c = (window.__ac || [])[i];
+  if(!c) return;
+  const r = db.routines.find(x => x.id === rid);
+  if(!r || r.exercises.some(e => e.key === c.key)) return;
+  r.exercises.push({ id:uid(), name: c.name, key: c.key });
+  save(); render();
+  setTimeout(() => { const inp = document.getElementById('newex'); if(inp) inp.focus(); }, 30);
+}
+function acHide(){
+  setTimeout(() => { const l = document.getElementById('aclist'); if(l) l.style.display = 'none'; }, 150);
+}
+function removeExercise(rid, exid){
+  const r = db.routines.find(x => x.id === rid);
+  r.exercises = r.exercises.filter(e => e.id !== exid);
+  save(); render();
+}
+
+function startSession(rid){
+  const r = db.routines.find(x => x.id === rid);
+  db.active = {
+    id: uid(),
+    routineId: r.id, routineName: r.name,
+    start: Date.now(),
+    exercises: r.exercises.map(ex => {
+      const sugg = computeSuggestion(ex.key);
+      const n = sugg ? sugg.sets : 1;
+      return { key:ex.key, name:ex.name, sugg,
+               sets: Array.from({length:Math.max(1,n)}, () => ({w:'', r:'', rir:''})) };
+    })
+  };
+  restUntil = null;
+  save(); go({name:'session'});
+}
+
+function setVal(xi, si, field, val){
+  const st = db.active.exercises[xi].sets[si];
+  const wasEmpty = (st[field] === '' || st[field] === undefined);
+  st[field] = val;
+  save();
+  /* al anotar las reps de una serie, arranca solo el descanso */
+  if(field === 'r' && val !== '' && wasEmpty) startRestAuto();
+}
+function addSet(xi){
+  const ex = db.active.exercises[xi];
+  ex.sets.push({w:'', r:'', rir:''});
+  save();
+  const corp = exMeta(ex.key).type === 'corporal';
+  const cont = document.getElementById('sets-'+xi);
+  cont.insertAdjacentHTML('beforeend', setRowHTML(xi, ex.sets.length-1, {w:'',r:'',rir:''}, ex.sugg, corp));
+}
+function removeSet(xi, si){
+  const ex = db.active.exercises[xi];
+  if(ex.sets.length <= 1){ ex.sets[0] = {w:'',r:'',rir:''}; }
+  else ex.sets.splice(si,1);
+  save();
+  const corp = exMeta(ex.key).type === 'corporal';
+  document.getElementById('sets-'+xi).innerHTML =
+    ex.sets.map((st,i) => setRowHTML(xi, i, st, ex.sugg, corp)).join('');
+}
+
+function collectEntries(s){
+  const entries = [];
+  for(const ex of s.exercises){
+    const corp = exMeta(ex.key).type === 'corporal';
+    const sets = ex.sets.map(st => {
+      let w = parseFloat(st.w);
+      if(isNaN(w) && corp && st.r !== '' && st.r !== undefined) w = 0;  /* corporal: kg en blanco = 0 */
+      const r = parseInt(st.r,10);
+      const out = { w, r };
+      const rir = parseInt(st.rir,10);
+      if(!isNaN(rir)) out.rir = Math.min(9, Math.max(0, rir));
+      return out;
+    }).filter(st => !isNaN(st.w) && st.w >= 0 && !isNaN(st.r) && st.r > 0);
+    if(sets.length) entries.push({ key:ex.key, name:ex.name, sets });
+  }
+  return entries;
+}
+
+function askFinish(){
+  const s = db.active;
+  const done = collectEntries(s).reduce((a,e) => a + e.sets.length, 0);
+  const dur = Math.floor((Date.now() - s.start)/1000);
+  if(!done){
+    confirmModal('No registraste ninguna serie', 'Si terminas ahora, la sesión se descarta sin guardarse.',
+      'Descartar sesión', () => { db.active = null; restUntil = null; save(); go({name:'home'}); });
+    return;
+  }
+  confirmModal('¿Terminar la sesión?',
+    `Llevas ${fmtDur(dur)} y registraste ${done} serie${done===1?'':'s'}. Se guarda en tu historial y las sugerencias se actualizan.`,
+    'Terminar y guardar', finishSession, true);
+}
+
+function finishSession(){
+  const s = db.active;
+  const entries = collectEntries(s);
+  const rec = {
+    id: s.id, routineId: s.routineId, routineName: s.routineName,
+    date: new Date().toISOString(),
+    duration: Math.floor((Date.now() - s.start)/1000),
+    entries
+  };
+  db.history.push(rec);
+  db.active = null;
+  restUntil = null;
+  save();
+  for(const e of entries) updateProgress(e.key, e.sets, rec.date);
+  closeModal();
+  openModal(`
+    <h2>Sesión guardada 💪</h2>
+    <p class="muted">${fmtDur(rec.duration)} · ${entries.reduce((a,e)=>a+e.sets.length,0)} series.
+      La próxima vez verás las sugerencias actualizadas en cada ejercicio.</p>
+    <button class="btn btn-acc" onclick="closeModal(); go({name:'history'})">Ver historial</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'home'})">Volver al inicio</button>`);
+}
+
+function setGoal(k){ db.settings.goal = k; save(); render(); }
+function setRest(v){ db.settings.rest = v; save(); }
+function askWipe(){
+  confirmModal('¿Borrar todos los datos?', 'Se eliminan rutinas, historial y ajustes de este dispositivo. No se puede deshacer. Tip: descarga antes un respaldo.',
+    'Borrar todo', () => {
+      localStorage.removeItem(LS_KEY);
+      db = load(); go({name:'home'});
+    });
+}
+
+/* =====================================================================
+   TIMER DE DESCANSO
+   ===================================================================== */
+function restSecs(){
+  const r = db.settings.rest;
+  if(r === 'off') return null;
+  if(r && r !== 'auto'){ const n = parseInt(r,10); if(!isNaN(n) && n > 0) return n; }
+  return GOALS[db.settings.goal || 'ambas'].rest;
+}
+function startRestAuto(){
+  const s = restSecs(); if(!s) return;
+  restUntil = Date.now() + s*1000;
+  tickRest();
+}
+function toggleRest(){
+  if(restUntil) restUntil = null;
+  else startRestAuto();
+  tickRest();
+}
+function beep(){
+  try{
+    if(navigator.vibrate) navigator.vibrate([200,120,200]);
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = audioCtx.currentTime;
+    for(const [f, t] of [[880, 0], [1175, 0.22]]){
+      const o = audioCtx.createOscillator(), gn = audioCtx.createGain();
+      o.connect(gn); gn.connect(audioCtx.destination);
+      o.frequency.value = f;
+      gn.gain.setValueAtTime(0.18, t0 + t);
+      gn.gain.exponentialRampToValueAtTime(0.001, t0 + t + 0.25);
+      o.start(t0 + t); o.stop(t0 + t + 0.3);
+    }
+  }catch(e){}
+}
+function tickRest(){
+  const el = document.getElementById('restchip');
+  if(!el) return;
+  const total = restSecs();
+  if(restUntil === null){
+    if(el.className !== 'restchip'){ el.className = 'restchip'; el.textContent = `▶ Descanso (${fmtClock(total || 0)})`; }
+    return;
+  }
+  const rem = Math.ceil((restUntil - Date.now())/1000);
+  if(rem <= 0){
+    restUntil = null;
+    beep();
+    el.className = 'restchip done';
+    el.textContent = '✓ Descanso listo — ¡a la siguiente serie!';
+    setTimeout(() => { if(restUntil === null) tickRest(); }, 4000);
+    /* forzar refresco del texto al estado normal después del aviso */
+    setTimeout(() => { const e2 = document.getElementById('restchip'); if(e2 && restUntil === null){ e2.className='restchip'; e2.textContent = `▶ Descanso (${fmtClock(restSecs() || 0)})`; } }, 4200);
+    return;
+  }
+  el.className = 'restchip on';
+  el.textContent = `⏸ Descanso: ${fmtClock(rem)}`;
+}
+
+/* =====================================================================
+   GRÁFICA DE PROGRESO (canvas, una serie: 1RM estimado o reps)
+   ===================================================================== */
+function drawChart(){
+  const cv = document.getElementById('exchart');
+  if(!cv) return;
+  const pts = window.__chartPts || [];
+  if(pts.length < 2) return;
+  const W = cv.parentElement.clientWidth, H = 190;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W*dpr; cv.height = H*dpr;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const padL = 38, padR = 14, padT = 16, padB = 22;
+  const dmin = Math.min(...pts.map(p=>p.v)), dmax = Math.max(...pts.map(p=>p.v));
+  let lo = dmin, hi = dmax;
+  if(lo === hi){ lo -= 1; hi += 1; }
+  const span = hi - lo; lo -= span*0.12; hi += span*0.12;
+  const X = i => padL + (W-padL-padR) * (pts.length === 1 ? 0.5 : i/(pts.length-1));
+  const Y = v => padT + (H-padT-padB) * (1 - (v-lo)/(hi-lo));
+
+  /* rejilla recesiva: 3 líneas con valor */
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.lineWidth = 1;
+  for(const v of [dmin, (dmin+dmax)/2, dmax]){
+    const y = Y(v);
+    ctx.strokeStyle = '#262b34';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
+    ctx.fillStyle = '#8e94a0'; ctx.textAlign = 'left';
+    ctx.fillText(fmtW(Math.round(v*10)/10), 2, y+3.5);
+  }
+  /* línea de la serie */
+  ctx.strokeStyle = '#f5c242'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  pts.forEach((p,i) => i ? ctx.lineTo(X(i), Y(p.v)) : ctx.moveTo(X(0), Y(p.v)));
+  ctx.stroke();
+  /* puntos: discretos, último enfatizado con anillo de superficie */
+  pts.forEach((p,i) => {
+    const last = i === pts.length-1;
+    ctx.beginPath();
+    ctx.arc(X(i), Y(p.v), last ? 4.5 : 2.5, 0, 7);
+    ctx.fillStyle = '#f5c242'; ctx.fill();
+    if(last){ ctx.strokeStyle = '#181b21'; ctx.lineWidth = 2; ctx.stroke(); }
+  });
+  /* etiqueta directa solo en el último punto */
+  const lastP = pts[pts.length-1];
+  ctx.fillStyle = '#eae6dc'; ctx.font = '700 12px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(fmtW(lastP.v), Math.min(X(pts.length-1)+4, W-padR), Math.max(12, Y(lastP.v)-9));
+  /* fechas primera y última */
+  ctx.fillStyle = '#8e94a0'; ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'left';  ctx.fillText(fmtDateShort(pts[0].date), padL, H-6);
+  ctx.textAlign = 'right'; ctx.fillText(fmtDateShort(lastP.date), W-padR, H-6);
+
+  /* interacción: tocar/mover muestra el detalle de la sesión más cercana */
+  const pick = ev => {
+    const rect = cv.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    let i = Math.round((x - padL) / ((W-padL-padR) / (pts.length-1)));
+    i = Math.max(0, Math.min(pts.length-1, i));
+    const tip = document.getElementById('charttip');
+    if(tip) tip.innerHTML = `<b style="color:var(--ink)">${fmtDate(pts[i].date)}</b> · ${fmtW(pts[i].v)} ${window.__chartUnit}`;
+  };
+  cv.onpointerdown = pick;
+  cv.onpointermove = ev => { if(ev.buttons || ev.pointerType === 'mouse') pick(ev); };
+}
+
+/* =====================================================================
+   RESPALDO (exportar / restaurar)
+   ===================================================================== */
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(db)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hierro-respaldo-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+function importBackup(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => infoModal('No se pudo leer el archivo', 'Vuelve a intentarlo.');
+  reader.onload = () => {
+    try{
+      const d = JSON.parse(String(reader.result));
+      if(!d || !Array.isArray(d.routines) || !Array.isArray(d.history)) throw new Error('estructura');
+      window.__backup = d;
+      confirmModal('¿Restaurar este respaldo?',
+        `Contiene ${d.routines.length} rutina${d.routines.length===1?'':'s'} y ${d.history.length} sesiones. REEMPLAZA todo lo que hay ahora en este dispositivo.`,
+        'Restaurar', applyBackup, true);
+    }catch(e){
+      infoModal('Archivo no válido', 'No parece un respaldo de Hierro (el .json que se descarga desde Ajustes → Respaldo).');
+    }
+  };
+  reader.readAsText(file);
+}
+function applyBackup(){
+  db = normalize(window.__backup);
+  window.__backup = null;
+  save(); closeModal(); go({name:'home'});
+}
+
+/* =====================================================================
+   IMPORTACIÓN DESDE HEVY (CSV)
+   ===================================================================== */
+function parseCSV(text){
+  const rows = []; let row = [], cur = '', q = false;
+  for(let i = 0; i < text.length; i++){
+    const c = text[i];
+    if(q){
+      if(c === '"'){ if(text[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+      else cur += c;
+    }
+    else if(c === '"') q = true;
+    else if(c === ',') { row.push(cur); cur = ''; }
+    else if(c === '\n' || c === '\r'){
+      if(c === '\r' && text[i+1] === '\n') i++;
+      row.push(cur); cur = '';
+      if(row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    }
+    else cur += c;
+  }
+  if(cur !== '' || row.length){ row.push(cur); if(row.length > 1 || row[0] !== '') rows.push(row); }
+  return rows;
+}
+
+const HEVY_MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function parseHevyDate(s){
+  const m = /(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*([ap]m)?/i.exec(s || '');
+  if(!m) return null;
+  const mo = HEVY_MONTHS[m[2].toLowerCase()];
+  if(mo === undefined) return null;
+  let h = parseInt(m[4],10);
+  const ap = (m[6]||'').toLowerCase();
+  if(ap === 'pm' && h < 12) h += 12;
+  if(ap === 'am' && h === 12) h = 0;
+  return new Date(parseInt(m[3],10), mo, parseInt(m[1],10), h, parseInt(m[5],10));
+}
+
+function importHevy(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => infoModal('No se pudo leer el archivo', 'Vuelve a intentarlo o revisa que sea el CSV exportado por Hevy.');
+  reader.onload = () => {
+    try{
+      const rows = parseCSV(String(reader.result));
+      const head = (rows.shift() || []).map(h => h.trim().toLowerCase());
+      const col = n => head.indexOf(n);
+      const iT = col('title'), iS = col('start_time'), iE = col('end_time'),
+            iX = col('exercise_title'), iTy = col('set_type'),
+            iW = col('weight_kg'), iR = col('reps'), iRPE = col('rpe');
+      if(iT < 0 || iS < 0 || iX < 0 || iR < 0){
+        infoModal('Formato no reconocido', 'El archivo no parece una exportación de Hevy: faltan las columnas title, start_time, exercise_title o reps.');
+        return;
+      }
+      const sessions = new Map();
+      let skippedWarmup = 0;
+      for(const r of rows){
+        const start = parseHevyDate(r[iS]);
+        if(!start || !r[iX]) continue;
+        if(iTy >= 0 && (r[iTy]||'').toLowerCase() === 'warmup'){ skippedWarmup++; continue; }
+        const reps = parseInt(r[iR],10);
+        if(isNaN(reps) || reps <= 0) continue;              /* cardio / series sin reps */
+        let w = parseFloat(r[iW]);
+        if(isNaN(w) || w < 0) w = 0;                        /* peso corporal → 0 kg */
+        const skey = (r[iT]||'Hevy') + '|' + r[iS];
+        if(!sessions.has(skey)){
+          const end = iE >= 0 ? parseHevyDate(r[iE]) : null;
+          sessions.set(skey, {
+            hevyKey: skey, title: r[iT] || 'Hevy',
+            date: start.toISOString(),
+            duration: (end && end > start) ? Math.floor((end - start)/1000) : 0,
+            ex: new Map()
+          });
+        }
+        const s = sessions.get(skey);
+        if(!s.ex.has(r[iX])) s.ex.set(r[iX], []);
+        const set = { w, r: reps };
+        if(iRPE >= 0){
+          const rpe = parseFloat(r[iRPE]);
+          if(!isNaN(rpe) && rpe > 0) set.rir = Math.max(0, Math.min(5, Math.round(10 - rpe)));
+        }
+        s.ex.get(r[iX]).push(set);
+      }
+      const existing = new Set(db.history.map(h => h.hevyKey).filter(Boolean));
+      const news = [...sessions.values()].filter(s => s.ex.size && !existing.has(s.hevyKey));
+      if(!news.length){
+        infoModal('Nada nuevo para importar', sessions.size
+          ? 'Todas las sesiones del archivo ya están en tu historial.'
+          : 'No se encontraron sesiones con series de peso y reps en el archivo.');
+        return;
+      }
+      window.__hevyImport = news;
+      const titles = [...new Set(news.map(s => s.title))];
+      const nSets = news.reduce((a,s) => a + [...s.ex.values()].reduce((b,x) => b + x.length, 0), 0);
+      openModal(`
+        <h2>Importar de Hevy</h2>
+        <p class="muted">Se encontraron <b style="color:var(--ink)">${news.length} sesiones</b> nuevas
+          (${nSets} series) de: ${titles.map(esc).join(', ')}.
+          ${skippedWarmup ? `Se omiten ${skippedWarmup} series de calentamiento.` : ''}
+          Las rutinas que no existan se crean con los ejercicios de la sesión más reciente.</p>
+        <button class="btn btn-acc" onclick="applyHevyImport()">Importar todo</button>
+        <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+    }catch(err){
+      infoModal('No se pudo importar', 'El archivo no se pudo procesar: ' + esc(err.message));
+    }
+  };
+  reader.readAsText(file);
+}
+
+function applyHevyImport(){
+  const news = window.__hevyImport || [];
+  if(!news.length){ closeModal(); return; }
+  for(const s of news){
+    db.history.push({
+      id: uid(), hevyKey: s.hevyKey, routineId: null,
+      routineName: s.title, date: s.date, duration: s.duration,
+      entries: [...s.ex.entries()].map(([name, sets]) => ({ key: exKey(name), name, sets }))
+    });
+  }
+  db.history.sort((a,b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+
+  /* detectar tipo automáticamente: "(Assisted)" → asistido; todo a 0 kg → corporal */
+  const traits = new Map();
+  for(const s of news) for(const [nm, sets] of s.ex){
+    const k = exKey(nm);
+    const t = traits.get(k) || { zero:true, assisted:/assisted/i.test(nm) };
+    if(sets.some(x => x.w > 0)) t.zero = false;
+    traits.set(k, t);
+  }
+  for(const [k, t] of traits){
+    const m = exMeta(k);
+    if(m.type === 'normal'){
+      if(t.assisted) m.type = 'asistido';
+      else if(t.zero) m.type = 'corporal';
+    }
+  }
+
+  /* crear rutinas que falten, con los ejercicios de la sesión más reciente de cada título */
+  const byTitle = new Map();
+  for(const s of news){
+    const c = byTitle.get(s.title);
+    if(!c || s.date > c.date) byTitle.set(s.title, s);
+  }
+  let newRoutines = 0;
+  for(const [title, s] of byTitle){
+    if(db.routines.some(r => r.name.trim().toLowerCase() === title.trim().toLowerCase())) continue;
+    db.routines.push({ id: uid(), name: title,
+      exercises: [...s.ex.keys()].map(n => ({ id: uid(), name: n, key: exKey(n) })) });
+    newRoutines++;
+  }
+
+  /* reconstruir el estado adaptativo reproduciendo todo el historial en orden */
+  db.progress = {};
+  for(const h of db.history)
+    for(const e of h.entries) updateProgress(e.key, e.sets, h.date);
+
+  window.__hevyImport = null;
+  save(); closeModal();
+  openModal(`
+    <h2>Importación lista 💪</h2>
+    <p class="muted">${news.length} sesiones agregadas al historial${newRoutines ? ` y ${newRoutines} rutina${newRoutines===1?'':'s'} creada${newRoutines===1?'':'s'}` : ''}.
+      Los ejercicios asistidos y de peso corporal se detectaron solos, y las sugerencias del coach ya usan todo tu historial.</p>
+    <button class="btn btn-acc" onclick="closeModal(); go({name:'home'})">Ver rutinas</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'history'})">Ver historial</button>`);
+}
+
+/* =====================================================================
+   MODALES + GUÍA PARA PRINCIPIANTES
+   ===================================================================== */
+function openModal(html){
+  document.getElementById('modalhost').innerHTML =
+    `<div class="overlay" onclick="if(event.target===this)closeModal()">
+       <div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
+}
+function closeModal(){ document.getElementById('modalhost').innerHTML = ''; }
+function confirmModal(title, body, actionLabel, fn, accent){
+  window.__confirmFn = () => { closeModal(); fn(); };
+  openModal(`
+    <h2>${title}</h2>
+    <p class="muted">${body}</p>
+    <button class="btn ${accent?'btn-acc':'btn-danger'}" onclick="window.__confirmFn()">${actionLabel}</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+}
+function infoModal(title, body){
+  openModal(`
+    <h2>${title}</h2>
+    <p class="muted" style="line-height:1.65">${body}</p>
+    <button class="btn" onclick="closeModal()">Entendido</button>`);
+}
+
+function rirInfo(){
+  infoModal('¿Qué es el RIR?', `
+    <b style="color:var(--ink)">RIR = “reps en reserva”</b>: cuántas repeticiones MÁS podrías haber hecho
+    al terminar la serie.<br><br>
+    · Hiciste 10 reps pero podías hacer 12 → RIR 2.<br>
+    · No podías hacer ni una más → RIR 0 (llegaste al fallo).<br><br>
+    <b style="color:var(--ink)">¿Para qué sirve?</b> La ciencia dice que lo ideal es entrenar dejando
+    1–3 reps en reserva: suficiente esfuerzo para crecer, sin el desgaste de ir al fallo siempre.<br><br>
+    <b style="color:var(--ink)">Es opcional</b>, pero si lo anotas el coach afina mejor: si pones RIR 4+
+    (te sobraban muchas reps), te sugerirá subir el peso antes; si pones RIR 0 seguido, sabrá que ese peso
+    te queda pesado.`);
+}
+function e1rmInfo(){
+  infoModal('¿Qué es el 1RM estimado?', `
+    Tu <b style="color:var(--ink)">1RM</b> (repetición máxima) es el peso más pesado que podrías levantar
+    UNA sola vez. No hace falta probarlo de verdad (¡ni es recomendable!): se puede
+    <b style="color:var(--ink)">estimar</b> desde cualquier serie con una fórmula
+    (Epley: peso × (1 + reps/30)).<br><br>
+    Por ejemplo: 60 kg × 10 reps ≈ 80 kg de 1RM estimado.<br><br>
+    <b style="color:var(--ink)">¿Para qué sirve?</b> Es la mejor forma de ver tu progreso real:
+    aunque una semana hagas 8 reps y otra 11, o cambies de rango, el 1RM estimado
+    los vuelve comparables. La gráfica de cada ejercicio muestra cómo evoluciona.`);
+}
+function asistInfo(){
+  infoModal('¿Qué son los ejercicios asistidos?', `
+    Son ejercicios donde una máquina o banda elástica <b style="color:var(--ink)">te ayuda</b> a completar
+    el movimiento, típicamente dominadas y fondos asistidos.<br><br>
+    <b style="color:var(--ink)">Clave:</b> los kg que marcas en la máquina son la AYUDA que recibes,
+    no el peso que levantas. Por eso aquí el progreso funciona al revés:<br><br>
+    · Menos kg de ayuda = más difícil = <b style="color:var(--ink)">progreso</b> ✓<br>
+    · Más kg de ayuda = más fácil.<br><br>
+    Si marcas un ejercicio como “Asistido” (tocándolo en su rutina), el coach lo entiende y te sugiere
+    ir bajando la ayuda hasta que puedas hacerlo libre. Los importados de Hevy con “(Assisted)” se
+    detectan solos.`);
+}
+function coachInfo(){
+  infoModal('¿Cómo me sugiere progresar el coach?', `
+    Usa <b style="color:var(--ink)">doble progresión</b>, el método con más respaldo científico:<br><br>
+    1. Cada ejercicio tiene un rango de reps según tu objetivo (ej. 8–12).<br>
+    2. Con el mismo peso, intenta sumar reps sesión a sesión.<br>
+    3. Cuando llegas al tope del rango en TODAS las series → sube el peso (~2,5 %) y vuelve a empezar
+    desde el piso del rango.<br><br>
+    Además se adapta a ti, por ejercicio: si fallas tras subir, los saltos se hacen más pequeños;
+    si no sostienes el rango 2 veces seguidas, te propone bajar ~5 % y reconstruir; si te estancas
+    varias sesiones, te suma una serie (más volumen = más progreso). En peso corporal progresas por
+    reps y en asistidos bajando la ayuda.<br><br>
+    Regla de oro: termina tus series dejando 1–3 reps en reserva (RIR 1–3) — esfuerzo alto sin
+    ir al fallo cada vez.`);
+}
+
+/* ---------- post-render ---------- */
+function afterRender(){
+  if(view.name === 'session' && db.active){
+    const tick = () => {
+      const el = document.getElementById('clock');
+      if(!el || !db.active) return;
+      el.textContent = fmtClock(Math.floor((Date.now() - db.active.start)/1000));
+      tickRest();
+    };
+    tick();
+    timerInt = setInterval(tick, 1000);
+  }
+  if(view.name === 'exercise') drawChart();
+}
+
+/* migración: detectar asistidos/corporales en historial ya importado */
+function migrateTypes(){
+  const traits = new Map();
+  for(const h of db.history) for(const e of h.entries){
+    if(db.exmeta[e.key]) continue;   /* ya configurado por el usuario */
+    const t = traits.get(e.key) || { zero:true, assisted:/assisted|asistid/i.test(e.name) };
+    if(e.sets.some(x => x.w > 0)) t.zero = false;
+    traits.set(e.key, t);
+  }
+  let changed = false;
+  for(const [k, t] of traits){
+    if(t.assisted){ exMeta(k).type = 'asistido'; changed = true; }
+    else if(t.zero){ exMeta(k).type = 'corporal'; changed = true; }
+  }
+  if(changed) save();
+}
+
+/* ---------- arranque ---------- */
+(function init(){
+  /* PWA: registrar el service worker para funcionar sin conexión */
+  if('serviceWorker' in navigator && location.protocol === 'https:'){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+  migrateTypes();
+  render();
+  if(!db.settings.goal){
+    openModal(`
+      <h2>¿Cuál es tu objetivo?</h2>
+      <p class="muted">Define el rango de reps y cómo el coach te sugiere progresar. Lo puedes cambiar en Ajustes.</p>
+      <div class="stack">
+        ${Object.entries(GOALS).map(([k,v]) => `
+          <button class="goal-opt" onclick="setGoal('${k}'); closeModal()">
+            <b>${v.label}</b><span>${v.desc}</span>
+          </button>`).join('')}
+      </div>`);
+  }
+  if(db.active) go({name:'session'});
+})();
+</script>
+</body>
+</html>
