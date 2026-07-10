@@ -1805,21 +1805,31 @@ function importHevy(file){
         }
         s.ex.get(r[iX]).push(set);
       }
-      const existing = new Set(db.history.map(h => h.hevyKey).filter(Boolean));
-      const news = [...sessions.values()].filter(s => s.ex.size && !existing.has(s.hevyKey));
-      if(!news.length){
+      const existingMap = new Map(db.history.filter(h => h.hevyKey).map(h => [h.hevyKey, h]));
+      const news = [], repairs = [];
+      for(const s of sessions.values()){
+        if(!s.ex.size) continue;
+        const old = existingMap.get(s.hevyKey);
+        if(!old){ news.push(s); continue; }
+        /* auto-reparación: la sesión existe pero se importó sin pesos (bug previo con
+           CSV en libras) y el archivo sí trae pesos → se actualiza en vez de saltarse */
+        const oldAllZero = old.entries.every(e => e.sets.every(st => !st.w));
+        const incomingHasW = [...s.ex.values()].some(sets => sets.some(st => st.w > 0));
+        if(oldAllZero && incomingHasW) repairs.push(s);
+      }
+      if(!news.length && !repairs.length){
         infoModal('Nada nuevo para importar', sessions.size
-          ? 'Todas las sesiones del archivo ya están en tu historial.'
+          ? 'Todas las sesiones del archivo ya están en tu historial, con sus pesos correctos.'
           : 'No se encontraron sesiones con series de peso y reps en el archivo.');
         return;
       }
-      window.__hevyImport = news;
-      const titles = [...new Set(news.map(s => s.title))];
+      window.__hevyImport = { news, repairs };
+      const titles = [...new Set(news.concat(repairs).map(s => s.title))];
       const nSets = news.reduce((a,s) => a + [...s.ex.values()].reduce((b,x) => b + x.length, 0), 0);
       openModal(`
         <h2>Importar de Hevy</h2>
-        <p class="muted">Se encontraron <b style="color:var(--ink)">${news.length} sesiones</b> nuevas
-          (${nSets} series) de: ${titles.map(esc).join(', ')}.
+        <p class="muted">${news.length ? `Se encontraron <b style="color:var(--ink)">${news.length} sesiones</b> nuevas (${nSets} series) de: ${titles.map(esc).join(', ')}.` : ''}
+          ${repairs.length ? `<b style="color:var(--acc)">${repairs.length} sesiones que se habían importado sin pesos se repararán</b> con los pesos correctos del archivo.` : ''}
           Pesos del archivo detectados en <b style="color:var(--ink)">${wUnit === 'lb' ? 'libras' : 'kilos'}</b>${wUnit === 'lb' ? ' — se convierten automáticamente (internamente todo vive en kg)' : ''}.
           ${skippedWarmup ? `Se omiten ${skippedWarmup} series de calentamiento.` : ''}
           Las rutinas que no existan se crean con los ejercicios de la sesión más reciente.</p>
@@ -1833,14 +1843,28 @@ function importHevy(file){
 }
 
 function applyHevyImport(){
-  const news = window.__hevyImport || [];
-  if(!news.length){ closeModal(); return; }
+  const { news = [], repairs = [] } = window.__hevyImport || {};
+  if(!news.length && !repairs.length){ closeModal(); return; }
   for(const s of news){
     db.history.push({
       id: uid(), hevyKey: s.hevyKey, routineId: null,
       routineName: s.title, date: s.date, duration: s.duration,
       entries: [...s.ex.entries()].map(([name, sets]) => ({ key: exKey(name), name, sets }))
     });
+  }
+  /* reparar sesiones importadas sin pesos por el bug de weight_lbs */
+  for(const s of repairs){
+    const old = db.history.find(h => h.hevyKey === s.hevyKey);
+    if(!old) continue;
+    old.entries = [...s.ex.entries()].map(([name, sets]) => ({ key: exKey(name), name, sets }));
+    if(!old.duration && s.duration) old.duration = s.duration;
+    /* deshacer el "peso corporal" mal asignado cuando ahora sí hay pesos */
+    for(const [nm, sets] of s.ex){
+      const m = exMeta(exKey(nm));
+      if(m.type === 'corporal' && sets.some(x => x.w > 0)){
+        m.type = /assisted/i.test(nm) ? 'asistido' : 'normal';
+      }
+    }
   }
   db.history.sort((a,b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
 
@@ -1886,7 +1910,8 @@ function applyHevyImport(){
   save(); closeModal();
   openModal(`
     <h2>Importación lista 💪</h2>
-    <p class="muted">${news.length} sesiones agregadas al historial${newRoutines ? ` y ${newRoutines} rutina${newRoutines===1?'':'s'} creada${newRoutines===1?'':'s'}` : ''}.
+    <p class="muted">${news.length ? `${news.length} sesiones agregadas al historial` : ''}${news.length && newRoutines ? ` y ${newRoutines} rutina${newRoutines===1?'':'s'} creada${newRoutines===1?'':'s'}` : ''}${news.length && repairs.length ? '. ' : ''}
+      ${repairs.length ? `${repairs.length} sesiones reparadas con sus pesos correctos.` : ''}
       Los ejercicios asistidos y de peso corporal se detectaron solos, y las sugerencias del coach ya usan todo tu historial.</p>
     <button class="btn btn-acc" onclick="closeModal(); go({name:'home'})">Ver rutinas</button>
     <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'history'})">Ver historial</button>`);
