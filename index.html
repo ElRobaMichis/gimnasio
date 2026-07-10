@@ -453,6 +453,34 @@ function computeSuggestion(key){
   const nSets = sets.length;
   const rir = avgRIR(atW);
   const step = effStep(key, w);
+
+  /* vuelta tras una pausa: la fuerza cae tras ~2 semanas sin un ejercicio → descontar */
+  const gapDays = Math.floor((Date.now() - new Date(last.session.date).getTime()) / 864e5);
+  if(gapDays >= 14){
+    const factor = gapDays < 28 ? 0.925 : (gapDays < 60 ? 0.85 : 0.8);
+    const weeks = Math.round(gapDays / 7);
+    let back;
+    if(meta.type === 'asistido' && w > 0){
+      const nw = roundToStep(w * (2 - factor), step);
+      back = { w:nw, reps:lo, type:'back',
+        msg:`Vuelta tras ~${weeks} semanas: <b>${fmtW(nw)} ${uLabel()} de ayuda × ${lo}</b>`,
+        why:`Llevas ${gapDays} días sin este ejercicio. Retoma con algo más de asistencia; en 1–2 sesiones vuelves a tu marca.` };
+    } else if(meta.type === 'corporal' || w === 0){
+      const target = Math.max(lo, Math.round(maxR * factor));
+      back = { w, reps:target, type:'back',
+        msg:`Vuelta tras ~${weeks} semanas: apunta a <b>${target} reps</b>`,
+        why:`Llevas ${gapDays} días sin este ejercicio. Retoma sin exigirte el récord; en 1–2 sesiones recuperas el nivel.` };
+    } else {
+      let nw = roundToStep(w * factor, step);
+      if(nw <= 0) nw = w;
+      back = { w:nw, reps:lo, type:'back',
+        msg:`Vuelta tras ~${weeks} semanas: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b> (~${Math.round((1-factor)*100)} % menos)`,
+        why:`Llevas ${gapDays} días sin hacer este ejercicio y la fuerza cae un poco con la pausa. Arranca más liviano — en 1–2 sesiones estás de vuelta en ${fmtW(w)} ${uLabel()}. Esto evita lesiones y agujetas brutales.` };
+    }
+    back.sets = Math.max(1, nSets - (gapDays >= 28 ? 1 : 0));
+    return back;
+  }
+
   let sugg;
 
   if(meta.type === 'asistido' && w > 0){
@@ -541,6 +569,9 @@ function computeSuggestion(key){
     sugg.msg += ` · y suma una serie extra (${nSets + 1} en total)`;
     sugg.why = `Varias sesiones sin avanzar: más volumen semanal también genera progreso (con retornos decrecientes). ` + sugg.why;
   }
+  if(p.stall >= 6 && sugg.type !== 'up'){
+    sugg.why = `🔁 Lleva ${p.stall} sesiones estancado: considera rotarlo por una variante del mismo músculo durante 4–6 semanas — un estímulo nuevo suele reactivar el progreso. ` + sugg.why;
+  }
   return sugg;
 }
 
@@ -628,6 +659,41 @@ function renderTabs(){
     </div>`;
 }
 
+/* ---------- fatiga sistémica: si retrocede casi todo a la vez, falta descanso ---------- */
+function systemicFatigue(){
+  const cut = new Date(Date.now() - 10*864e5).toISOString();
+  if(db.settings.fatigueDismissed && db.settings.fatigueDismissed > cut) return null;
+  const perKey = new Map();
+  for(const h of db.history) for(const e of h.entries){
+    if(!e.sets.length) continue;
+    if(!perKey.has(e.key)) perKey.set(e.key, []);
+    perKey.get(e.key).push({ date:h.date, sets:e.sets });
+  }
+  let evaluated = 0, regressed = 0;
+  for(const [key, arr] of perKey){
+    arr.sort((a,b) => a.date < b.date ? -1 : 1);
+    const lastE = arr[arr.length-1], prev = arr[arr.length-2];
+    if(!prev || lastE.date < cut) continue;                        /* no entrenado en la ventana */
+    if(new Date(lastE.date) - new Date(prev.date) > 45*864e5) continue;  /* comparación sin sentido */
+    const corporal = exMeta(key).type === 'corporal';
+    const mNow = corporal ? Math.max(...lastE.sets.map(s=>s.r)) : bestE1RM(lastE.sets);
+    const mPrev = corporal ? Math.max(...prev.sets.map(s=>s.r)) : bestE1RM(prev.sets);
+    if(mPrev <= 0) continue;
+    evaluated++;
+    if(mNow < mPrev * 0.98) regressed++;
+  }
+  return (evaluated >= 4 && regressed / evaluated >= 0.5) ? { regressed, evaluated } : null;
+}
+function dismissFatigue(){
+  db.settings.fatigueDismissed = new Date().toISOString();
+  save(); render();
+}
+function daysSinceBackup(){
+  return db.settings.lastBackup
+    ? Math.floor((Date.now() - new Date(db.settings.lastBackup).getTime()) / 864e5)
+    : null;
+}
+
 /* ---------- HOME ---------- */
 function viewHome(){
   let cards = db.routines.map(r => {
@@ -658,8 +724,32 @@ function viewHome(){
       ⏱️ Continuar sesión en curso — ${esc(db.active.routineName)}
     </button>` : '';
 
+  const fat = systemicFatigue();
+  const fatBanner = fat ? `
+    <div class="coach warn" style="margin-top:0">
+      🪫 Señal de fatiga acumulada: retrocediste en <b>${fat.regressed} de ${fat.evaluated}</b> ejercicios recientes.
+      <span class="why">Cuando cae casi todo a la vez, el problema no es un ejercicio: es falta de recuperación.
+      Lo que mejor funciona: una semana de descarga (mismos ejercicios, la mitad de las series y ~10 % menos peso)
+      o 2–3 días extra de descanso y sueño. Después se progresa mejor que forzando.</span>
+      <button class="btn btn-ghost" style="margin-top:8px;padding:7px;font-size:13px" onclick="dismissFatigue()">Entendido — ocultar 10 días</button>
+    </div>` : '';
+
+  const dsb = daysSinceBackup();
+  const backupBanner = (db.history.length >= 5 && (dsb === null || dsb >= 30)) ? `
+    <div class="card" style="border-color:#4a4630">
+      <div class="row">
+        <div class="grow">
+          <b style="font-size:14.5px">💾 ${dsb === null ? 'Aún no tienes respaldo de tus datos' : `Hace ${dsb} días del último respaldo`}</b>
+          <div class="tiny">Tus datos viven solo en este dispositivo. Un respaldo (.json) te protege.</div>
+        </div>
+        <button class="btn" style="width:auto;flex:none;padding:9px 12px;font-size:13px" onclick="exportBackup()">Descargar</button>
+      </div>
+    </div>` : '';
+
   return `<div class="stack">
     ${resume}
+    ${fatBanner}
+    ${backupBanner}
     ${cards}
     <button class="btn" onclick="promptNewRoutine()">＋ Nueva rutina</button>
   </div>`;
@@ -714,7 +804,7 @@ function viewRoutine(){
         <button class="iconbtn" aria-label="Eliminar ejercicio"
           onclick="event.stopPropagation(); removeExercise('${r.id}','${ex.id}')">✕</button>
       </div>
-      ${ sugg ? `<div class="coach ${sugg.type==='up'?'good':(sugg.type==='deload'?'warn':'')}">
+      ${ sugg ? `<div class="coach ${sugg.type==='up'?'good':((sugg.type==='deload'||sugg.type==='back')?'warn':'')}">
           ${sugg.msg}<span class="why">${sugg.why}</span></div>` : '' }
     </div>`;
   }).join('');
@@ -764,6 +854,7 @@ function exerciseHistory(key){
 function viewExercise(){
   const key = view.key, meta = exMeta(key);
   const g = goalRange();
+  const p = prog(key);
   const hist = exerciseHistory(key);
   const corporal = meta.type === 'corporal';
   const pts = hist.map(h => ({
@@ -800,6 +891,21 @@ function viewExercise(){
           : `<p class="tiny" style="margin-top:8px">Registra al menos 2 sesiones para ver la gráfica.</p>` }`
         : `<p class="muted" style="margin-top:8px">Todavía no hay registros de este ejercicio. Cuando entrenes, aquí verás tu progreso.</p>` }
     </div>
+
+    ${ (p.stall >= 6 && meta.muscle && meta.muscle !== 'none') ? (() => {
+        const vars = [...allExerciseNames()]
+          .filter(([k, info]) => k !== key && exMeta(k).muscle === meta.muscle)
+          .slice(0, 3).map(([k, info]) => esc(info.name));
+        return `<div class="card">
+          <p class="eyebrow" style="margin-bottom:6px">🔁 Rotación sugerida</p>
+          <p class="muted" style="font-size:13.5px;line-height:1.6">
+            Este ejercicio lleva <b style="color:var(--ink)">${p.stall} sesiones sin avanzar</b> a pesar del volumen extra.
+            Cambiarlo por una variante del mismo músculo durante 4–6 semanas suele reactivar el progreso
+            (estímulo nuevo, mismas ganancias). Después puedes volver.
+            ${vars.length ? `Variantes que ya conoces: <b style="color:var(--ink)">${vars.join(', ')}</b>.` : ''}
+          </p>
+        </div>`;
+      })() : '' }
 
     <div class="card">
       <p class="eyebrow" style="margin-bottom:8px">¿Cómo se progresa en este ejercicio?</p>
@@ -920,7 +1026,7 @@ function viewSession(){
     <div class="card" id="exb-${xi}">
       <div class="row" style="gap:8px"><b style="font-size:16px" class="grow">${esc(ex.name)}</b>${typePill(ex.key)}</div>
       ${ meta.notes ? `<div class="tiny">📝 ${esc(meta.notes)}</div>` : '' }
-      ${ ex.sugg ? `<div class="coach ${ex.sugg.type==='up'?'good':(ex.sugg.type==='deload'?'warn':'')}">
+      ${ ex.sugg ? `<div class="coach ${ex.sugg.type==='up'?'good':((ex.sugg.type==='deload'||ex.sugg.type==='back')?'warn':'')}">
           Hoy: ${ex.sugg.msg}<span class="why">${ex.sugg.why}</span></div>`
         : `<div class="coach">${firstMsg}</div>` }
       <div class="sethead"><span>#</span><span>${corp ? 'lastre' : (meta.type==='asistido' ? 'ayuda' : uLabel())}</span><span>reps</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
@@ -1196,6 +1302,8 @@ function viewSettings(){
       <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
         Tus datos viven solo en este navegador. Descarga un respaldo de vez en cuando
         (o antes de cambiar de teléfono) y restáuralo donde quieras.
+        <b style="color:var(--ink)">${daysSinceBackup() === null ? 'Todavía no has descargado ninguno.' : `Último respaldo: hace ${daysSinceBackup()} día${daysSinceBackup()===1?'':'s'}.`}</b>
+        Si pasan 30 días sin respaldo, te lo recuerdo en la pantalla de inicio.
       </p>
       <div class="stack">
         <button class="btn" onclick="exportBackup()">⬇️ Descargar respaldo (.json)</button>
@@ -1683,6 +1791,8 @@ function drawChart(){
    RESPALDO (exportar / restaurar)
    ===================================================================== */
 function exportBackup(){
+  db.settings.lastBackup = new Date().toISOString();
+  save();
   const blob = new Blob([JSON.stringify(db)], { type:'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1690,6 +1800,7 @@ function exportBackup(){
   a.download = `hierro-respaldo-${new Date().toISOString().slice(0,10)}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 3000);
+  render();   /* refrescar "último respaldo" y ocultar el aviso */
 }
 function importBackup(file){
   if(!file) return;
