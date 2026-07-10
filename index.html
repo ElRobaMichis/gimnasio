@@ -448,8 +448,11 @@ function computeSuggestion(key){
   const sets = last.entry.sets;
   const w = workWeight(sets);
   const atW = sets.filter(s => s.w === w);
-  const minR = Math.min(...atW.map(s => s.r));
-  const maxR = Math.max(...atW.map(s => s.r));
+  const repsAtW = atW.map(s => s.r).sort((a,b) => a - b);
+  /* con 4+ series se ignora la peor: que la última se caiga es fatiga normal, no mal peso */
+  const minAll = repsAtW[0];
+  const minR = repsAtW.length >= 4 ? repsAtW[1] : repsAtW[0];
+  const maxR = repsAtW[repsAtW.length - 1];
   const nSets = sets.length;
   const rir = avgRIR(atW);
   const step = effStep(key, w);
@@ -569,6 +572,24 @@ function computeSuggestion(key){
     sugg.msg += ` · y suma una serie extra (${nSets + 1} en total)`;
     sugg.why = `Varias sesiones sin avanzar: más volumen semanal también genera progreso (con retornos decrecientes). ` + sugg.why;
   }
+  /* consolidación de series: 5+ series del mismo ejercicio rinden poco por sesión
+     (Pelland 2025 per-session: retornos decrecientes fuertes tras 3-4 series) */
+  if(nSets >= 5 && meta.type === 'normal'){
+    const target = Math.max(3, nSets - 2);
+    const flat = (maxR - minAll) <= 1;   /* reps casi idénticas en todas → mucha reserva */
+    if(sugg.type === 'reps' && flat && minR >= lo){
+      let nw = roundToStep(w * (1 + p.inc), step);
+      if(nw - w < step/2) nw = w + step;
+      const reps = Math.min(hi, Math.max(lo, maxR));
+      sugg = { w: nw, reps, sets: target, type:'up',
+        msg:`Concentra el trabajo: <b>${fmtW(nw)} ${uLabel()} × ${reps}</b> en <b>${target} series</b> (antes ${nSets})`,
+        why:`Hiciste ${nSets} series casi idénticas (${minAll}–${maxR} reps): te sobra reserva, y a partir de la 4ª serie del mismo ejercicio el beneficio por sesión cae en picada. Con ${target} series intensas (RIR 1–3) y algo más de peso logras lo mismo en menos tiempo.` };
+    } else {
+      sugg.sets = target;
+      sugg.msg += ` · en <b>${target} series</b> (antes ${nSets})`;
+      sugg.why = `${nSets} series del mismo ejercicio rinden poco a partir de la 4ª (retornos decrecientes por sesión): con ${target} series intensas logras prácticamente lo mismo y llegas con menos fatiga a las últimas. ` + sugg.why;
+    }
+  }
   if(p.stall >= 6 && sugg.type !== 'up'){
     sugg.why = `🔁 Lleva ${p.stall} sesiones estancado: considera rotarlo por una variante del mismo músculo durante 4–6 semanas — un estímulo nuevo suele reactivar el progreso. ` + sugg.why;
   }
@@ -586,8 +607,9 @@ function updateProgress(key, newSets, dateISO){
   const dir = meta.type === 'asistido' ? -1 : 1;   /* asistido: menos kg = progreso */
   const wNow = workWeight(newSets);
   const atW = newSets.filter(s => s.w === wNow);
-  const minR = Math.min(...atW.map(s => s.r));
-  const maxR = Math.max(...atW.map(s => s.r));
+  const repsNow = atW.map(s => s.r).sort((a,b) => a - b);
+  const minR = repsNow.length >= 4 ? repsNow[1] : repsNow[0];   /* misma tolerancia que el coach */
+  const maxR = repsNow[repsNow.length - 1];
   const wPrev = workWeight(prev.entry.sets);
   const prevAtW = prev.entry.sets.filter(s => s.w === wPrev);
   const maxRPrev = Math.max(...prevAtW.map(s => s.r));
@@ -2186,6 +2208,10 @@ function coachInfo(){
     si no sostienes el rango 2 veces seguidas, te propone bajar ~5 % y reconstruir; si te estancas
     varias sesiones, te suma una serie (más volumen = más progreso). En peso corporal progresas por
     reps y en asistidos bajando la ayuda.<br><br>
+    Sobre las series: la zona ideal es <b style="color:var(--ink)">2–4 series por ejercicio</b> —
+    a partir de la 4ª el beneficio por sesión cae en picada. Si vienes haciendo 5 o más, el coach
+    te sugerirá concentrar el trabajo en menos series más intensas. Con 4+ series, la peor no cuenta
+    para evaluar tu progreso (que la última se caiga es fatiga normal).<br><br>
     Regla de oro: termina tus series dejando 1–3 reps en reserva (RIR 1–3) — esfuerzo alto sin
     ir al fallo cada vez.`);
 }
