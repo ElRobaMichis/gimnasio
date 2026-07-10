@@ -292,6 +292,7 @@ function normalize(d){
   d.settings = (d.settings && typeof d.settings === 'object') ? d.settings : {};
   if(d.settings.goal === undefined) d.settings.goal = null;
   if(d.settings.rest === undefined) d.settings.rest = 'auto';
+  if(d.settings.screenOn === undefined) d.settings.screenOn = 'on';
   d.routines = Array.isArray(d.routines) ? d.routines : [];
   d.history  = Array.isArray(d.history)  ? d.history  : [];
   d.progress = (d.progress && typeof d.progress === 'object') ? d.progress : {};
@@ -337,7 +338,7 @@ function prog(key){
 
 /* metadatos por ejercicio: tipo, rango de reps propio, salto de kg, notas */
 function exMeta(key){
-  if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'' };
+  if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'', rest:null };
   return db.exmeta[key];
 }
 function effRange(key){
@@ -763,10 +764,18 @@ function viewExercise(){
               <option value="${v}" ${String(meta.step ?? 'auto')===v?'selected':''}>${v==='auto'?'Auto':v.replace('.',',')+' kg'}</option>`).join('')}
           </select></div>
       </div>
+      <div class="field" style="margin-top:10px"><span>Descanso entre series de este ejercicio</span>
+        <select onchange="setExRest('${key}',this.value)">
+          <option value="auto" ${!meta.rest?'selected':''}>Igual que el general (Ajustes)</option>
+          ${[45,60,90,120,150,180,240].map(s => `
+            <option value="${s}" ${String(meta.rest)===String(s)?'selected':''}>${fmtClock(s)} min</option>`).join('')}
+        </select>
+      </div>
       <p class="tiny" style="margin-top:8px">
         El rango de reps viene de tu objetivo (${g.lo}–${g.hi}); cámbialo solo para casos especiales
         (ej. abdominales 15–25). “Salto de kg” = el aumento mínimo posible en tu gimnasio
-        (mancuernas suelen ir de 2 en 2 kg; barra, de 2,5 en 2,5).
+        (mancuernas suelen ir de 2 en 2 kg; barra, de 2,5 en 2,5). El descanso propio es útil para
+        básicos pesados (sentadilla → 3:00) o accesorios ligeros (curl → 1:00).
       </p>
     </div>
 
@@ -795,6 +804,10 @@ function setExStep(key, val){
   save();
 }
 function setExNotes(key, val){ exMeta(key).notes = val.slice(0,300); save(); }
+function setExRest(key, val){
+  exMeta(key).rest = (val === 'auto') ? null : parseInt(val,10);
+  save();
+}
 
 /* ---------- SESIÓN ACTIVA ---------- */
 function viewSession(){
@@ -917,7 +930,18 @@ function viewSettings(){
       <p class="tiny" style="margin-top:8px">
         El timer arranca solo al anotar las reps de una serie, y te avisa con sonido y vibración.
         Automático: Fuerza 3:00 · Hipertrofia 1:30 · Ambas 2:00 — lo que la evidencia recomienda para cada meta.
+        También puedes darle un descanso propio a cada ejercicio desde su ficha.
       </p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:8px">Pantalla durante la sesión</p>
+      <button class="goal-opt ${db.settings.screenOn !== 'off' ? 'on' : ''}"
+        onclick="setScreenOn(db.settings.screenOn === 'off' ? 'on' : 'off')">
+        <b>Mantener la pantalla encendida ${db.settings.screenOn !== 'off' ? '✓' : ''}</b>
+        <span>Mientras hay una sesión en curso, el teléfono no se bloquea: siempre ves el cronómetro
+        y el descanso sin tocar nada. Se libera al terminar la sesión.</span>
+      </button>
     </div>
 
     <div class="card">
@@ -1105,8 +1129,8 @@ function setVal(xi, si, field, val){
   const wasEmpty = (st[field] === '' || st[field] === undefined);
   st[field] = val;
   save();
-  /* al anotar las reps de una serie, arranca solo el descanso */
-  if(field === 'r' && val !== '' && wasEmpty) startRestAuto();
+  /* al anotar las reps de una serie, arranca solo el descanso (con el tiempo propio del ejercicio) */
+  if(field === 'r' && val !== '' && wasEmpty) startRestAuto(db.active.exercises[xi].key);
 }
 function addSet(xi){
   const ex = db.active.exercises[xi];
@@ -1150,7 +1174,7 @@ function askFinish(){
   const dur = Math.floor((Date.now() - s.start)/1000);
   if(!done){
     confirmModal('No registraste ninguna serie', 'Si terminas ahora, la sesión se descarta sin guardarse.',
-      'Descartar sesión', () => { db.active = null; restUntil = null; save(); go({name:'home'}); });
+      'Descartar sesión', () => { db.active = null; restUntil = null; releaseWake(); save(); go({name:'home'}); });
     return;
   }
   confirmModal('¿Terminar la sesión?',
@@ -1158,9 +1182,36 @@ function askFinish(){
     'Terminar y guardar', finishSession, true);
 }
 
+/* mejor marca previa de un ejercicio: e1RM (normal) o reps máximas (corporal) */
+function bestMetricBefore(key){
+  const corporal = exMeta(key).type === 'corporal';
+  let best = 0;
+  for(const h of db.history){
+    const e = h.entries.find(x => x.key === key);
+    if(!e) continue;
+    const v = corporal ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
+    if(v > best) best = v;
+  }
+  return best;
+}
+
 function finishSession(){
   const s = db.active;
   const entries = collectEntries(s);
+
+  /* récords personales: comparar contra la mejor marca histórica ANTES de guardar */
+  const prs = [];
+  for(const e of entries){
+    const meta = exMeta(e.key);
+    if(meta.type === 'asistido') continue;   /* en asistidos el e1RM de la ayuda no significa nada */
+    const corporal = meta.type === 'corporal';
+    const prev = bestMetricBefore(e.key);
+    const now = corporal ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
+    if(prev > 0 && now > prev){
+      prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${fmtW(Math.round(now*10)/10)} ${corporal ? 'reps' : 'kg'}</b> <span class="tiny">(antes ${fmtW(Math.round(prev*10)/10)})</span>`);
+    }
+  }
+
   const rec = {
     id: s.id, routineId: s.routineId, routineName: s.routineName,
     date: new Date().toISOString(),
@@ -1170,19 +1221,26 @@ function finishSession(){
   db.history.push(rec);
   db.active = null;
   restUntil = null;
+  releaseWake();
   save();
   for(const e of entries) updateProgress(e.key, e.sets, rec.date);
   closeModal();
   openModal(`
-    <h2>Sesión guardada 💪</h2>
+    <h2>${prs.length ? '🏆 ¡Sesión con récord!' : 'Sesión guardada 💪'}</h2>
     <p class="muted">${fmtDur(rec.duration)} · ${entries.reduce((a,e)=>a+e.sets.length,0)} series.
-      La próxima vez verás las sugerencias actualizadas en cada ejercicio.</p>
+      ${prs.length ? '' : 'La próxima vez verás las sugerencias actualizadas en cada ejercicio.'}</p>
+    ${prs.length ? `<div class="coach good" style="margin-bottom:16px">
+      Nuevo récord${prs.length===1?'':'s'} de 1RM estimado:<br>${prs.join('<br>')}</div>` : ''}
     <button class="btn btn-acc" onclick="closeModal(); go({name:'history'})">Ver historial</button>
     <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'home'})">Volver al inicio</button>`);
 }
 
 function setGoal(k){ db.settings.goal = k; save(); render(); }
 function setRest(v){ db.settings.rest = v; save(); }
+function setScreenOn(v){
+  db.settings.screenOn = v; save(); render();
+  if(v === 'off') releaseWake(); else acquireWake();
+}
 function askWipe(){
   confirmModal('¿Borrar todos los datos?', 'Se eliminan rutinas, historial y ajustes de este dispositivo. No se puede deshacer. Tip: descarga antes un respaldo.',
     'Borrar todo', () => {
@@ -1194,14 +1252,18 @@ function askWipe(){
 /* =====================================================================
    TIMER DE DESCANSO
    ===================================================================== */
-function restSecs(){
+function restSecs(key){
   const r = db.settings.rest;
   if(r === 'off') return null;
+  if(key){                       /* descanso propio del ejercicio, si lo configuró */
+    const er = parseInt(exMeta(key).rest, 10);
+    if(!isNaN(er) && er > 0) return er;
+  }
   if(r && r !== 'auto'){ const n = parseInt(r,10); if(!isNaN(n) && n > 0) return n; }
   return GOALS[db.settings.goal || 'ambas'].rest;
 }
-function startRestAuto(){
-  const s = restSecs(); if(!s) return;
+function startRestAuto(key){
+  const s = restSecs(key); if(!s) return;
   restUntil = Date.now() + s*1000;
   tickRest();
 }
@@ -1210,6 +1272,21 @@ function toggleRest(){
   else startRestAuto();
   tickRest();
 }
+/* pantalla siempre encendida durante la sesión (Wake Lock) */
+let wakeLock = null;
+async function acquireWake(){
+  try{
+    if('wakeLock' in navigator && db.settings.screenOn !== 'off' && db.active && !wakeLock){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  }catch(e){}
+}
+function releaseWake(){
+  try{ if(wakeLock) wakeLock.release(); }catch(e){}
+  wakeLock = null;
+}
+
 function beep(){
   try{
     if(navigator.vibrate) navigator.vibrate([200,120,200]);
@@ -1604,6 +1681,7 @@ function afterRender(){
     };
     tick();
     timerInt = setInterval(tick, 1000);
+    acquireWake();
   }
   if(view.name === 'exercise') drawChart();
 }
@@ -1631,6 +1709,10 @@ function migrateTypes(){
   if('serviceWorker' in navigator && location.protocol === 'https:'){
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  /* el wake lock se libera solo al minimizar; re-adquirirlo al volver */
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && db.active) acquireWake();
+  });
   migrateTypes();
   render();
   if(!db.settings.goal){
