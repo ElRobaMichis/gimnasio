@@ -306,6 +306,7 @@ function normalize(d){
   if(d.settings.goal === undefined) d.settings.goal = null;
   if(d.settings.rest === undefined) d.settings.rest = 'auto';
   if(d.settings.screenOn === undefined) d.settings.screenOn = 'on';
+  if(d.settings.unit !== 'lb') d.settings.unit = 'kg';
   d.routines = Array.isArray(d.routines) ? d.routines : [];
   d.history  = Array.isArray(d.history)  ? d.history  : [];
   d.progress = (d.progress && typeof d.progress === 'object') ? d.progress : {};
@@ -336,7 +337,16 @@ function fmtDur(sec){
   const m = Math.floor(sec/60), s = sec%60;
   return m >= 60 ? `${Math.floor(m/60)} h ${m%60} min` : `${m} min ${s} s`;
 }
-function fmtW(w){ return (Math.round(w*100)/100).toString().replace('.',','); }
+/* ---------- unidades: TODO se guarda en kg; la unidad solo cambia la vista ---------- */
+const LB_KG = 0.45359237;
+function uLabel(){ return db.settings.unit === 'lb' ? 'lb' : 'kg'; }
+function fromKg(kg){ return db.settings.unit === 'lb' ? kg / LB_KG : kg; }
+function toKg(x){ return db.settings.unit === 'lb' ? x * LB_KG : x; }
+function fmtNum(x){ return (Math.round(x*100)/100).toString().replace('.',','); }
+/* fmtW SIEMPRE recibe kg y muestra en la unidad activa */
+function fmtW(kg){ return fmtNum(fromKg(kg)); }
+/* valor para atributos value= de inputs (punto decimal, en unidad activa) */
+function inputW(kg){ return String(Math.round(fromKg(kg)*100)/100); }
 function fmtClock(sec){ return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`; }
 
 /* =====================================================================
@@ -415,7 +425,15 @@ function workWeight(sets){
   }
   return best;
 }
-function roundStep(w){ return w >= 20 ? 2.5 : (w >= 10 ? 1 : 0.5); }
+function roundStep(wKg){
+  if(db.settings.unit === 'lb'){
+    /* pasos nativos de discos en lb para que las sugerencias salgan "limpias" (95, 100…) */
+    const wLb = wKg / LB_KG;
+    const stepLb = wLb >= 45 ? 5 : (wLb >= 25 ? 2.5 : 1);
+    return stepLb * LB_KG;
+  }
+  return wKg >= 20 ? 2.5 : (wKg >= 10 ? 1 : 0.5);
+}
 function roundToStep(w, st){ st = st || roundStep(w); return Math.round(w/st)*st; }
 
 /*  computeSuggestion(key) → null (primera vez) o
@@ -444,24 +462,24 @@ function computeSuggestion(key){
       sugg = (nw <= 0 || w <= 2.5)
         ? { w:0, reps:lo, type:'up',
             msg:`¡Prueba <b>sin asistencia</b>!`,
-            why:`Llegaste a ${hi} reps con solo ${fmtW(w)} kg de ayuda. Intenta la versión libre y registra 0 kg.` }
+            why:`Llegaste a ${hi} reps con solo ${fmtW(w)} ${uLabel()} de ayuda. Intenta la versión libre y registra 0 kg.` }
         : { w:nw, reps:lo, type:'up',
-            msg:`Baja la ayuda: <b>${fmtW(nw)} kg × ${lo}</b>`,
-            why:`En asistidos, menos kg de ayuda = más difícil = progreso. Llegaste a ${hi} reps con ${fmtW(w)} kg de ayuda.` };
+            msg:`Baja la ayuda: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
+            why:`En asistidos, menos peso de ayuda = más difícil = progreso. Llegaste a ${hi} reps con ${fmtW(w)} ${uLabel()} de ayuda.` };
     } else if(minR < lo){
       if(p.fail >= 2){
         sugg = { w:w + step, reps:lo, type:'deload',
-          msg:`Sube la ayuda a <b>${fmtW(w + step)} kg</b> y reconstruye`,
+          msg:`Sube la ayuda a <b>${fmtW(w + step)} ${uLabel()}</b> y reconstruye`,
           why:`Van ${p.fail} sesiones sin sostener el rango (${lo}–${hi}). Con un poco más de asistencia vuelves a progresar.` };
       } else {
         sugg = { w, reps:lo, type:'hold',
-          msg:`Misma ayuda (<b>${fmtW(w)} kg</b>): busca al menos ${lo} reps`,
+          msg:`Misma ayuda (<b>${fmtW(w)} ${uLabel()}</b>): busca al menos ${lo} reps`,
           why:`Consolida el rango (${lo}–${hi}) antes de bajar la asistencia.` };
       }
     } else {
       const target = Math.min(hi, maxR + 1);
       sugg = { w, reps:target, type:'reps',
-        msg:`Misma ayuda (<b>${fmtW(w)} kg</b>), apunta a <b>${target} reps</b>`,
+        msg:`Misma ayuda (<b>${fmtW(w)} ${uLabel()}</b>), apunta a <b>${target} reps</b>`,
         why:`Cuando llegues a ${hi} reps en todas las series, te sugeriré bajar la ayuda.` };
     }
   } else if(meta.type === 'corporal' || w === 0){
@@ -469,7 +487,7 @@ function computeSuggestion(key){
     if(minR >= hi){
       sugg = { w, reps:maxR + 1, type:'up',
         msg:`Suma reps: apunta a <b>${maxR + 1}</b> por serie`,
-        why:`Sin peso externo progresas sumando reps o series. Si ya es muy fácil, agrega lastre (peso extra, ej. mochila o disco) y registra esos kg.` };
+        why:`Sin peso externo progresas sumando reps o series. Si ya es muy fácil, agrega lastre (peso extra, ej. mochila o disco) y regístralo.` };
     } else if(minR < lo){
       sugg = { w, reps:lo, type:'hold',
         msg:`Busca al menos <b>${lo} reps</b> por serie`,
@@ -484,35 +502,35 @@ function computeSuggestion(key){
     if(minR >= hi){
       const boost = (rir !== null && rir >= 3) ? 1.7 : 1;
       let nw = roundToStep(w * (1 + p.inc * boost), step);
-      if(nw <= w) nw = w + step;
+      if(nw - w < step/2) nw = w + step;   /* progreso real de al menos un paso (evita errores de redondeo) */
       sugg = { w:nw, reps:lo, type:'up',
-        msg:`Sube el peso: <b>${fmtW(nw)} kg × ${lo}</b>`,
-        why:`Llegaste a ${hi} reps en todas las series con ${fmtW(w)} kg.` +
+        msg:`Sube el peso: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
+        why:`Llegaste a ${hi} reps en todas las series con ${fmtW(w)} ${uLabel()}.` +
             (boost > 1 ? ` Además te sobraban reps (RIR ${Math.round(rir)}), así que el salto es un poco mayor.`
                        : ` Toca progresar la carga (~${(p.inc*100).toFixed(1)} %).`) };
     } else if(minR < lo){
       if(p.fail >= 2){
         let nw = roundToStep(w * 0.95, step);
-        if(nw >= w) nw = w - step;
+        if(w - nw < step/2) nw = w - step;   /* retroceso real de al menos un paso */
         if(nw <= 0) nw = w;
         sugg = { w:nw, reps:lo, type:'deload',
-          msg:`Baja un poco: <b>${fmtW(nw)} kg × ${lo}</b>`,
-          why:`Van ${p.fail} sesiones sin sostener el rango con ${fmtW(w)} kg. Retroceder ~5 % y volver a construir es lo que mejor funciona.` };
+          msg:`Baja un poco: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
+          why:`Van ${p.fail} sesiones sin sostener el rango con ${fmtW(w)} ${uLabel()}. Retroceder ~5 % y volver a construir es lo que mejor funciona.` };
       } else {
         sugg = { w, reps:lo, type:'hold',
-          msg:`Consolida <b>${fmtW(w)} kg</b>: busca al menos ${lo} reps por serie`,
+          msg:`Consolida <b>${fmtW(w)} ${uLabel()}</b>: busca al menos ${lo} reps por serie`,
           why:`La última vez alguna serie quedó bajo el rango (${lo}–${hi}). Repite el peso dejando 1–3 reps en reserva antes de subir.` };
       }
     } else if(rir !== null && rir >= 4){
       let nw = roundToStep(w * (1 + p.inc), step);
-      if(nw <= w) nw = w + step;
+      if(nw - w < step/2) nw = w + step;   /* progreso real de al menos un paso (evita errores de redondeo) */
       sugg = { w:nw, reps:lo, type:'up',
-        msg:`Sube ya el peso: <b>${fmtW(nw)} kg × ${lo}</b>`,
+        msg:`Sube ya el peso: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
         why:`Registraste RIR ${Math.round(rir)} (te sobraban ~${Math.round(rir)} reps): ese peso te queda liviano, no hace falta esperar al tope del rango.` };
     } else {
       const target = Math.min(hi, maxR + 1);
       sugg = { w, reps:target, type:'reps',
-        msg:`Mismo peso (<b>${fmtW(w)} kg</b>), apunta a <b>${target} reps</b>`,
+        msg:`Mismo peso (<b>${fmtW(w)} ${uLabel()}</b>), apunta a <b>${target} reps</b>`,
         why:`Doble progresión: primero llena el rango de reps (${lo}–${hi}), después sube el peso.` };
     }
   }
@@ -750,10 +768,10 @@ function viewExercise(){
   const corporal = meta.type === 'corporal';
   const pts = hist.map(h => ({
     date: h.date,
-    v: corporal ? Math.max(...h.sets.map(s => s.r)) : Math.round(bestE1RM(h.sets)*10)/10
+    v: corporal ? Math.max(...h.sets.map(s => s.r)) : Math.round(fromKg(bestE1RM(h.sets))*10)/10
   })).filter(p => p.v > 0);
   window.__chartPts = pts;
-  window.__chartUnit = corporal ? 'reps' : 'kg';
+  window.__chartUnit = corporal ? 'reps' : uLabel();
   const best = pts.length ? Math.max(...pts.map(p => p.v)) : 0;
 
   const recent = [...hist].reverse().slice(0, 6).map(h => `
@@ -771,7 +789,7 @@ function viewExercise(){
       <p class="eyebrow">Progreso</p>
       ${ pts.length ? `
         <div class="row" style="margin-top:8px;align-items:baseline">
-          <div class="bignum grow">${fmtW(best)} <small>${corporal ? 'reps (tu récord)' : 'kg'}</small></div>
+          <div class="bignum grow">${fmtNum(best)} <small>${corporal ? 'reps (tu récord)' : uLabel()}</small></div>
         </div>
         <p class="tiny">${corporal
           ? 'Tus mejores reps en una serie.'
@@ -810,10 +828,9 @@ function viewExercise(){
         <div class="field grow"><span>Reps máx.</span>
           <input type="number" inputmode="numeric" min="2" placeholder="${g.hi}" value="${meta.hi ?? ''}"
             oninput="setExRange('${key}','hi',this.value)"></div>
-        <div class="field grow"><span>Salto de kg</span>
+        <div class="field grow"><span>Salto mínimo</span>
           <select onchange="setExStep('${key}',this.value)">
-            ${['auto','0.5','1','2','2.5','5'].map(v => `
-              <option value="${v}" ${String(meta.step ?? 'auto')===v?'selected':''}>${v==='auto'?'Auto':v.replace('.',',')+' kg'}</option>`).join('')}
+            ${stepOptionsHTML(meta.step)}
           </select></div>
       </div>
       <div class="field" style="margin-top:10px"><span>Grupo muscular</span>
@@ -832,9 +849,9 @@ function viewExercise(){
       </div>
       <p class="tiny" style="margin-top:8px">
         El rango de reps viene de tu objetivo (${g.lo}–${g.hi}); cámbialo solo para casos especiales
-        (ej. abdominales 15–25). “Salto de kg” = el aumento mínimo posible en tu gimnasio
-        (mancuernas suelen ir de 2 en 2 kg; barra, de 2,5 en 2,5). El descanso propio es útil para
-        básicos pesados (sentadilla → 3:00) o accesorios ligeros (curl → 1:00).
+        (ej. abdominales 15–25). “Salto mínimo” = el aumento más pequeño posible en tu gimnasio
+        (en kg: mancuernas de 2 en 2, barra de 2,5 en 2,5 · en lb: de 5 en 5). El descanso propio es útil
+        para básicos pesados (sentadilla → 3:00) o accesorios ligeros (curl → 1:00).
       </p>
     </div>
 
@@ -862,6 +879,22 @@ function setExStep(key, val){
   exMeta(key).step = (val === 'auto') ? null : parseFloat(val);
   save();
 }
+/* opciones de salto en la unidad activa; el valor guardado siempre es kg */
+function stepOptionsHTML(cur){
+  const lb = db.settings.unit === 'lb';
+  const opts = lb
+    ? [1.25, 2.5, 5, 10].map(v => [Math.round(v*LB_KG*1000)/1000, v + ' lb'])
+    : [0.5, 1, 2, 2.5, 5].map(v => [v, String(v).replace('.',',') + ' kg']);
+  let html = `<option value="auto" ${cur == null ? 'selected' : ''}>Auto</option>`;
+  let matched = cur == null;
+  for(const [kg, label] of opts){
+    const sel = cur != null && Math.abs(cur - kg) < 0.01;
+    if(sel) matched = true;
+    html += `<option value="${kg}" ${sel ? 'selected' : ''}>${label}</option>`;
+  }
+  if(!matched) html += `<option value="${cur}" selected>Actual: ${fmtW(cur)} ${uLabel()}</option>`;
+  return html;
+}
 function setExNotes(key, val){ exMeta(key).notes = val.slice(0,300); save(); }
 function setExRest(key, val){
   exMeta(key).rest = (val === 'auto') ? null : parseInt(val,10);
@@ -879,8 +912,8 @@ function viewSession(){
     const firstTime = !ex.sugg;
     let firstMsg = '';
     if(firstTime){
-      if(corp) firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). Los kg puedes dejarlos en blanco; si usas lastre, anótalo.`;
-      else if(meta.type === 'asistido') firstMsg = `Primera vez. Anota en kg la AYUDA de la máquina/banda. Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
+      if(corp) firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). El peso puedes dejarlo en blanco; si usas lastre, anótalo.`;
+      else if(meta.type === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina/banda (en ${uLabel()}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
       else firstMsg = `Primera vez con este ejercicio. Elige un peso con el que puedas hacer ${lo}–${hi} reps quedándote 1–3 en reserva (sin llegar al fallo). Desde la próxima, te sugiero la progresión.`;
     }
     return `
@@ -890,7 +923,7 @@ function viewSession(){
       ${ ex.sugg ? `<div class="coach ${ex.sugg.type==='up'?'good':(ex.sugg.type==='deload'?'warn':'')}">
           Hoy: ${ex.sugg.msg}<span class="why">${ex.sugg.why}</span></div>`
         : `<div class="coach">${firstMsg}</div>` }
-      <div class="sethead"><span>#</span><span>${corp ? 'lastre' : (meta.type==='asistido' ? 'ayuda' : 'kg')}</span><span>reps</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
+      <div class="sethead"><span>#</span><span>${corp ? 'lastre' : (meta.type==='asistido' ? 'ayuda' : uLabel())}</span><span>reps</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
       <div id="sets-${xi}">
         ${ ex.sets.map((st, si) => setRowHTML(xi, si, st, ex.sugg, corp)).join('') }
       </div>
@@ -909,13 +942,17 @@ function viewSession(){
         </div>
         <button class="btn btn-danger" style="width:auto;padding:10px 16px" onclick="askFinish()">Terminar</button>
       </div>
-      ${ rest ? `<button class="restchip" id="restchip" onclick="toggleRest()">▶ Descanso (${fmtClock(rest)})</button>` : '' }
+      <div class="row">
+        ${ rest ? `<button class="restchip" id="restchip" style="width:auto;flex:1" onclick="toggleRest()">▶ Descanso (${fmtClock(rest)})</button>` : '<span class="grow"></span>' }
+        <button class="btn" style="width:auto;padding:9px 13px;font-size:13px;flex:none"
+          aria-label="Cambiar unidad de peso" onclick="askUnitSwitch()">${uLabel()} ⇄</button>
+      </div>
     </div>
     <div class="stack">${blocks}</div>`;
 }
 
 function setRowHTML(xi, si, st, sugg, corp){
-  const pw = sugg ? fmtW(sugg.w) : (corp ? '0' : 'kg');
+  const pw = sugg ? fmtW(sugg.w) : (corp ? '0' : uLabel());
   const pr = sugg ? sugg.reps : 'reps';
   const cls = sugg ? 'class="sugg"' : '';
   return `
@@ -1001,7 +1038,7 @@ function viewHistory(){
       <summary>
         <div class="grow">
           <b>${esc(h.routineName)}</b>
-          <div class="tiny">${fmtDate(h.date)}${h.duration ? ` · ${fmtDur(h.duration)}` : ''} · ${nSets} series${vol ? ` · ${fmtW(Math.round(vol))} kg movidos` : ''}</div>
+          <div class="tiny">${fmtDate(h.date)}${h.duration ? ` · ${fmtDur(h.duration)}` : ''} · ${nSets} series${vol ? ` · ${fmtNum(Math.round(fromKg(vol)))} ${uLabel()} movidos` : ''}</div>
         </div>
         <span style="color:var(--mut)">▾</span>
       </summary>
@@ -1055,8 +1092,8 @@ function editSession(id){
         ${e.sets.map((st, si) => `
           <div class="setrow" style="grid-template-columns:24px 1.15fr 1fr .95fr">
             <span class="idx">${si+1}</span>
-            <input type="number" inputmode="decimal" step="any" min="0" value="${st.w ?? ''}"
-              aria-label="Peso" oninput="editVal(${ei},${si},'w',this.value)">
+            <input type="number" inputmode="decimal" step="any" min="0" value="${st.w != null ? inputW(st.w) : ''}"
+              aria-label="Peso en ${uLabel()}" oninput="editVal(${ei},${si},'w',this.value)">
             <input type="number" inputmode="numeric" step="1" min="0" value="${st.r ?? ''}"
               aria-label="Reps" oninput="editVal(${ei},${si},'r',this.value)">
             <input type="number" inputmode="numeric" step="1" min="0" max="9" value="${st.rir ?? ''}" placeholder="rir"
@@ -1074,7 +1111,9 @@ function saveEditedSession(){
   const entries = [];
   for(const e of ed.entries){
     const sets = e.sets.map(st => {
-      const w = parseFloat(st.w), r = parseInt(st.r,10), rir = parseInt(st.rir,10);
+      let w = parseFloat(st.w);
+      if(!isNaN(w)) w = Math.round(toKg(w)*1000)/1000;   /* editado en la unidad activa → kg */
+      const r = parseInt(st.r,10), rir = parseInt(st.rir,10);
       const out = { w, r };
       if(!isNaN(rir)) out.rir = Math.min(9, Math.max(0, rir));
       return out;
@@ -1101,6 +1140,23 @@ function viewSettings(){
       </button>`).join('')}
 
     <div class="card" style="margin-top:8px">
+      <p class="eyebrow" style="margin-bottom:8px">Unidad de peso</p>
+      <div class="row">
+        <button class="goal-opt ${db.settings.unit==='kg'?'on':''}" style="flex:1" onclick="askUnitSwitch('kg')">
+          <b>Kilos (kg) ${db.settings.unit==='kg'?'✓':''}</b>
+        </button>
+        <button class="goal-opt ${db.settings.unit==='lb'?'on':''}" style="flex:1" onclick="askUnitSwitch('lb')">
+          <b>Libras (lb) ${db.settings.unit==='lb'?'✓':''}</b>
+        </button>
+      </div>
+      <p class="tiny" style="margin-top:8px">
+        Tus registros se guardan siempre en kg internamente: cambiar la unidad solo cambia cómo se
+        muestran y cómo escribes — puedes alternar mil veces sin que nada se corrompa. Durante una
+        sesión también puedes cambiarla con el botón “${uLabel()} ⇄” (útil si entrenas en otro gimnasio).
+      </p>
+    </div>
+
+    <div class="card">
       <p class="eyebrow" style="margin-bottom:8px">Descanso entre series</p>
       <select onchange="setRest(this.value)">
         <option value="auto" ${rest==='auto'?'selected':''}>Automático según objetivo (recomendado)</option>
@@ -1353,7 +1409,8 @@ function collectEntries(s){
     const corp = exMeta(ex.key).type === 'corporal';
     const sets = ex.sets.map(st => {
       let w = parseFloat(st.w);
-      if(isNaN(w) && corp && st.r !== '' && st.r !== undefined) w = 0;  /* corporal: kg en blanco = 0 */
+      if(isNaN(w) && corp && st.r !== '' && st.r !== undefined) w = 0;  /* corporal: peso en blanco = 0 */
+      if(!isNaN(w)) w = Math.round(toKg(w)*1000)/1000;                  /* lo escrito está en la unidad activa → guardar en kg */
       const r = parseInt(st.r,10);
       const out = { w, r };
       const rir = parseInt(st.rir,10);
@@ -1405,7 +1462,8 @@ function finishSession(){
     const prev = bestMetricBefore(e.key);
     const now = corporal ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
     if(prev > 0 && now > prev){
-      prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${fmtW(Math.round(now*10)/10)} ${corporal ? 'reps' : 'kg'}</b> <span class="tiny">(antes ${fmtW(Math.round(prev*10)/10)})</span>`);
+      const fv = v => corporal ? fmtNum(Math.round(v*10)/10) : fmtW(Math.round(v*10)/10);
+      prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${fv(now)} ${corporal ? 'reps' : uLabel()}</b> <span class="tiny">(antes ${fv(prev)})</span>`);
     }
   }
 
@@ -1434,6 +1492,36 @@ function finishSession(){
 
 function setGoal(k){ db.settings.goal = k; save(); render(); }
 function setRest(v){ db.settings.rest = v; save(); }
+
+/* ---------- cambio de unidad kg ⇄ lb ---------- */
+function askUnitSwitch(target){
+  const nu = target || (db.settings.unit === 'lb' ? 'kg' : 'lb');
+  if(nu === db.settings.unit) return;
+  confirmModal(`¿Cambiar a ${nu === 'lb' ? 'libras (lb)' : 'kilos (kg)'}?`,
+    `Tus datos guardados NO se modifican — internamente todo vive en kg y solo cambia cómo se muestra y cómo escribes.
+     ${db.active ? 'Lo que ya escribiste en esta sesión se convierte automáticamente a la nueva unidad.' : ''}
+     Puedes alternar cuando quieras (ej. si entrenas en otro gimnasio).`,
+    `Cambiar a ${nu}`, () => setUnit(nu), true);
+}
+function setUnit(u){
+  if(db.settings.unit === u) return;
+  /* convertir lo ya escrito en la sesión activa (estaba en la unidad anterior) */
+  if(db.active){
+    const f = (u === 'lb') ? 1/LB_KG : LB_KG;
+    for(const ex of db.active.exercises){
+      for(const st of ex.sets){
+        const n = parseFloat(st.w);
+        if(st.w !== '' && st.w !== undefined && !isNaN(n)){
+          st.w = String(Math.round(n * f * 100) / 100);
+        }
+      }
+    }
+  }
+  db.settings.unit = u;
+  /* regenerar sugerencias: sus textos llevan la unidad y el redondeo cambia */
+  if(db.active) for(const ex of db.active.exercises) ex.sugg = computeSuggestion(ex.key);
+  save(); render();
+}
 function setScreenOn(v){
   db.settings.screenOn = v; save(); render();
   if(v === 'off') releaseWake(); else acquireWake();
@@ -1553,7 +1641,7 @@ function drawChart(){
     ctx.strokeStyle = '#262b34';
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
     ctx.fillStyle = '#8e94a0'; ctx.textAlign = 'left';
-    ctx.fillText(fmtW(Math.round(v*10)/10), 2, y+3.5);
+    ctx.fillText(fmtNum(Math.round(v*10)/10), 2, y+3.5);
   }
   /* línea de la serie */
   ctx.strokeStyle = '#f5c242'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -1572,7 +1660,7 @@ function drawChart(){
   const lastP = pts[pts.length-1];
   ctx.fillStyle = '#eae6dc'; ctx.font = '700 12px -apple-system, sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(fmtW(lastP.v), Math.min(X(pts.length-1)+4, W-padR), Math.max(12, Y(lastP.v)-9));
+  ctx.fillText(fmtNum(lastP.v), Math.min(X(pts.length-1)+4, W-padR), Math.max(12, Y(lastP.v)-9));
   /* fechas primera y última */
   ctx.fillStyle = '#8e94a0'; ctx.font = '10px -apple-system, sans-serif';
   ctx.textAlign = 'left';  ctx.fillText(fmtDateShort(pts[0].date), padL, H-6);
@@ -1585,7 +1673,7 @@ function drawChart(){
     let i = Math.round((x - padL) / ((W-padL-padR) / (pts.length-1)));
     i = Math.max(0, Math.min(pts.length-1, i));
     const tip = document.getElementById('charttip');
-    if(tip) tip.innerHTML = `<b style="color:var(--ink)">${fmtDate(pts[i].date)}</b> · ${fmtW(pts[i].v)} ${window.__chartUnit}`;
+    if(tip) tip.innerHTML = `<b style="color:var(--ink)">${fmtDate(pts[i].date)}</b> · ${fmtNum(pts[i].v)} ${window.__chartUnit}`;
   };
   cv.onpointerdown = pick;
   cv.onpointermove = ev => { if(ev.buttons || ev.pointerType === 'mouse') pick(ev); };
