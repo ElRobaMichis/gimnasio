@@ -1029,6 +1029,7 @@ function viewSession(){
       ${ ex.sugg ? `<div class="coach ${ex.sugg.type==='up'?'good':((ex.sugg.type==='deload'||ex.sugg.type==='back')?'warn':'')}">
           Hoy: ${ex.sugg.msg}<span class="why">${ex.sugg.why}</span></div>`
         : `<div class="coach">${firstMsg}</div>` }
+      <button class="linkish tiny" style="margin-top:8px" onclick="showWarmup(${xi})">🔥 Calentamiento sugerido</button>
       <div class="sethead"><span>#</span><span>${corp ? 'lastre' : (meta.type==='asistido' ? 'ayuda' : uLabel())}</span><span>reps</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
       <div id="sets-${xi}">
         ${ ex.sets.map((st, si) => setRowHTML(xi, si, st, ex.sugg, corp)).join('') }
@@ -1640,6 +1641,93 @@ function askWipe(){
       localStorage.removeItem(LS_KEY);
       db = load(); go({name:'home'});
     });
+}
+
+/* =====================================================================
+   CALENTAMIENTO CALCULADO
+   Evidencia: escalera específica 40–80 % de la carga de trabajo con reps
+   decrecientes (Ribeiro 2021); cargas moderadas necesitan 0–2 series
+   (Ribeiro 2020); pesado → llegar a ~80 % con intención de velocidad
+   (scoping review 2025); músculo ya caliente → menos (Iversen 2021).
+   ===================================================================== */
+function warmupPlan(xi){
+  const s = db.active, ex = s.exercises[xi];
+  const meta = exMeta(ex.key);
+  const { hi } = effRange(ex.key);
+
+  /* peso de trabajo de hoy: lo escrito en la serie 1, o la sugerencia del coach */
+  let W = NaN;
+  const typed = parseFloat(ex.sets[0] && ex.sets[0].w);
+  if(!isNaN(typed) && typed > 0) W = toKg(typed);
+  else if(ex.sugg && ex.sugg.w > 0) W = ex.sugg.w;
+
+  /* ¿el músculo ya viene caliente de un ejercicio anterior de esta sesión? */
+  let first = true;
+  if(meta.muscle && meta.muscle !== 'none'){
+    for(let i = 0; i < xi; i++){
+      if(exMeta(s.exercises[i].key).muscle === meta.muscle){ first = false; break; }
+    }
+  } else first = (xi === 0);
+
+  if(meta.type === 'corporal'){
+    const target = ex.sugg ? ex.sugg.reps : hi;
+    const easy = Math.max(3, Math.round(target * 0.5));
+    return { rows: [`1 serie × ${easy} reps fáciles (misma técnica, lejos del fallo)`], first,
+             note: 'En peso corporal basta una serie suave del mismo movimiento para activar el patrón.' };
+  }
+  if(isNaN(W) || W <= 0) return null;         /* aún no hay peso de referencia */
+  if(meta.type === 'asistido'){
+    const helpW = roundToStep(W * 1.5, effStep(ex.key, W));
+    return { rows: [`1 serie × 6 con más ayuda (~${fmtW(helpW)} ${uLabel()})`], first,
+             note: 'En asistidos, calentar = misma técnica con bastante más asistencia.' };
+  }
+  if(W <= 12){
+    return { rows: [], first, W,
+             note: 'Peso ligero: la evidencia muestra que con cargas moderadas el calentamiento específico aporta poco. Si es tu primer ejercicio del día, haz 1 serie suave del mismo movimiento y listo.' };
+  }
+  const heavy = hi <= 7;    /* rango de fuerza → cargas relativas altas */
+  const scheme = heavy
+    ? (first ? [[0.4,5],[0.6,3],[0.8,2]] : [[0.55,3],[0.8,2]])
+    : (first ? [[0.5,6],[0.75,3]]        : [[0.7,4]]);
+  const rows = [], seen = new Set();
+  for(const [pct, reps] of scheme){
+    const wk = roundToStep(W * pct);
+    if(wk <= 0 || wk >= W || seen.has(wk)) continue;
+    seen.add(wk);
+    rows.push(`${fmtW(wk)} ${uLabel()} × ${reps}`);
+  }
+  return { rows, first, W, heavy,
+           note: rows.length ? null : 'El peso de trabajo es tan bajo que no salen escalones útiles: 1 serie suave alcanza.' };
+}
+
+function showWarmup(xi){
+  const ex = db.active.exercises[xi];
+  const plan = warmupPlan(xi);
+  if(!plan){
+    infoModal('Calentamiento', 'Escribe primero el peso de hoy en la serie 1 (o entrena una vez este ejercicio) y te calculo la escalera de calentamiento.');
+    return;
+  }
+  const list = plan.rows.map((r, i) => `
+    <div class="row" style="padding:6px 0;border-bottom:1px dashed #232833">
+      <span style="width:22px;text-align:center;color:var(--mut);font-weight:700" class="num">${i+1}</span>
+      <b class="num">${r}</b>
+    </div>`).join('')
+    + (plan.W && plan.rows.length ? `
+    <div class="row" style="padding:8px 0">
+      <span style="width:22px;text-align:center;color:var(--good)">→</span>
+      <b>Series de trabajo: ${fmtW(plan.W)} ${uLabel()}</b>
+    </div>` : '');
+  openModal(`
+    <h2>🔥 Calentamiento — ${esc(ex.name)}</h2>
+    ${ plan.first ? '' : `<p class="muted" style="margin-bottom:10px">Este músculo ya viene caliente de un ejercicio anterior: con menos alcanza.</p>` }
+    ${ list ? `<div style="margin-bottom:12px">${list}</div>` : '' }
+    ${ plan.note ? `<p class="muted" style="margin-bottom:12px">${plan.note}</p>` : '' }
+    <p class="tiny" style="line-height:1.6;margin-bottom:14px">
+      Descansa solo 30–60 s entre series de calentamiento y mueve el peso con <b>intención de velocidad</b>
+      (activa sin fatigar). <b>No registres estas series en la app</b> — solo las de trabajo.
+      ${ plan.first && xi === 0 ? ' Antes del primer ejercicio del día, 5 min de cardio suave suman — sobre todo en pierna (+8 % de rendimiento en la evidencia).' : '' }
+    </p>
+    <button class="btn" onclick="closeModal()">Listo</button>`);
 }
 
 /* =====================================================================
