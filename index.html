@@ -716,6 +716,26 @@ function daysSinceBackup(){
     : null;
 }
 
+/* hábito de entrenar al fallo: mayoría de RIR 0 en varias sesiones recientes */
+function failureHabit(){
+  if(db.settings.rirDismissed &&
+     (Date.now() - new Date(db.settings.rirDismissed).getTime()) < 14*864e5) return null;
+  const recent = db.history.slice(-5);
+  let withData = 0, failSessions = 0;
+  for(const h of recent){
+    const rirs = h.entries.flatMap(e => e.sets)
+      .map(s => s.rir).filter(x => x !== undefined && x !== null);
+    if(rirs.length < 3) continue;
+    withData++;
+    if(rirs.filter(x => x === 0).length / rirs.length >= 0.6) failSessions++;
+  }
+  return (withData >= 2 && failSessions >= 2) ? { failSessions } : null;
+}
+function dismissRIR(){
+  db.settings.rirDismissed = new Date().toISOString();
+  save(); render();
+}
+
 /* ---------- HOME ---------- */
 function viewHome(){
   let cards = db.routines.map(r => {
@@ -756,6 +776,16 @@ function viewHome(){
       <button class="btn btn-ghost" style="margin-top:8px;padding:7px;font-size:13px" onclick="dismissFatigue()">Entendido — ocultar 10 días</button>
     </div>` : '';
 
+  const fh = failureHabit();
+  const rirBanner = fh ? `
+    <div class="coach warn" style="margin-top:0">
+      🛑 Vienes llegando al fallo (RIR 0) en ${fh.failSessions} de tus últimas sesiones.
+      <span class="why">Ir al fallo da casi el mismo músculo que parar a 1–3 reps en reserva, pero tu cuerpo
+      tarda 24–48 h más en recuperarse — incluso con el mismo volumen total. Deja 1–2 reps en reserva
+      en la mayoría de las series; si acaso, guarda el fallo para la última serie de máquinas o aislamientos.</span>
+      <button class="btn btn-ghost" style="margin-top:8px;padding:7px;font-size:13px" onclick="dismissRIR()">Entendido — ocultar 14 días</button>
+    </div>` : '';
+
   const dsb = daysSinceBackup();
   const backupBanner = (db.history.length >= 5 && (dsb === null || dsb >= 30)) ? `
     <div class="card" style="border-color:#4a4630">
@@ -771,6 +801,7 @@ function viewHome(){
   return `<div class="stack">
     ${resume}
     ${fatBanner}
+    ${rirBanner}
     ${backupBanner}
     ${cards}
     <button class="btn" onclick="promptNewRoutine()">＋ Nueva rutina</button>
@@ -1604,6 +1635,17 @@ function finishSession(){
     duration: Math.floor((Date.now() - s.start)/1000),
     entries
   };
+  /* nota educativa: sesión mayormente al fallo (RIR 0) */
+  const rirAll = entries.flatMap(e => e.sets).filter(s => s.rir !== undefined && s.rir !== null);
+  const zeros = rirAll.filter(s => s.rir === 0).length;
+  const failNote = (rirAll.length >= 4 && zeros / rirAll.length >= 0.7) ? `
+    <div class="coach warn" style="margin-bottom:16px">
+      Hoy llegaste al fallo (RIR 0) en ${zeros} de ${rirAll.length} series registradas.
+      <span class="why">La evidencia: ir al fallo da casi el mismo músculo que quedarte a 1–3 reps de él,
+      pero alarga la recuperación 24–48 h. Prueba dejar 1–2 reps en reserva en la mayoría de series —
+      progresarás igual y llegarás más fresca a la próxima sesión.</span>
+    </div>` : '';
+
   db.history.push(rec);
   db.active = null;
   restUntil = null;
@@ -1617,6 +1659,7 @@ function finishSession(){
       ${prs.length ? '' : 'La próxima vez verás las sugerencias actualizadas en cada ejercicio.'}</p>
     ${prs.length ? `<div class="coach good" style="margin-bottom:16px">
       Nuevo récord${prs.length===1?'':'s'} de 1RM estimado:<br>${prs.join('<br>')}</div>` : ''}
+    ${failNote}
     <button class="btn btn-acc" onclick="closeModal(); go({name:'history'})">Ver historial</button>
     <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'home'})">Volver al inicio</button>`);
 }
