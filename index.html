@@ -1764,7 +1764,13 @@ function importHevy(file){
       const col = n => head.indexOf(n);
       const iT = col('title'), iS = col('start_time'), iE = col('end_time'),
             iX = col('exercise_title'), iTy = col('set_type'),
-            iW = col('weight_kg'), iR = col('reps'), iRPE = col('rpe');
+            iR = col('reps'), iRPE = col('rpe');
+      /* Hevy exporta según la unidad de la cuenta: weight_kg (kg) o weight_lbs (libras) */
+      let iW = col('weight_kg'), wFactor = 1, wUnit = 'kg';
+      if(iW < 0){
+        iW = col('weight_lbs');
+        if(iW >= 0){ wFactor = LB_KG; wUnit = 'lb'; }
+      }
       if(iT < 0 || iS < 0 || iX < 0 || iR < 0){
         infoModal('Formato no reconocido', 'El archivo no parece una exportación de Hevy: faltan las columnas title, start_time, exercise_title o reps.');
         return;
@@ -1777,8 +1783,9 @@ function importHevy(file){
         if(iTy >= 0 && (r[iTy]||'').toLowerCase() === 'warmup'){ skippedWarmup++; continue; }
         const reps = parseInt(r[iR],10);
         if(isNaN(reps) || reps <= 0) continue;              /* cardio / series sin reps */
-        let w = parseFloat(r[iW]);
+        let w = iW >= 0 ? parseFloat(r[iW]) : NaN;
         if(isNaN(w) || w < 0) w = 0;                        /* peso corporal → 0 kg */
+        w = Math.round(w * wFactor * 1000) / 1000;          /* si venía en lb, a kg (canónico) */
         const skey = (r[iT]||'Hevy') + '|' + r[iS];
         if(!sessions.has(skey)){
           const end = iE >= 0 ? parseHevyDate(r[iE]) : null;
@@ -1813,6 +1820,7 @@ function importHevy(file){
         <h2>Importar de Hevy</h2>
         <p class="muted">Se encontraron <b style="color:var(--ink)">${news.length} sesiones</b> nuevas
           (${nSets} series) de: ${titles.map(esc).join(', ')}.
+          Pesos del archivo detectados en <b style="color:var(--ink)">${wUnit === 'lb' ? 'libras' : 'kilos'}</b>${wUnit === 'lb' ? ' — se convierten automáticamente (internamente todo vive en kg)' : ''}.
           ${skippedWarmup ? `Se omiten ${skippedWarmup} series de calentamiento.` : ''}
           Las rutinas que no existan se crean con los ejercicios de la sesión más reciente.</p>
         <button class="btn btn-acc" onclick="applyHevyImport()">Importar todo</button>
