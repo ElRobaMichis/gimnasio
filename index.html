@@ -198,6 +198,13 @@
   .aclist b{color:var(--acc)}
   .aclist .from{color:var(--mut);font-size:11px;white-space:nowrap;flex:none}
 
+  /* ---------- volumen semanal ---------- */
+  .volrow{display:grid;grid-template-columns:82px 1fr 86px;gap:10px;align-items:center;padding:4px 0}
+  .volrow .lbl{font-size:13px}
+  .volbar{height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden}
+  .volbar i{display:block;height:100%;border-radius:3px}
+  .volrow .val{font-size:12px;color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
   /* ---------- gráfica ---------- */
   .chartwrap{margin-top:10px}
   .chartwrap canvas{display:block;width:100%;touch-action:pan-y;border-radius:8px}
@@ -279,6 +286,12 @@ const GOALS = {
 const INC_START = 0.025, INC_MIN = 0.0125, INC_MAX = 0.06;
 const MAX_SETS_SUGG = 5;
 const TYPE_LABEL = { normal:'', asistido:'Asistido', corporal:'Peso corporal' };
+const MUSCLES = [
+  ['pecho','Pecho'], ['espalda','Espalda'], ['hombros','Hombros'],
+  ['biceps','Bíceps'], ['triceps','Tríceps'], ['pierna','Pierna'],
+  ['gluteos','Glúteos'], ['core','Core']
+];
+const PUSH_G = ['pecho','hombros','triceps'], PULL_G = ['espalda','biceps'];
 
 /* ---------- estado ---------- */
 let db = load();
@@ -338,8 +351,26 @@ function prog(key){
 
 /* metadatos por ejercicio: tipo, rango de reps propio, salto de kg, notas */
 function exMeta(key){
-  if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'', rest:null };
+  if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'', rest:null, muscle:null };
   return db.exmeta[key];
+}
+
+/* adivinar el grupo muscular por el nombre del ejercicio (es/en) */
+const MUSCLE_HINTS = [
+  ['core',    ['leg raise','crunch','plank','plancha','abdominal',' abs','ab wheel','oblique','oblicuo','russian','sit up','situp','woodchop']],
+  ['pierna',  ['squat','sentadilla','leg press','leg curl','leg extension','lunge','zancada','calf','gemelo','soleo','rdl','romanian','femoral','cuadriceps','hack','bulgarian','prensa','adductor','aductor','abductor','peso muerto rumano','step up','sissy']],
+  ['gluteos', ['glute','gluteo','hip thrust','puente','kickback','hip abduction','patada']],
+  ['hombros', ['shoulder','lateral','deltoid','delt','face pull','overhead','military','militar','arnold','pajaro','elevacion','upright row','rear fly']],
+  ['triceps', ['triceps','tricep','pushdown','skull','frances','rompecraneos','katana','jm press']],
+  ['biceps',  ['curl','biceps','bicep','preacher','predicador','martillo','hammer','bayesian']],
+  ['espalda', ['row','pulldown','pull up','pullup','pull-up','pull over','pullover','chin','dorsal','remo','jalon','deadlift','shrug','encogimiento','rack pull','good morning','hiperextension','back extension','lat ']],
+  ['pecho',   ['bench','chest','banca','pecho','fly','apertura','dip','fondos','push up','pushup','flexion','pec deck','crossover','press de banca','svend']],
+];
+function guessMuscle(name){
+  const n = ' ' + acNorm(name) + ' ';
+  for(const [group, words] of MUSCLE_HINTS)
+    if(words.some(w => n.includes(w))) return group;
+  return null;
 }
 function effRange(key){
   const m = exMeta(key), g = goalRange();
@@ -627,6 +658,25 @@ function viewRoutine(){
   if(!r) return viewHome();
   const goal = goalRange();
 
+  /* modo reordenar: solo nombres con flechas ↑↓ */
+  if(view.sort){
+    const sortItems = r.exercises.map((ex, i) => `
+      <div class="card"><div class="row">
+        <b class="grow">${i+1}. ${esc(ex.name)}</b>
+        <button class="iconbtn" aria-label="Subir" ${i===0?'disabled style="opacity:.25"':''}
+          onclick="moveEx('${r.id}',${i},-1)">↑</button>
+        <button class="iconbtn" aria-label="Bajar" ${i===r.exercises.length-1?'disabled style="opacity:.25"':''}
+          onclick="moveEx('${r.id}',${i},1)">↓</button>
+      </div></div>`).join('');
+    return `<div class="stack">
+      <div class="row">
+        <h2 class="grow">Ordenar — ${esc(r.name)}</h2>
+      </div>
+      ${sortItems}
+      <button class="btn btn-acc" onclick="toggleSort()">✓ Listo</button>
+    </div>`;
+  }
+
   const items = r.exercises.map(ex => {
     const sugg = computeSuggestion(ex.key);
     const last = lastEntry(ex.key);
@@ -655,6 +705,8 @@ function viewRoutine(){
     <button class="btn-ghost row" style="color:var(--mut);font-weight:600;width:auto" onclick="go({name:'home'})">‹ Rutinas</button>
     <div class="row">
       <h2 class="grow">${esc(r.name)}</h2>
+      ${r.exercises.length > 1 ? `<button class="iconbtn" aria-label="Reordenar ejercicios" onclick="toggleSort()">↕️</button>` : ''}
+      <button class="iconbtn" aria-label="Duplicar rutina" onclick="duplicateRoutine('${r.id}')">⧉</button>
       <button class="iconbtn" aria-label="Eliminar rutina" onclick="deleteRoutine('${r.id}')">🗑️</button>
     </div>
     ${items || `<div class="empty"><p class="muted">Agrega los ejercicios de esta rutina.</p></div>`}
@@ -764,6 +816,13 @@ function viewExercise(){
               <option value="${v}" ${String(meta.step ?? 'auto')===v?'selected':''}>${v==='auto'?'Auto':v.replace('.',',')+' kg'}</option>`).join('')}
           </select></div>
       </div>
+      <div class="field" style="margin-top:10px"><span>Grupo muscular</span>
+        <select onchange="setExMuscle('${key}',this.value)">
+          <option value="none" ${!meta.muscle || meta.muscle==='none' ? 'selected':''}>Sin grupo</option>
+          ${MUSCLES.map(([k,l]) => `<option value="${k}" ${meta.muscle===k?'selected':''}>${l}</option>`).join('')}
+        </select>
+        <span style="text-transform:none;letter-spacing:0;font-weight:400">Alimenta el resumen semanal de volumen (pestaña Historial).</span>
+      </div>
       <div class="field" style="margin-top:10px"><span>Descanso entre series de este ejercicio</span>
         <select onchange="setExRest('${key}',this.value)">
           <option value="auto" ${!meta.rest?'selected':''}>Igual que el general (Ajustes)</option>
@@ -808,6 +867,7 @@ function setExRest(key, val){
   exMeta(key).rest = (val === 'auto') ? null : parseInt(val,10);
   save();
 }
+function setExMuscle(key, val){ exMeta(key).muscle = val; save(); }
 
 /* ---------- SESIÓN ACTIVA ---------- */
 function viewSession(){
@@ -878,6 +938,55 @@ function setRowHTML(xi, si, st, sugg, corp){
 }
 
 /* ---------- HISTORIAL ---------- */
+/* series de los últimos 7 días por grupo muscular + desbalance empuje/jalón (14 días) */
+function volumeCardHTML(){
+  const now = Date.now();
+  const cut7 = new Date(now - 7*864e5).toISOString();
+  const cut14 = new Date(now - 14*864e5).toISOString();
+  const counts = {}; let untagged = 0, push = 0, pull = 0, any = false;
+  for(const h of db.history){
+    if(h.date < cut14) continue;
+    for(const e of h.entries){
+      const m = exMeta(e.key).muscle;
+      const n = e.sets.length;
+      if(h.date >= cut7){
+        any = true;
+        if(!m || m === 'none') untagged += n;
+        else counts[m] = (counts[m]||0) + n;
+      }
+      if(m && PUSH_G.includes(m)) push += n;
+      if(m && PULL_G.includes(m)) pull += n;
+    }
+  }
+  if(!any) return '';
+  const rows = MUSCLES.filter(([k]) => counts[k]).map(([k,l]) => {
+    const c = counts[k];
+    const pct = Math.min(100, c/20*100);
+    const color = c > 20 ? 'var(--warn)' : (c >= 10 ? 'var(--good)' : '#5b6170');
+    const tag = c > 20 ? 'alto' : (c >= 10 ? '✓ óptimo' : 'bajo');
+    return `<div class="volrow">
+      <span class="lbl">${l}</span>
+      <span class="volbar"><i style="width:${pct}%;background:${color}"></i></span>
+      <span class="val num">${c} · ${tag}</span>
+    </div>`;
+  }).join('');
+  let imb = '';
+  if(push + pull >= 24 && (push > pull*1.75 || pull > push*1.75)){
+    const masEmpuje = push > pull;
+    imb = `<div class="coach warn" style="margin-top:10px">
+      ⚖️ Desbalance (14 días): <b>${masEmpuje?'empuje':'jalón'} ${masEmpuje?push:pull} series</b> vs ${masEmpuje?'jalón':'empuje'} ${masEmpuje?pull:push}.
+      <span class="why">Empuje = pecho/hombros/tríceps · jalón = espalda/bíceps. Mantenerlos cerca de 1:1 protege tus hombros:
+      suma ${masEmpuje?'remos y jalones':'presses y aperturas'}.</span></div>`;
+  }
+  return `<div class="card">
+    <p class="eyebrow" style="margin-bottom:8px">Series · últimos 7 días</p>
+    ${rows || '<p class="muted">Asigna un grupo muscular a tus ejercicios (tocándolos en su rutina) para ver este resumen.</p>'}
+    ${rows ? '<p class="tiny" style="margin-top:8px">La evidencia: 10–20 series semanales por grupo es la zona óptima; más da retornos decrecientes.</p>' : ''}
+    ${untagged ? `<p class="tiny">${untagged} series sin grupo asignado (se asigna en la ficha de cada ejercicio).</p>` : ''}
+    ${imb}
+  </div>`;
+}
+
 function viewHistory(){
   if(!db.history.length) return `<div class="empty">
     <div class="big">📅</div>
@@ -902,10 +1011,82 @@ function viewHistory(){
             <span>${esc(e.name)}</span>
             <span class="sets num">${e.sets.map(s=>`${fmtW(s.w)}×${s.r}`).join(' · ')}</span>
           </div>`).join('')}
+        <div class="row" style="margin-top:12px">
+          <button class="btn" style="padding:9px;font-size:13.5px" onclick="editSession('${h.id}')">✏️ Editar</button>
+          <button class="btn btn-danger" style="padding:9px;font-size:13.5px" onclick="deleteSession('${h.id}')">🗑️ Borrar</button>
+        </div>
       </div>
     </details>`;
   }).join('');
-  return `<div class="stack">${items}</div>`;
+  return `<div class="stack">${volumeCardHTML()}${items}</div>`;
+}
+
+/* ---------- editar / borrar sesiones ---------- */
+function rebuildProgress(){
+  db.history.sort((a,b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+  db.progress = {};
+  for(const h of db.history)
+    for(const e of h.entries) updateProgress(e.key, e.sets, h.date);
+  save();
+}
+function deleteSession(id){
+  const h = db.history.find(x => x.id === id);
+  if(!h) return;
+  confirmModal(`¿Borrar la sesión de ${esc(h.routineName)}?`,
+    `${fmtDate(h.date)} · ${h.entries.reduce((a,e)=>a+e.sets.length,0)} series. Las sugerencias del coach se recalculan sin ella. No se puede deshacer.`,
+    'Borrar sesión', () => {
+      db.history = db.history.filter(x => x.id !== id);
+      rebuildProgress(); render();
+    });
+}
+function editSession(id){
+  const h = db.history.find(x => x.id === id);
+  if(!h) return;
+  window.__edit = JSON.parse(JSON.stringify(h));
+  const ed = window.__edit;
+  openModal(`
+    <h2>Editar sesión</h2>
+    <p class="muted">${esc(ed.routineName)} · ${fmtDate(ed.date)}. Corrige kg, reps o RIR;
+      deja las reps vacías (o en 0) para descartar esa serie.</p>
+    <div class="stack">
+    ${ed.entries.map((e, ei) => `
+      <div>
+        <b style="font-size:14.5px">${esc(e.name)}</b>
+        ${e.sets.map((st, si) => `
+          <div class="setrow" style="grid-template-columns:24px 1.15fr 1fr .95fr">
+            <span class="idx">${si+1}</span>
+            <input type="number" inputmode="decimal" step="any" min="0" value="${st.w ?? ''}"
+              aria-label="Peso" oninput="editVal(${ei},${si},'w',this.value)">
+            <input type="number" inputmode="numeric" step="1" min="0" value="${st.r ?? ''}"
+              aria-label="Reps" oninput="editVal(${ei},${si},'r',this.value)">
+            <input type="number" inputmode="numeric" step="1" min="0" max="9" value="${st.rir ?? ''}" placeholder="rir"
+              aria-label="RIR" oninput="editVal(${ei},${si},'rir',this.value)">
+          </div>`).join('')}
+      </div>`).join('')}
+    </div>
+    <button class="btn btn-acc" style="margin-top:16px" onclick="saveEditedSession()">Guardar cambios</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+}
+function editVal(ei, si, field, val){ window.__edit.entries[ei].sets[si][field] = val; }
+function saveEditedSession(){
+  const ed = window.__edit;
+  if(!ed) return;
+  const entries = [];
+  for(const e of ed.entries){
+    const sets = e.sets.map(st => {
+      const w = parseFloat(st.w), r = parseInt(st.r,10), rir = parseInt(st.rir,10);
+      const out = { w, r };
+      if(!isNaN(rir)) out.rir = Math.min(9, Math.max(0, rir));
+      return out;
+    }).filter(st => !isNaN(st.w) && st.w >= 0 && !isNaN(st.r) && st.r > 0);
+    if(sets.length) entries.push({ key: e.key, name: e.name, sets });
+  }
+  window.__edit = null;
+  closeModal();
+  if(!entries.length){ deleteSession(ed.id); return; }   /* quedó vacía → ofrecer borrarla */
+  const h = db.history.find(x => x.id === ed.id);
+  h.entries = entries;
+  rebuildProgress(); render();
 }
 
 /* ---------- AJUSTES ---------- */
@@ -1032,6 +1213,7 @@ function addExercise(ev, rid){
   const known = allExerciseNames().get(key);
   r.exercises.push({ id:uid(), name: known ? known.name : name, key });
   if(/assisted|asistid/i.test(name)) exMeta(key).type = 'asistido';
+  if(!exMeta(key).muscle){ const g = guessMuscle(name); if(g) exMeta(key).muscle = g; }
   save(); render();
   setTimeout(() => { const i = document.getElementById('newex'); if(i){ i.focus(); } }, 30);
 }
@@ -1105,6 +1287,21 @@ function removeExercise(rid, exid){
   const r = db.routines.find(x => x.id === rid);
   r.exercises = r.exercises.filter(e => e.id !== exid);
   save(); render();
+}
+function toggleSort(){ view.sort = !view.sort; render(); }
+function moveEx(rid, i, dir){
+  const r = db.routines.find(x => x.id === rid);
+  const j = i + dir;
+  if(j < 0 || j >= r.exercises.length) return;
+  [r.exercises[i], r.exercises[j]] = [r.exercises[j], r.exercises[i]];
+  save(); render();
+}
+function duplicateRoutine(rid){
+  const r = db.routines.find(x => x.id === rid);
+  const copy = { id:uid(), name: r.name + ' (copia)',
+    exercises: r.exercises.map(e => ({ id:uid(), name:e.name, key:e.key })) };
+  db.routines.push(copy);
+  save(); go({name:'routine', id:copy.id});
 }
 
 function startSession(rid){
@@ -1581,6 +1778,9 @@ function applyHevyImport(){
     newRoutines++;
   }
 
+  /* tipos y grupos musculares de lo recién importado */
+  migrateTypes();
+
   /* reconstruir el estado adaptativo reproduciendo todo el historial en orden */
   db.progress = {};
   for(const h of db.history)
@@ -1699,6 +1899,14 @@ function migrateTypes(){
   for(const [k, t] of traits){
     if(t.assisted){ exMeta(k).type = 'asistido'; changed = true; }
     else if(t.zero){ exMeta(k).type = 'corporal'; changed = true; }
+  }
+  /* grupos musculares: adivinar donde falte (el usuario puede corregir en la ficha) */
+  for(const [key, info] of allExerciseNames()){
+    const m = exMeta(key);
+    if(m.muscle === undefined || m.muscle === null){
+      const g = guessMuscle(info.name);
+      if(g){ m.muscle = g; changed = true; }
+    }
   }
   if(changed) save();
 }
