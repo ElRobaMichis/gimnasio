@@ -306,6 +306,7 @@ function normalize(d){
   if(d.settings.goal === undefined) d.settings.goal = null;
   if(d.settings.rest === undefined) d.settings.rest = 'auto';
   if(d.settings.screenOn === undefined) d.settings.screenOn = 'on';
+  if(d.settings.notify === undefined) d.settings.notify = 'off';
   if(d.settings.unit !== 'lb') d.settings.unit = 'kg';
   d.routines = Array.isArray(d.routines) ? d.routines : [];
   d.history  = Array.isArray(d.history)  ? d.history  : [];
@@ -1332,6 +1333,26 @@ function viewSettings(){
     </div>
 
     <div class="card">
+      <p class="eyebrow" style="margin-bottom:8px">Notificaciones</p>
+      ${ canNotify() ? `
+        <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
+          Activadas ✓ — te aviso cuando termina el descanso y si una sesión queda abierta sin actividad
+          (solo cuando la app no está a la vista).
+        </p>
+        <button class="btn" onclick="disableNotifications()">Desactivar</button>` : `
+        <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
+          Recibe un aviso cuando termine tu descanso o si tu sesión queda olvidada — útil si cambias
+          de app mientras descansas.
+        </p>
+        <button class="btn btn-acc" onclick="enableNotifications()">Activar notificaciones</button>` }
+      <p class="tiny" style="margin-top:8px">
+        En iPhone requiere la app instalada en la pantalla de inicio (iOS 16.4+). Con la app a la vista
+        no notifica: el sonido y la vibración ya avisan. Si el teléfono está bloqueado, iOS puede pausar
+        la app — la opción “pantalla encendida durante la sesión” evita justo eso.
+      </p>
+    </div>
+
+    <div class="card">
       <p class="eyebrow" style="margin-bottom:8px">Pantalla durante la sesión</p>
       <button class="goal-opt ${db.settings.screenOn !== 'off' ? 'on' : ''}"
         onclick="setScreenOn(db.settings.screenOn === 'off' ? 'on' : 'off')">
@@ -1543,6 +1564,7 @@ function setVal(xi, si, field, val){
   const st = db.active.exercises[xi].sets[si];
   const wasEmpty = (st[field] === '' || st[field] === undefined);
   st[field] = val;
+  db.active.lastLog = Date.now();
   save();
   /* al anotar las reps de una serie, arranca solo el descanso (con el tiempo propio del ejercicio) */
   if(field === 'r' && val !== '' && wasEmpty) startRestAuto(db.active.exercises[xi].key);
@@ -1818,6 +1840,57 @@ function toggleRest(){
   else startRestAuto();
   tickRest();
 }
+/* ---------- notificaciones del sistema (opt-in) ---------- */
+function canNotify(){
+  return db.settings.notify === 'on' &&
+         typeof Notification !== 'undefined' && Notification.permission === 'granted';
+}
+/* solo avisa cuando la app NO está a la vista: en pantalla, el sonido/vibración bastan */
+function notify(title, body, tag){
+  if(!canNotify()) return;
+  if(typeof document !== 'undefined' && document.visibilityState === 'visible') return;
+  try{
+    if(navigator.serviceWorker && navigator.serviceWorker.ready){
+      navigator.serviceWorker.ready
+        .then(reg => reg.showNotification(title, { body, tag, icon:'icon-192.png', badge:'icon-192.png' }))
+        .catch(() => {});
+    } else {
+      new Notification(title, { body, tag });
+    }
+  }catch(e){}
+}
+function enableNotifications(){
+  if(typeof Notification === 'undefined'){
+    infoModal('No disponible en este navegador',
+      'En iPhone, las notificaciones solo funcionan con la app instalada en la pantalla de inicio (Safari → Compartir → Añadir a pantalla de inicio) y iOS 16.4 o más nuevo. Instálala y actívalas desde ahí.');
+    return;
+  }
+  Notification.requestPermission().then(perm => {
+    if(perm === 'granted'){
+      db.settings.notify = 'on'; save(); render();
+      infoModal('Notificaciones activadas ✓',
+        'Te avisaré cuando termine tu descanso y si una sesión queda abierta sin actividad — solo cuando la app no esté a la vista.');
+    } else {
+      db.settings.notify = 'off'; save(); render();
+      if(perm === 'denied') infoModal('Permiso bloqueado',
+        'El navegador tiene bloqueadas las notificaciones para esta app. Para permitirlas: ajustes del navegador/teléfono → notificaciones de este sitio → permitir, y vuelve a intentarlo.');
+    }
+  });
+}
+function disableNotifications(){ db.settings.notify = 'off'; save(); render(); }
+
+/* sesión olvidada: abierta 15+ min sin anotar nada */
+function checkIdleSession(){
+  if(!db.active) return;
+  const last = db.active.lastLog || db.active.start;
+  if(Date.now() - last > 15*60*1000 && !(db.active.idleNotified > last)){
+    db.active.idleNotified = Date.now();
+    save();
+    notify('⏱️ Tu sesión sigue en curso',
+      'Llevas 15 min sin anotar series. ¿Seguimos? Si ya acabaste, entra y toca “Terminar” para guardarla.', 'hierro-idle');
+  }
+}
+
 /* pantalla siempre encendida durante la sesión (Wake Lock) */
 let wakeLock = null;
 async function acquireWake(){
@@ -1860,6 +1933,7 @@ function tickRest(){
   if(rem <= 0){
     restUntil = null;
     beep();
+    notify('✅ Descanso listo', '¡A la siguiente serie!', 'hierro-rest');
     el.className = 'restchip done';
     el.textContent = '✓ Descanso listo — ¡a la siguiente serie!';
     setTimeout(() => { if(restUntil === null) tickRest(); }, 4000);
@@ -2310,6 +2384,7 @@ function migrateTypes(){
   document.addEventListener('visibilitychange', () => {
     if(document.visibilityState === 'visible' && db.active) acquireWake();
   });
+  setInterval(checkIdleSession, 60*1000);
   migrateTypes();
   render();
   if(!db.settings.goal){
