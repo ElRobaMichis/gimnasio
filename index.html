@@ -411,15 +411,46 @@ function avgRIR(sets){
   return rs.length ? rs.reduce((a,b) => a+b, 0) / rs.length : null;
 }
 
-/* último registro histórico de un ejercicio (opcional: solo antes de una fecha) */
+/* último registro histórico de un ejercicio (opcional: solo antes de una fecha).
+   Las sesiones de descarga no cuentan: son mantenimiento, no datos de progresión. */
 function lastEntry(key, beforeISO){
   let best = null;
   for(const s of db.history){
+    if(s.deload) continue;
     if(beforeISO && s.date >= beforeISO) continue;
     const e = s.entries.find(x => x.key === key);
     if(e && e.sets.length && (!best || s.date > best.session.date)) best = { entry:e, session:s };
   }
   return best;
+}
+
+/* transformar la sugerencia normal en objetivo de descarga:
+   ~10 % menos carga y la mitad de las series (50 % del volumen) */
+function deloadSugg(key, sugg){
+  if(!sugg) return null;
+  const meta = exMeta(key);
+  const { lo } = effRange(key);
+  const sets = Math.max(1, Math.ceil(sugg.sets / 2));
+  const why = `Sesión de descarga: ~10 % menos carga y la mitad de las series. Recuperas sin perder el hábito, y la próxima sesión normal retoma tu progresión exactamente donde iba.`;
+  if(meta.type === 'asistido' && sugg.w > 0){
+    const w = sugg.w + effStep(key, sugg.w);
+    return { w, reps: lo, sets, type:'hold',
+      msg:`Descarga: <b>${fmtW(w)} ${uLabel()} de ayuda × ${lo}</b> en ${sets} serie${sets===1?'':'s'}`, why };
+  }
+  if(meta.type === 'tiempo'){
+    const reps = Math.max(10, Math.round(sugg.reps * 0.7 / 5) * 5);
+    return { w: sugg.w, reps, sets, type:'hold',
+      msg:`Descarga: <b>${reps} s</b> en ${sets} serie${sets===1?'':'s'}`, why };
+  }
+  if(meta.type === 'corporal' || sugg.w === 0){
+    const reps = Math.max(1, Math.round(sugg.reps * 0.7));
+    return { w: sugg.w, reps, sets, type:'hold',
+      msg:`Descarga: <b>${reps} reps</b> en ${sets} serie${sets===1?'':'s'}`, why };
+  }
+  let w = roundToStep(sugg.w * 0.9, effStep(key, sugg.w));
+  if(w <= 0) w = sugg.w;
+  return { w, reps: lo, sets, type:'hold',
+    msg:`Descarga: <b>${fmtW(w)} ${uLabel()} × ${lo}</b> en ${sets} serie${sets===1?'':'s'}`, why };
 }
 
 /* peso "de trabajo": el más usado en la sesión; empate → el mayor */
@@ -736,7 +767,7 @@ function systemicFatigue(){
   if(db.settings.fatigueDismissed && db.settings.fatigueDismissed > cut) return null;
   const perKey = new Map();
   for(const h of db.history) for(const e of h.entries){
-    if(!e.sets.length) continue;
+    if(h.deload || !e.sets.length) continue;   /* una descarga no es retroceso */
     if(!perKey.has(e.key)) perKey.set(e.key, []);
     perKey.get(e.key).push({ date:h.date, sets:e.sets });
   }
@@ -820,8 +851,9 @@ function viewHome(){
     <div class="coach warn" style="margin-top:0">
       🪫 Señal de fatiga acumulada: retrocediste en <b>${fat.regressed} de ${fat.evaluated}</b> ejercicios recientes.
       <span class="why">Cuando cae casi todo a la vez, el problema no es un ejercicio: es falta de recuperación.
-      Lo que mejor funciona: una semana de descarga (mismos ejercicios, la mitad de las series y ~10 % menos peso)
-      o 2–3 días extra de descanso y sueño. Después se progresa mejor que forzando.</span>
+      Lo que mejor funciona: una semana de descarga o 2–3 días extra de descanso y sueño.
+      Tip: en cada rutina tienes <b>“Empezar como descarga”</b> — el coach calcula solo los pesos
+      y series suaves, y tu progresión no se toca.</span>
       <button class="btn btn-ghost" style="margin-top:8px;padding:7px;font-size:13px" onclick="dismissFatigue()">Entendido — ocultar 10 días</button>
     </div>` : '';
 
@@ -930,6 +962,7 @@ function viewRoutine(){
     </form>
     ${ r.exercises.length ? `
       <button class="btn btn-acc" style="font-size:17px;padding:16px" onclick="startSession('${r.id}')">▶ &nbsp;Empezar sesión</button>
+      <button class="linkish tiny" style="margin:2px auto 0;display:block" onclick="confirmModal('¿Sesión de descarga?','El coach recalcula todo: ~10 % menos carga y la mitad de las series. Ideal tras semanas duras o cuando aparece el aviso de fatiga. No afecta tu progresión: la próxima sesión normal retoma donde ibas.','Empezar descarga',() => startSession('${r.id}', true), true)">🪫 Empezar como descarga</button>
       <p class="tiny" style="text-align:center">Rango objetivo según tu meta: ${goal.lo}–${goal.hi} reps por serie, dejando 1–3 en reserva.
         Toca un ejercicio para ver su progreso y ajustes.</p>` : '' }
   </div>`;
@@ -991,6 +1024,14 @@ function viewExercise(){
           : corporal
           ? 'Tus mejores reps en una serie.'
           : `Tu récord de <span class="linkish" role="button" tabindex="0" onclick="e1rmInfo()">1RM estimado ⓘ</span> — el peso máximo que podrías levantar una sola vez, calculado desde tus series.`}</p>
+        ${ (() => {
+          if(repsMode || meta.type === 'asistido' || !hist.length) return '';
+          const wNow = workWeight(hist[hist.length-1].sets);
+          const bestKg = Math.max(0, ...hist.map(h => bestE1RM(h.sets)));
+          if(!(wNow > 0) || !(bestKg > 0)) return '';
+          return `<p class="tiny" style="margin-top:4px">Tu peso de trabajo actual (${fmtW(wNow)} ${uLabel()})
+            ≈ <b style="color:var(--ink)">${Math.round(wNow / bestKg * 100)} %</b> de tu 1RM estimado.</p>`;
+        })() }
         ${ pts.length >= 2 ? `
           <div class="chartwrap"><canvas id="exchart" height="190"></canvas></div>
           <p class="tiny" id="charttip" style="text-align:center;margin-top:6px">Toca la gráfica para ver cada sesión</p>`
@@ -1159,6 +1200,7 @@ function viewSession(){
       <div id="sets-${xi}">
         ${ ex.sets.map((st, si) => setRowHTML(xi, si, st, ex.sugg, t)).join('') }
       </div>
+      <div class="tiny num" id="vs-${xi}" style="margin-top:7px;text-align:center"></div>
       <button class="addset" onclick="addSet(${xi})">＋ Agregar serie</button>
     </div>`;
   }).join('');
@@ -1171,7 +1213,7 @@ function viewSession(){
         <span class="dot" aria-hidden="true"></span>
         <div class="grow">
           <div class="clock num" id="clock">0:00</div>
-          <div class="tiny">${esc(s.routineName)} · en curso</div>
+          <div class="tiny">${esc(s.routineName)}${s.deload ? ' · <b style="color:var(--warn)">DESCARGA</b>' : ' · en curso'}</div>
         </div>
         <button class="btn btn-danger" style="width:auto;padding:10px 16px" onclick="askFinish()">Terminar</button>
       </div>
@@ -1275,7 +1317,7 @@ function viewHistory(){
     <details class="hist">
       <summary>
         <div class="grow">
-          <b>${esc(h.routineName)}</b>
+          <b>${esc(h.routineName)}</b>${h.deload ? ' <span class="pill" style="color:var(--warn);border-color:#4a4630">Descarga</span>' : ''}
           <div class="tiny">${fmtDate(h.date)}${h.duration ? ` · ${fmtDur(h.duration)}` : ''} · ${nSets} series${vol ? ` · ${fmtNum(Math.round(fromKg(vol)))} ${uLabel()} movidos` : ''}</div>
         </div>
         <span style="color:var(--mut)">▾</span>
@@ -1300,8 +1342,10 @@ function viewHistory(){
 function rebuildProgress(){
   db.history.sort((a,b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
   db.progress = {};
-  for(const h of db.history)
+  for(const h of db.history){
+    if(h.deload) continue;   /* las descargas no alimentan la progresión */
     for(const e of h.entries) updateProgress(e.key, e.sets, h.date);
+  }
   save();
 }
 function deleteSession(id){
@@ -1651,14 +1695,16 @@ function duplicateRoutine(rid){
   save(); go({name:'routine', id:copy.id});
 }
 
-function startSession(rid){
+function startSession(rid, deload){
   const r = db.routines.find(x => x.id === rid);
   db.active = {
     id: uid(),
     routineId: r.id, routineName: r.name,
     start: Date.now(),
+    deload: !!deload,
     exercises: r.exercises.map(ex => {
-      const sugg = computeSuggestion(ex.key);
+      let sugg = computeSuggestion(ex.key);
+      if(deload) sugg = deloadSugg(ex.key, sugg);
       const n = sugg ? sugg.sets : 1;
       return { key:ex.key, name:ex.name, sugg,
                sets: Array.from({length:Math.max(1,n)}, () => ({w:'', r:'', rir:''})) };
@@ -1674,8 +1720,61 @@ function setVal(xi, si, field, val){
   st[field] = val;
   db.active.lastLog = Date.now();
   save();
+  updateVsChip(xi);
+  if(field === 'w' || field === 'r') syncPlaceholders(xi);
   /* al anotar las reps de una serie, arranca solo el descanso (con el tiempo propio del ejercicio) */
   if(field === 'r' && val !== '' && wasEmpty) startRestAuto(db.active.exercises[xi].key);
+}
+
+/* comparación en vivo del volumen del ejercicio contra su última sesión */
+function vsLastInfo(xi){
+  const ex = db.active.exercises[xi];
+  const meta = exMeta(ex.key);
+  if(meta.type === 'asistido') return null;      /* menos ayuda ≠ menos volumen */
+  const last = lastEntry(ex.key);
+  if(!last) return null;
+  const repsMode = meta.type === 'corporal' || meta.type === 'tiempo';
+  const prevVol = last.entry.sets.reduce((a,s) => a + (repsMode ? s.r : s.w * s.r), 0);
+  if(prevVol <= 0) return null;
+  let vol = 0, done = 0;
+  for(const st of ex.sets){
+    const r = parseInt(st.r, 10);
+    if(isNaN(r) || r <= 0) continue;
+    if(repsMode){ vol += r; done++; }
+    else {
+      const w = parseFloat(st.w);
+      if(!isNaN(w) && w >= 0){ vol += toKg(w) * r; done++; }
+    }
+  }
+  if(!done) return null;
+  return { pct: Math.round(vol / prevVol * 100), beat: vol > prevVol };
+}
+function updateVsChip(xi){
+  const el = document.getElementById('vs-' + xi);
+  if(!el) return;
+  const info = vsLastInfo(xi);
+  if(!info){ el.textContent = ''; return; }
+  el.style.color = info.beat ? 'var(--good)' : 'var(--mut)';
+  el.textContent = info.beat
+    ? `✓ Superaste el volumen de la última sesión (${info.pct} %)`
+    : `Volumen vs última sesión: ${info.pct} %`;
+}
+
+/* al escribir peso o reps, las series vacías siguientes heredan ese valor como sugerencia */
+function syncPlaceholders(xi){
+  const ex = db.active.exercises[xi];
+  let lastW = '', lastR = '';
+  ex.sets.forEach((st, si) => {
+    const filledW = st.w !== '' && st.w !== undefined;
+    const filledR = st.r !== '' && st.r !== undefined;
+    if(filledW) lastW = st.w;
+    if(filledR) lastR = st.r;
+    const row = document.getElementById(`set-${xi}-${si}`);
+    if(!row || !row.querySelectorAll) return;
+    const inps = row.querySelectorAll('input');
+    if(!filledW && inps[0] && lastW !== '') inps[0].placeholder = lastW;
+    if(!filledR && inps[1] && lastR !== '') inps[1].placeholder = lastR;
+  });
 }
 function addSet(xi){
   const ex = db.active.exercises[xi];
@@ -1683,6 +1782,7 @@ function addSet(xi){
   save();
   const cont = document.getElementById('sets-'+xi);
   cont.insertAdjacentHTML('beforeend', setRowHTML(xi, ex.sets.length-1, {w:'',r:'',rir:''}, ex.sugg, exMeta(ex.key).type));
+  updateVsChip(xi); syncPlaceholders(xi);
 }
 function removeSet(xi, si){
   const ex = db.active.exercises[xi];
@@ -1691,6 +1791,7 @@ function removeSet(xi, si){
   save();
   document.getElementById('sets-'+xi).innerHTML =
     ex.sets.map((st,i) => setRowHTML(xi, i, st, ex.sugg, exMeta(ex.key).type)).join('');
+  updateVsChip(xi); syncPlaceholders(xi);
 }
 
 /* ---------- agregar ejercicio a la sesión en curso ---------- */
@@ -1881,6 +1982,19 @@ function askFinish(){
 }
 
 /* mejor marca previa de un ejercicio: e1RM (normal) o reps máximas (corporal) */
+/* récord en asistidos: la MENOR ayuda con la que se logró el piso del rango */
+function bestAssistBefore(key){
+  const { lo } = effRange(key);
+  let best = Infinity;
+  for(const h of db.history){
+    if(h.deload) continue;
+    const e = h.entries.find(x => x.key === key);
+    if(!e) continue;
+    for(const st of e.sets) if(st.r >= lo && st.w < best) best = st.w;
+  }
+  return best;
+}
+
 function bestMetricBefore(key){
   const repsMode = ['corporal','tiempo'].includes(exMeta(key).type);
   let best = 0;
@@ -1896,12 +2010,23 @@ function bestMetricBefore(key){
 function finishSession(){
   const s = db.active;
   const entries = collectEntries(s);
+  const isDeload = !!s.deload;
 
-  /* récords personales: comparar contra la mejor marca histórica ANTES de guardar */
+  /* récords personales: comparar contra la mejor marca histórica ANTES de guardar
+     (una descarga nunca compite por récords) */
   const prs = [];
-  for(const e of entries){
+  if(!isDeload) for(const e of entries){
     const meta = exMeta(e.key);
-    if(meta.type === 'asistido') continue;   /* en asistidos el e1RM de la ayuda no significa nada */
+    if(meta.type === 'asistido'){
+      /* asistido: el récord es lograr el rango con MENOS ayuda */
+      const { lo } = effRange(e.key);
+      const prevBest = bestAssistBefore(e.key);
+      const nowBest = Math.min(...e.sets.filter(st => st.r >= lo).map(st => st.w), Infinity);
+      if(prevBest !== Infinity && nowBest < prevBest - 1e-9){
+        prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${nowBest === 0 ? '¡sin asistencia!' : fmtW(nowBest) + ' ' + uLabel() + ' de ayuda'}</b> <span class="tiny">(antes ${fmtW(prevBest)})</span>`);
+      }
+      continue;
+    }
     const repsMode = ['corporal','tiempo'].includes(meta.type);
     const prev = bestMetricBefore(e.key);
     const now = repsMode ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
@@ -1918,6 +2043,7 @@ function finishSession(){
     duration: Math.floor((Date.now() - s.start)/1000),
     entries
   };
+  if(isDeload) rec.deload = true;
   /* nota educativa: sesión mayormente al fallo (RIR 0) */
   const rirAll = entries.flatMap(e => e.sets).filter(s => s.rir !== undefined && s.rir !== null);
   const zeros = rirAll.filter(s => s.rir === 0).length;
@@ -1934,14 +2060,23 @@ function finishSession(){
   restUntil = null;
   releaseWake();
   save();
-  for(const e of entries) updateProgress(e.key, e.sets, rec.date);
+  if(!isDeload) for(const e of entries) updateProgress(e.key, e.sets, rec.date);
   closeModal();
+  if(isDeload){
+    openModal(`
+      <h2>Descarga guardada 🪫→🔋</h2>
+      <p class="muted">${fmtDur(rec.duration)} · ${entries.reduce((a,e)=>a+e.sets.length,0)} series suaves.
+        Esta sesión no toca tu progresión ni tus récords: la próxima sesión normal retoma
+        exactamente donde ibas, con el cuerpo más fresco.</p>
+      <button class="btn btn-acc" onclick="closeModal(); go({name:'home'})">Listo</button>`);
+    return;
+  }
   openModal(`
     <h2>${prs.length ? '🏆 ¡Sesión con récord!' : 'Sesión guardada 💪'}</h2>
     <p class="muted">${fmtDur(rec.duration)} · ${entries.reduce((a,e)=>a+e.sets.length,0)} series.
       ${prs.length ? '' : 'La próxima vez verás las sugerencias actualizadas en cada ejercicio.'}</p>
     ${prs.length ? `<div class="coach good" style="margin-bottom:16px">
-      Nuevo récord${prs.length===1?'':'s'} de 1RM estimado:<br>${prs.join('<br>')}</div>` : ''}
+      Nuevo récord${prs.length===1?'':'s'}:<br>${prs.join('<br>')}</div>` : ''}
     ${failNote}
     <button class="btn btn-acc" onclick="closeModal(); go({name:'history'})">Ver historial</button>
     <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'home'})">Volver al inicio</button>`);
@@ -2612,6 +2747,7 @@ function afterRender(){
     tick();
     timerInt = setInterval(tick, 1000);
     acquireWake();
+    db.active.exercises.forEach((ex, xi) => { updateVsChip(xi); syncPlaceholders(xi); });
   }
   if(view.name === 'exercise') drawChart();
 }

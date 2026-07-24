@@ -495,6 +495,91 @@ const entries2 = (db.active.exercises[1].sets[0] = { w:'62.5', r:'10', rir:'' },
 chk(entries2.length === 1 && entries2[0].key === 'press banca', 'al guardar solo cuentan las series llenadas');
 db.active = null;
 
+/* =====================================================================
+   LOTE 2: modo descarga, vs última sesión, PR asistidos, auto-copia
+   ===================================================================== */
+suite('Modo descarga');
+resetDB();
+sess('banca', [S(60,12), S(60,12), S(60,12), S(60,12)]);
+exMeta('dominadas').type = 'corporal';
+sess('dominadas', [S(0,10), S(0,10)]);
+exMeta('fondos a').type = 'asistido';
+sess('fondos a', [S(20,10), S(20,10)]);
+exMeta('plancha').type = 'tiempo';
+sess('plancha', [S(0,40), S(0,40)]);
+db.routines.push({ id:'r1', name:'Full', exercises:[
+  { id:'a', name:'Banca', key:'banca' }, { id:'b', name:'Dominadas', key:'dominadas' },
+  { id:'c', name:'Fondos a', key:'fondos a' }, { id:'d', name:'Plancha', key:'plancha' }] });
+const incBefore = prog('banca').inc, failBefore = prog('banca').fail;
+startSession('r1', true);
+chk(db.active.deload === true, 'sesión marcada como descarga');
+let dl = db.active.exercises[0].sugg;
+chk(dl.msg.includes('Descarga') && dl.w < 62.5 && dl.sets === 2, 'normal: ~-10% de carga y mitad de series (4 → 2)');
+chk(db.active.exercises[1].sugg.reps === 8, 'corporal: ~70% del objetivo del coach (11 → 8)');
+chk(db.active.exercises[2].sugg.w > 20, 'asistido: MÁS ayuda en descarga');
+chk(db.active.exercises[3].sugg.reps % 5 === 0 && db.active.exercises[3].sugg.reps < 45, 'tiempo: segundos reducidos y redondeados a 5');
+db.active.exercises[0].sets[0] = { w:'55', r:'8', rir:'' };
+db.active.exercises[0].sets[1] = { w:'55', r:'8', rir:'' };
+finishSession();
+chk(els['modalhost'].innerHTML.includes('Descarga guardada'), 'modal propio de descarga');
+chk(db.history[db.history.length-1].deload === true, 'guardada con marca de descarga');
+chk(prog('banca').inc === incBefore && prog('banca').fail === failBefore, 'NO toca el estado adaptativo');
+s = computeSuggestion('banca');
+chk(s.w === 62.5, 'la siguiente sugerencia retoma desde la sesión NORMAL (60 → 62,5), no desde la descarga');
+chk(systemicFatigue() === null, 'la descarga no dispara la alarma de fatiga');
+chk(!els['modalhost'].innerHTML.includes('Nuevo récord') && !els['modalhost'].innerHTML.includes('🏆'),
+    'una descarga nunca compite por récords');
+
+suite('vs última sesión (en vivo)');
+resetDB();
+sess('banca', [S(60,10), S(60,10)]);        /* volumen previo: 1200 */
+db.routines.push({ id:'r1', name:'T', exercises:[{ id:'a', name:'Banca', key:'banca' }] });
+startSession('r1');
+chk(vsLastInfo(0) === null, 'sin series llenadas aún → sin chip');
+db.active.exercises[0].sets[0] = { w:'60', r:'10', rir:'' };
+let vi = vsLastInfo(0);
+chk(vi && vi.pct === 50 && !vi.beat, 'una serie de dos: 50 % del volumen previo');
+db.active.exercises[0].sets[1] = { w:'62.5', r:'10', rir:'' };
+vi = vsLastInfo(0);
+chk(vi && vi.beat && vi.pct > 100, 'al superar el total anterior lo celebra');
+db.active = null;
+/* corporal compara reps, y asistido no muestra chip */
+exMeta('dominadas').type = 'corporal';
+sess('dominadas', [S(0,10), S(0,10)]);
+db.routines.push({ id:'r2', name:'C', exercises:[{ id:'x', name:'Dominadas', key:'dominadas' }] });
+startSession('r2');
+db.active.exercises[0].sets[0] = { w:'', r:'21', rir:'' };
+vi = vsLastInfo(0);
+chk(vi && vi.beat, 'corporal: 21 reps superan las 20 previas');
+db.active = null;
+exMeta('jalon a').type = 'asistido';
+sess('jalon a', [S(30,10)]);
+db.routines.push({ id:'r3', name:'A', exercises:[{ id:'y', name:'Jalon a', key:'jalon a' }] });
+startSession('r3');
+db.active.exercises[0].sets[0] = { w:'25', r:'10', rir:'' };
+chk(vsLastInfo(0) === null, 'asistido: sin chip (menos ayuda ≠ menos volumen)');
+db.active = null;
+
+suite('PR de asistidos');
+resetDB();
+exMeta('pull up a').type = 'asistido';
+sess('pull up a', [S(25,10), S(25,9)]);
+db.routines.push({ id:'r1', name:'T', exercises:[{ id:'a', name:'Pull up a', key:'pull up a' }] });
+startSession('r1');
+db.active.exercises[0].sets[0] = { w:'20', r:'9', rir:'' };
+finishSession();
+chk(els['modalhost'].innerHTML.includes('récord') && els['modalhost'].innerHTML.includes('20'),
+    'menos ayuda sosteniendo el rango = récord (25 → 20)');
+startSession('r1');
+db.active.exercises[0].sets[0] = { w:'20', r:'4', rir:'' };   /* bajo el piso del rango */
+finishSession();
+chk(!els['modalhost'].innerHTML.includes('récord'), 'menos ayuda SIN llegar al rango no cuenta');
+startSession('r1');
+db.active.exercises[0].sets[0] = { w:'0', r:'8', rir:'' };
+finishSession();
+chk(els['modalhost'].innerHTML.includes('sin asistencia'), 'llegar a 0 kg de ayuda se celebra especial');
+db.active = null;
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
