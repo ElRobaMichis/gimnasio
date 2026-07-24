@@ -1240,32 +1240,63 @@ function deleteSession(id){
 function editSession(id){
   const h = db.history.find(x => x.id === id);
   if(!h) return;
-  window.__edit = JSON.parse(JSON.stringify(h));
+  /* el modelo de edición vive SIEMPRE en la unidad activa (strings);
+     se convierte a kg una sola vez al guardar — así re-renderizar es seguro */
+  window.__edit = {
+    id: h.id, routineName: h.routineName, date: h.date,
+    entries: h.entries.map(e => ({
+      key: e.key, name: e.name,
+      sets: e.sets.map(st => ({
+        w: st.w != null ? inputW(st.w) : '',
+        r: st.r != null ? String(st.r) : '',
+        rir: (st.rir === undefined || st.rir === null) ? '' : String(st.rir)
+      }))
+    }))
+  };
+  renderEditModal();
+}
+function renderEditModal(){
   const ed = window.__edit;
+  if(!ed) return;
   openModal(`
     <h2>Editar sesión</h2>
-    <p class="muted">${esc(ed.routineName)} · ${fmtDate(ed.date)}. Corrige kg, reps o RIR;
-      deja las reps vacías (o en 0) para descartar esa serie.</p>
+    <p class="muted">${esc(ed.routineName)} · ${fmtDate(ed.date)}. Corrige valores, agrega la serie
+      que olvidaste o quita la que sobra. Al guardar, las sugerencias del coach se recalculan
+      con los datos corregidos.</p>
     <div class="stack">
     ${ed.entries.map((e, ei) => `
       <div>
         <b style="font-size:14.5px">${esc(e.name)}</b>
+        <div class="sethead"><span>#</span><span>${uLabel()}</span><span>reps</span><span>rir</span><span></span></div>
         ${e.sets.map((st, si) => `
-          <div class="setrow" style="grid-template-columns:24px 1.15fr 1fr .95fr">
+          <div class="setrow">
             <span class="idx">${si+1}</span>
-            <input type="number" inputmode="decimal" step="any" min="0" value="${st.w != null ? inputW(st.w) : ''}"
+            <input type="number" inputmode="decimal" step="any" min="0" value="${st.w}"
               aria-label="Peso en ${uLabel()}" oninput="editVal(${ei},${si},'w',this.value)">
-            <input type="number" inputmode="numeric" step="1" min="0" value="${st.r ?? ''}"
+            <input type="number" inputmode="numeric" step="1" min="0" value="${st.r}"
               aria-label="Reps" oninput="editVal(${ei},${si},'r',this.value)">
-            <input type="number" inputmode="numeric" step="1" min="0" max="9" value="${st.rir ?? ''}" placeholder="rir"
+            <input type="number" inputmode="numeric" step="1" min="0" max="9" value="${st.rir}" placeholder="–"
               aria-label="RIR" oninput="editVal(${ei},${si},'rir',this.value)">
+            <button class="iconbtn" aria-label="Quitar serie" onclick="editRemoveSet(${ei},${si})">✕</button>
           </div>`).join('')}
+        <button class="addset" onclick="editAddSet(${ei})">＋ Agregar serie</button>
       </div>`).join('')}
     </div>
     <button class="btn btn-acc" style="margin-top:16px" onclick="saveEditedSession()">Guardar cambios</button>
     <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
 }
 function editVal(ei, si, field, val){ window.__edit.entries[ei].sets[si][field] = val; }
+function editAddSet(ei){
+  const e = window.__edit.entries[ei];
+  /* prellenar con la última serie: la olvidada casi siempre es "una más igual" */
+  const prev = e.sets[e.sets.length - 1];
+  e.sets.push(prev ? { w: prev.w, r: prev.r, rir: '' } : { w:'', r:'', rir:'' });
+  renderEditModal();
+}
+function editRemoveSet(ei, si){
+  window.__edit.entries[ei].sets.splice(si, 1);
+  renderEditModal();
+}
 function saveEditedSession(){
   const ed = window.__edit;
   if(!ed) return;
