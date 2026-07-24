@@ -285,7 +285,8 @@ const GOALS = {
 };
 const INC_START = 0.025, INC_MIN = 0.0125, INC_MAX = 0.06;
 const MAX_SETS_SUGG = 5;
-const TYPE_LABEL = { normal:'', asistido:'Asistido', corporal:'Peso corporal' };
+const TYPE_LABEL = { normal:'', asistido:'Asistido', corporal:'Peso corporal', tiempo:'Por tiempo' };
+const TIEMPO_RANGE = { lo:20, hi:45 };   /* segundos por defecto para isométricos */
 const MUSCLES = [
   ['pecho','Pecho'], ['espalda','Espalda'], ['hombros','Hombros'],
   ['biceps','Bíceps'], ['triceps','Tríceps'], ['pierna','Pierna'],
@@ -349,6 +350,11 @@ function fmtW(kg){ return fmtNum(fromKg(kg)); }
 /* valor para atributos value= de inputs (punto decimal, en unidad activa) */
 function inputW(kg){ return String(Math.round(fromKg(kg)*100)/100); }
 function fmtClock(sec){ return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`; }
+/* una serie en texto: "60×10" o, en ejercicios por tiempo, "45s" / "10+45s" (lastre) */
+function fmtSet(key, s){
+  if(exMeta(key).type === 'tiempo') return (s.w > 0 ? fmtW(s.w) + '+' : '') + s.r + 's';
+  return `${fmtW(s.w)}×${s.r}`;
+}
 
 /* =====================================================================
    MOTOR DE SUGERENCIAS
@@ -384,7 +390,8 @@ function guessMuscle(name){
   return null;
 }
 function effRange(key){
-  const m = exMeta(key), g = goalRange();
+  const m = exMeta(key);
+  const g = m.type === 'tiempo' ? TIEMPO_RANGE : goalRange();
   let lo = parseInt(m.lo,10), hi = parseInt(m.hi,10);
   if(isNaN(lo) || lo < 1) lo = g.lo;
   if(isNaN(hi) || hi < 1) hi = g.hi;
@@ -469,6 +476,11 @@ function computeSuggestion(key){
       back = { w:nw, reps:lo, type:'back',
         msg:`Vuelta tras ~${weeks} semanas: <b>${fmtW(nw)} ${uLabel()} de ayuda × ${lo}</b>`,
         why:`Llevas ${gapDays} días sin este ejercicio. Retoma con algo más de asistencia; en 1–2 sesiones vuelves a tu marca.` };
+    } else if(meta.type === 'tiempo'){
+      const target = Math.max(lo, Math.round(maxR * factor / 5) * 5);
+      back = { w, reps:target, type:'back',
+        msg:`Vuelta tras ~${weeks} semanas: apunta a <b>${target} s</b>`,
+        why:`Llevas ${gapDays} días sin este ejercicio. Retoma sin exigirte el récord; en 1–2 sesiones recuperas el nivel.` };
     } else if(meta.type === 'corporal' || w === 0){
       const target = Math.max(lo, Math.round(maxR * factor));
       back = { w, reps:target, type:'back',
@@ -514,6 +526,22 @@ function computeSuggestion(key){
         msg:`Misma ayuda (<b>${fmtW(w)} ${uLabel()}</b>), apunta a <b>${target} reps</b>`,
         why:`Cuando llegues a ${hi} reps en todas las series, te sugeriré bajar la ayuda.` };
     }
+  } else if(meta.type === 'tiempo'){
+    /* isométricos: progresar = más segundos (de 5 en 5); lastre opcional */
+    if(minR >= hi){
+      sugg = { w, reps:maxR + 5, type:'up',
+        msg:`Suma tiempo: apunta a <b>${maxR + 5} s</b>`,
+        why:`Sostuviste ${hi}+ segundos en todas las series. Progresa de 5 en 5; si se vuelve muy fácil, agrega lastre y registra ese peso.` };
+    } else if(minR < lo){
+      sugg = { w, reps:lo, type:'hold',
+        msg:`Busca al menos <b>${lo} s</b> por serie`,
+        why:`Consolida el rango (${lo}–${hi} s) antes de sumar tiempo.` };
+    } else {
+      const target = Math.min(hi, maxR + 5);
+      sugg = { w, reps:target, type:'reps',
+        msg:`Apunta a <b>${target} s</b>`,
+        why:`Cinco segundos más que la última vez ya es progreso.` };
+    }
   } else if(meta.type === 'corporal' || w === 0){
     /* peso corporal (o sin peso externo): progresar = más reps / series / lastre */
     if(minR >= hi){
@@ -531,15 +559,28 @@ function computeSuggestion(key){
     }
   } else {
     /* normal: doble progresión reps → peso, modulada por RIR si lo registras */
+    const cap = parseFloat(meta.cap);
+    const hasCap = !isNaN(cap) && cap > 0;
+    const atCap = hasCap && w >= cap - 1e-9;
     if(minR >= hi){
-      const boost = (rir !== null && rir >= 3) ? 1.7 : 1;
-      let nw = roundToStep(w * (1 + p.inc * boost), step);
-      if(nw - w < step/2) nw = w + step;   /* progreso real de al menos un paso (evita errores de redondeo) */
-      sugg = { w:nw, reps:lo, type:'up',
-        msg:`Sube el peso: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
-        why:`Llegaste a ${hi} reps en todas las series con ${fmtW(w)} ${uLabel()}.` +
-            (boost > 1 ? ` Además te sobraban reps (RIR ${Math.round(rir)}), así que el salto es un poco mayor.`
-                       : ` Toca progresar la carga (~${(p.inc*100).toFixed(1)} %).`) };
+      if(atCap){
+        /* la máquina no da más → progresión por reps abiertas (y series, vía estancamiento) */
+        sugg = { w, reps:maxR + 1, type:'reps',
+          msg:`Tope de la máquina: mantén <b>${fmtW(w)} ${uLabel()}</b> y apunta a <b>${maxR + 1} reps</b>`,
+          why:`Marcaste ${fmtW(cap)} ${uLabel()} como máximo disponible en este equipo. Sin más peso, el progreso sigue por reps y series — y cuando lo superes con holgura, considera una variante más difícil o agregar lastre.` };
+      } else {
+        const boost = (rir !== null && rir >= 3) ? 1.7 : 1;
+        let nw = roundToStep(w * (1 + p.inc * boost), step);
+        if(nw - w < step/2) nw = w + step;   /* progreso real de al menos un paso (evita errores de redondeo) */
+        const capped = hasCap && nw > cap;
+        if(capped) nw = cap;                 /* último salto: justo hasta el tope */
+        sugg = { w:nw, reps:lo, type:'up',
+          msg:`Sube el peso: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>${capped ? ' (tope de la máquina)' : ''}`,
+          why:`Llegaste a ${hi} reps en todas las series con ${fmtW(w)} ${uLabel()}.` +
+              (boost > 1 ? ` Además te sobraban reps (RIR ${Math.round(rir)}), así que el salto es un poco mayor.`
+                         : ` Toca progresar la carga (~${(p.inc*100).toFixed(1)} %).`) +
+              (capped ? ' Con este salto llegas al máximo del equipo.' : '') };
+      }
     } else if(minR < lo){
       if(p.fail >= 2){
         let nw = roundToStep(w * 0.95, step);
@@ -553,9 +594,10 @@ function computeSuggestion(key){
           msg:`Consolida <b>${fmtW(w)} ${uLabel()}</b>: busca al menos ${lo} reps por serie`,
           why:`La última vez alguna serie quedó bajo el rango (${lo}–${hi}). Repite el peso dejando 1–3 reps en reserva antes de subir.` };
       }
-    } else if(rir !== null && rir >= 4){
+    } else if(rir !== null && rir >= 4 && !atCap){
       let nw = roundToStep(w * (1 + p.inc), step);
       if(nw - w < step/2) nw = w + step;   /* progreso real de al menos un paso (evita errores de redondeo) */
+      if(hasCap && nw > cap) nw = cap;
       sugg = { w:nw, reps:lo, type:'up',
         msg:`Sube ya el peso: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
         why:`Registraste RIR ${Math.round(rir)} (te sobraban ~${Math.round(rir)} reps): ese peso te queda liviano, no hace falta esperar al tope del rango.` };
@@ -578,12 +620,17 @@ function computeSuggestion(key){
   if(nSets >= 5 && meta.type === 'normal'){
     const target = Math.max(3, nSets - 2);
     const flat = (maxR - minAll) <= 1;   /* reps casi idénticas en todas → mucha reserva */
+    let nwC = 0;
     if(sugg.type === 'reps' && flat && minR >= lo){
-      let nw = roundToStep(w * (1 + p.inc), step);
-      if(nw - w < step/2) nw = w + step;
+      nwC = roundToStep(w * (1 + p.inc), step);
+      if(nwC - w < step/2) nwC = w + step;
+      const capC = parseFloat(meta.cap);
+      if(!isNaN(capC) && capC > 0 && nwC > capC) nwC = capC;   /* respeta el tope de la máquina */
+    }
+    if(nwC > w + 1e-9){
       const reps = Math.min(hi, Math.max(lo, maxR));
-      sugg = { w: nw, reps, sets: target, type:'up',
-        msg:`Concentra el trabajo: <b>${fmtW(nw)} ${uLabel()} × ${reps}</b> en <b>${target} series</b> (antes ${nSets})`,
+      sugg = { w: nwC, reps, sets: target, type:'up',
+        msg:`Concentra el trabajo: <b>${fmtW(nwC)} ${uLabel()} × ${reps}</b> en <b>${target} series</b> (antes ${nSets})`,
         why:`Hiciste ${nSets} series casi idénticas (${minAll}–${maxR} reps): te sobra reserva, y a partir de la 4ª serie del mismo ejercicio el beneficio por sesión cae en picada. Con ${target} series intensas (RIR 1–3) y algo más de peso logras lo mismo en menos tiempo.` };
     } else {
       sugg.sets = target;
@@ -625,7 +672,8 @@ function updateProgress(key, newSets, dateISO){
     }
   } else if(wNow === wPrev){
     p.fail = (minR < lo) ? p.fail + 1 : 0;
-    p.stall = (maxR <= maxRPrev && minR < hi) ? p.stall + 1 : 0;
+    /* sin mejora de reps = estancamiento (también por encima del rango, ej. tope de máquina) */
+    p.stall = (maxR <= maxRPrev) ? p.stall + 1 : 0;
   } else {                                /* retrocedió la carga (deload propio) */
     p.fail = 0; p.stall = 0;
     p.inc = Math.max(INC_MIN, p.inc * 0.85);
@@ -698,9 +746,9 @@ function systemicFatigue(){
     const lastE = arr[arr.length-1], prev = arr[arr.length-2];
     if(!prev || lastE.date < cut) continue;                        /* no entrenado en la ventana */
     if(new Date(lastE.date) - new Date(prev.date) > 45*864e5) continue;  /* comparación sin sentido */
-    const corporal = exMeta(key).type === 'corporal';
-    const mNow = corporal ? Math.max(...lastE.sets.map(s=>s.r)) : bestE1RM(lastE.sets);
-    const mPrev = corporal ? Math.max(...prev.sets.map(s=>s.r)) : bestE1RM(prev.sets);
+    const repsMode = ['corporal','tiempo'].includes(exMeta(key).type);
+    const mNow = repsMode ? Math.max(...lastE.sets.map(s=>s.r)) : bestE1RM(lastE.sets);
+    const mPrev = repsMode ? Math.max(...prev.sets.map(s=>s.r)) : bestE1RM(prev.sets);
     if(mPrev <= 0) continue;
     evaluated++;
     if(mNow < mPrev * 0.98) regressed++;
@@ -850,7 +898,7 @@ function viewRoutine(){
         <div class="grow">
           <div class="row" style="gap:8px"><b>${esc(ex.name)}</b>${typePill(ex.key)}</div>
           <div class="tiny">${ last
-            ? `Última vez: ${last.entry.sets.map(s=>`${fmtW(s.w)}×${s.r}`).join(' · ')}`
+            ? `Última vez: ${last.entry.sets.map(s => fmtSet(ex.key, s)).join(' · ')}`
             : 'Sin registros todavía — toca para configurar' }</div>
           ${notes ? `<div class="tiny">📝 ${esc(notes)}</div>` : ''}
         </div>
@@ -911,18 +959,20 @@ function viewExercise(){
   const p = prog(key);
   const hist = exerciseHistory(key);
   const corporal = meta.type === 'corporal';
+  const porTiempo = meta.type === 'tiempo';
+  const repsMode = corporal || porTiempo;   /* la métrica es reps/segundos, no e1RM */
   const pts = hist.map(h => ({
     date: h.date,
-    v: corporal ? Math.max(...h.sets.map(s => s.r)) : Math.round(fromKg(bestE1RM(h.sets))*10)/10
+    v: repsMode ? Math.max(...h.sets.map(s => s.r)) : Math.round(fromKg(bestE1RM(h.sets))*10)/10
   })).filter(p => p.v > 0);
   window.__chartPts = pts;
-  window.__chartUnit = corporal ? 'reps' : uLabel();
+  window.__chartUnit = porTiempo ? 's' : (corporal ? 'reps' : uLabel());
   const best = pts.length ? Math.max(...pts.map(p => p.v)) : 0;
 
   const recent = [...hist].reverse().slice(0, 6).map(h => `
     <div class="exline" style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #232833">
       <span class="tiny">${fmtDate(h.date)}</span>
-      <span class="tiny num" style="text-align:right">${h.sets.map(s => `${fmtW(s.w)}×${s.r}${s.rir!=null?`@${s.rir}`:''}`).join(' · ')}</span>
+      <span class="tiny num" style="text-align:right">${h.sets.map(s => fmtSet(key, s) + (s.rir != null ? `@${s.rir}` : '')).join(' · ')}</span>
     </div>`).join('');
 
   return `<div class="stack" style="padding-top:calc(16px + env(safe-area-inset-top, 0px))">
@@ -934,9 +984,11 @@ function viewExercise(){
       <p class="eyebrow">Progreso</p>
       ${ pts.length ? `
         <div class="row" style="margin-top:8px;align-items:baseline">
-          <div class="bignum grow">${fmtNum(best)} <small>${corporal ? 'reps (tu récord)' : uLabel()}</small></div>
+          <div class="bignum grow">${fmtNum(best)} <small>${porTiempo ? 'segundos (tu récord)' : (corporal ? 'reps (tu récord)' : uLabel())}</small></div>
         </div>
-        <p class="tiny">${corporal
+        <p class="tiny">${porTiempo
+          ? 'Tu mejor tiempo sostenido en una serie.'
+          : corporal
           ? 'Tus mejores reps en una serie.'
           : `Tu récord de <span class="linkish" role="button" tabindex="0" onclick="e1rmInfo()">1RM estimado ⓘ</span> — el peso máximo que podrías levantar una sola vez, calculado desde tus series.`}</p>
         ${ pts.length >= 2 ? `
@@ -974,7 +1026,11 @@ function viewExercise(){
         </button>
         <button class="goal-opt ${meta.type==='corporal'?'on':''}" onclick="setExType('${key}','corporal')">
           <b>Peso corporal ${meta.type==='corporal'?'✓':''}</b>
-          <span>Sin peso externo (flexiones, dominadas libres). Progresar = más reps o series. Puedes dejar los kg en blanco; si usas lastre, anota esos kg.</span>
+          <span>Sin peso externo (flexiones, dominadas libres). Progresar = más reps o series. Puedes dejar el peso en blanco; si usas lastre, anótalo.</span>
+        </button>
+        <button class="goal-opt ${meta.type==='tiempo'?'on':''}" onclick="setExType('${key}','tiempo')">
+          <b>Por tiempo ${meta.type==='tiempo'?'✓':''}</b>
+          <span>Isométricos y sostenidos (plancha, colgado, farmer carry, estiramientos): mides segundos, no reps. Con cronómetro y alarma integrados. Lastre opcional.</span>
         </button>
       </div>
     </div>
@@ -982,17 +1038,26 @@ function viewExercise(){
     <div class="card">
       <p class="eyebrow" style="margin-bottom:10px">Ajustes finos (opcional)</p>
       <div class="row" style="align-items:flex-end">
-        <div class="field grow"><span>Reps mín.</span>
-          <input type="number" inputmode="numeric" min="1" placeholder="${g.lo}" value="${meta.lo ?? ''}"
+        <div class="field grow"><span>${meta.type==='tiempo' ? 'Seg' : 'Reps'} mín.</span>
+          <input type="number" inputmode="numeric" min="1" placeholder="${meta.type==='tiempo' ? TIEMPO_RANGE.lo : g.lo}" value="${meta.lo ?? ''}"
             oninput="setExRange('${key}','lo',this.value)"></div>
-        <div class="field grow"><span>Reps máx.</span>
-          <input type="number" inputmode="numeric" min="2" placeholder="${g.hi}" value="${meta.hi ?? ''}"
+        <div class="field grow"><span>${meta.type==='tiempo' ? 'Seg' : 'Reps'} máx.</span>
+          <input type="number" inputmode="numeric" min="2" placeholder="${meta.type==='tiempo' ? TIEMPO_RANGE.hi : g.hi}" value="${meta.hi ?? ''}"
             oninput="setExRange('${key}','hi',this.value)"></div>
         <div class="field grow"><span>Salto mínimo</span>
           <select onchange="setExStep('${key}',this.value)">
             ${stepOptionsHTML(meta.step)}
           </select></div>
       </div>
+      ${ meta.type === 'normal' ? `
+      <div class="field" style="margin-top:10px"><span>Peso máximo disponible (${uLabel()})</span>
+        <input type="number" inputmode="decimal" step="any" min="0" placeholder="—"
+          value="${meta.cap != null ? inputW(meta.cap) : ''}"
+          oninput="setExCap('${key}',this.value)">
+        <span style="text-transform:none;letter-spacing:0;font-weight:400">
+          Si la máquina o tus mancuernas llegan hasta cierto peso, anótalo: al alcanzarlo, el coach
+          progresa por reps y series en vez de pedirte kilos imposibles.</span>
+      </div>` : '' }
       <div class="field" style="margin-top:10px"><span>Grupo muscular</span>
         <select onchange="setExMuscle('${key}',this.value)">
           <option value="none" ${!meta.muscle || meta.muscle==='none' ? 'selected':''}>Sin grupo</option>
@@ -1061,19 +1126,25 @@ function setExRest(key, val){
   save();
 }
 function setExMuscle(key, val){ exMeta(key).muscle = val; save(); }
+function setExCap(key, val){
+  const v = parseFloat(val);
+  exMeta(key).cap = (isNaN(v) || v <= 0) ? null : Math.round(toKg(v)*1000)/1000;
+  save();
+}
 
 /* ---------- SESIÓN ACTIVA ---------- */
 function viewSession(){
   const s = db.active;
   const blocks = s.exercises.map((ex, xi) => {
     const meta = exMeta(ex.key);
-    const corp = meta.type === 'corporal';
+    const t = meta.type;
     const { lo, hi } = effRange(ex.key);
     const firstTime = !ex.sugg;
     let firstMsg = '';
     if(firstTime){
-      if(corp) firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). El peso puedes dejarlo en blanco; si usas lastre, anótalo.`;
-      else if(meta.type === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina/banda (en ${uLabel()}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
+      if(t === 'corporal') firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). El peso puedes dejarlo en blanco; si usas lastre, anótalo.`;
+      else if(t === 'tiempo') firstMsg = `Primera vez. Mide los segundos que sostienes con buena técnica (ideal ${lo}–${hi} s). Toca el ▶ de cada serie para usar el cronómetro con alarma.`;
+      else if(t === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina/banda (en ${uLabel()}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
       else firstMsg = `Primera vez con este ejercicio. Elige un peso con el que puedas hacer ${lo}–${hi} reps quedándote 1–3 en reserva (sin llegar al fallo). Desde la próxima, te sugiero la progresión.`;
     }
     return `
@@ -1084,13 +1155,14 @@ function viewSession(){
           Hoy: ${ex.sugg.msg}<span class="why">${ex.sugg.why}</span></div>`
         : `<div class="coach">${firstMsg}</div>` }
       <button class="linkish tiny" style="margin-top:8px" onclick="showWarmup(${xi})">🔥 Calentamiento sugerido</button>
-      <div class="sethead"><span>#</span><span>${corp ? 'lastre' : (meta.type==='asistido' ? 'ayuda' : uLabel())}</span><span>reps</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
+      <div class="sethead"><span>${t==='tiempo' ? '▶' : '#'}</span><span>${(t==='corporal'||t==='tiempo') ? 'lastre' : (t==='asistido' ? 'ayuda' : uLabel())}</span><span>${t==='tiempo' ? 'seg' : 'reps'}</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
       <div id="sets-${xi}">
-        ${ ex.sets.map((st, si) => setRowHTML(xi, si, st, ex.sugg, corp)).join('') }
+        ${ ex.sets.map((st, si) => setRowHTML(xi, si, st, ex.sugg, t)).join('') }
       </div>
       <button class="addset" onclick="addSet(${xi})">＋ Agregar serie</button>
     </div>`;
   }).join('');
+  const addExBtn = `<button class="addset" style="border-style:solid" onclick="promptAddExercise()">＋ Agregar ejercicio a la sesión</button>`;
 
   const rest = restSecs();
   return `
@@ -1109,23 +1181,28 @@ function viewSession(){
           aria-label="Cambiar unidad de peso" onclick="askUnitSwitch()">${uLabel()} ⇄</button>
       </div>
     </div>
-    <div class="stack">${blocks}</div>`;
+    <div class="stack">${blocks}${addExBtn}</div>`;
 }
 
-function setRowHTML(xi, si, st, sugg, corp){
-  const pw = sugg ? fmtW(sugg.w) : (corp ? '0' : uLabel());
-  const pr = sugg ? sugg.reps : 'reps';
+function setRowHTML(xi, si, st, sugg, t){
+  const tiempo = t === 'tiempo';
+  const pw = sugg ? fmtW(sugg.w) : ((t === 'corporal' || tiempo) ? '0' : uLabel());
+  const pr = sugg ? sugg.reps : (tiempo ? 'seg' : 'reps');
   const cls = sugg ? 'class="sugg"' : '';
+  const idxCell = tiempo
+    ? `<button class="idx linkish" style="background:none;border:none;color:var(--acc);cursor:pointer"
+         aria-label="Cronómetro serie ${si+1}" onclick="startSetTimer(${xi},${si})">▶</button>`
+    : `<span class="idx">${si+1}</span>`;
   return `
   <div class="setrow" id="set-${xi}-${si}">
-    <span class="idx">${si+1}</span>
+    ${idxCell}
     <input type="number" inputmode="decimal" step="any" min="0" ${cls}
       placeholder="${pw}" value="${st.w ?? ''}"
       aria-label="Peso serie ${si+1}"
       oninput="setVal(${xi},${si},'w',this.value)">
     <input type="number" inputmode="numeric" step="1" min="0" ${cls}
       placeholder="${pr}" value="${st.r ?? ''}"
-      aria-label="Reps serie ${si+1}"
+      aria-label="${tiempo ? 'Segundos' : 'Reps'} serie ${si+1}"
       oninput="setVal(${xi},${si},'r',this.value)">
     <input type="number" inputmode="numeric" step="1" min="0" max="9"
       placeholder="1–3" value="${st.rir ?? ''}"
@@ -1207,7 +1284,7 @@ function viewHistory(){
         ${h.entries.map(e => `
           <div class="exline">
             <span>${esc(e.name)}</span>
-            <span class="sets num">${e.sets.map(s=>`${fmtW(s.w)}×${s.r}`).join(' · ')}</span>
+            <span class="sets num">${e.sets.map(s => fmtSet(e.key, s)).join(' · ')}</span>
           </div>`).join('')}
         <div class="row" style="margin-top:12px">
           <button class="btn" style="padding:9px;font-size:13.5px" onclick="editSession('${h.id}')">✏️ Editar</button>
@@ -1604,27 +1681,179 @@ function addSet(xi){
   const ex = db.active.exercises[xi];
   ex.sets.push({w:'', r:'', rir:''});
   save();
-  const corp = exMeta(ex.key).type === 'corporal';
   const cont = document.getElementById('sets-'+xi);
-  cont.insertAdjacentHTML('beforeend', setRowHTML(xi, ex.sets.length-1, {w:'',r:'',rir:''}, ex.sugg, corp));
+  cont.insertAdjacentHTML('beforeend', setRowHTML(xi, ex.sets.length-1, {w:'',r:'',rir:''}, ex.sugg, exMeta(ex.key).type));
 }
 function removeSet(xi, si){
   const ex = db.active.exercises[xi];
   if(ex.sets.length <= 1){ ex.sets[0] = {w:'',r:'',rir:''}; }
   else ex.sets.splice(si,1);
   save();
-  const corp = exMeta(ex.key).type === 'corporal';
   document.getElementById('sets-'+xi).innerHTML =
-    ex.sets.map((st,i) => setRowHTML(xi, i, st, ex.sugg, corp)).join('');
+    ex.sets.map((st,i) => setRowHTML(xi, i, st, ex.sugg, exMeta(ex.key).type)).join('');
+}
+
+/* ---------- agregar ejercicio a la sesión en curso ---------- */
+function promptAddExercise(){
+  window.__keepRoutine = false;
+  openModal(`
+    <h2>Agregar ejercicio</h2>
+    <p class="muted">Se suma a la sesión de hoy. Si ya lo conoces de otra rutina o del historial,
+      el coach trae su progresión.</p>
+    <form onsubmit="sessionAddExercise(event)" class="stack" autocomplete="off">
+      <div class="acwrap">
+        <input type="text" id="sessnewex" placeholder="Nombre del ejercicio" autocomplete="off"
+          oninput="acUpdateSession()" onfocus="acUpdateSession()" onblur="acHideSession()">
+        <div class="aclist" id="aclist2" style="display:none" role="listbox"></div>
+      </div>
+      <button class="goal-opt" type="button" id="keepRoutineBtn" onclick="toggleKeepRoutine()">
+        <b id="keepRoutineLabel">Solo por hoy</b>
+        <span>Toca para alternar: solo esta sesión, o guardarlo también en la rutina.</span>
+      </button>
+      <button class="btn btn-acc" type="submit">Agregar a la sesión</button>
+      <button class="btn btn-ghost" type="button" onclick="closeModal()">Cancelar</button>
+    </form>`);
+  setTimeout(() => document.getElementById('sessnewex')?.focus(), 60);
+}
+function toggleKeepRoutine(){
+  window.__keepRoutine = !window.__keepRoutine;
+  const lbl = document.getElementById('keepRoutineLabel');
+  const btn = document.getElementById('keepRoutineBtn');
+  if(lbl) lbl.textContent = window.__keepRoutine ? 'Guardar también en la rutina ✓' : 'Solo por hoy';
+  if(btn) btn.classList.toggle('on', window.__keepRoutine);
+}
+function acUpdateSession(){
+  const inp = document.getElementById('sessnewex');
+  const list = document.getElementById('aclist2');
+  if(!inp || !list || !db.active) return;
+  const q = acNorm(inp.value.trim());
+  if(!q){ list.style.display = 'none'; return; }
+  const inSession = new Set(db.active.exercises.map(e => e.key));
+  const cands = [];
+  for(const [key, info] of allExerciseNames()){
+    if(inSession.has(key)) continue;
+    const norm = acNorm(info.name);
+    const idx = norm.indexOf(q);
+    if(idx < 0) continue;
+    const rank = idx === 0 ? 0 : (norm[idx-1] === ' ' || norm[idx-1] === '(' ? 1 : 2);
+    cands.push({ key, name: info.name, src: info.src, rank });
+  }
+  cands.sort((a,b) => a.rank - b.rank || a.name.localeCompare(b.name));
+  const top = cands.slice(0, 6);
+  window.__ac2 = top;
+  if(!top.length){ list.style.display = 'none'; return; }
+  list.innerHTML = top.map((c, i) => `
+    <button type="button" role="option" onmousedown="event.preventDefault(); acPickSession(${i})">
+      <span>${acHighlight(c.name, q)}</span>
+      <span class="from">${esc(c.src)}</span>
+    </button>`).join('');
+  list.style.display = '';
+}
+function acPickSession(i){
+  const c = (window.__ac2 || [])[i];
+  if(!c) return;
+  const inp = document.getElementById('sessnewex');
+  if(inp) inp.value = c.name;
+  const list = document.getElementById('aclist2');
+  if(list) list.style.display = 'none';
+}
+function acHideSession(){
+  setTimeout(() => { const l = document.getElementById('aclist2'); if(l) l.style.display = 'none'; }, 150);
+}
+function sessionAddExercise(ev){
+  ev.preventDefault();
+  if(!db.active) return;
+  const inp = document.getElementById('sessnewex');
+  const name = inp.value.trim();
+  if(!name) return;
+  const key = exKey(name);
+  if(db.active.exercises.some(e => e.key === key)){
+    infoModal('Ya está en la sesión', `“${esc(name)}” ya es parte de la sesión de hoy.`);
+    return;
+  }
+  const known = allExerciseNames().get(key);
+  const finalName = known ? known.name : name;
+  if(exMeta(key).type === 'normal' && /assisted|asistid/i.test(finalName)) exMeta(key).type = 'asistido';
+  if(!exMeta(key).muscle){ const g = guessMuscle(finalName); if(g) exMeta(key).muscle = g; }
+  const sugg = computeSuggestion(key);
+  const n = sugg ? sugg.sets : 1;
+  db.active.exercises.push({ key, name: finalName, sugg,
+    sets: Array.from({length: Math.max(1, n)}, () => ({w:'', r:'', rir:''})) });
+  if(window.__keepRoutine){
+    const r = db.routines.find(x => x.id === db.active.routineId);
+    if(r && !r.exercises.some(e => e.key === key)) r.exercises.push({ id: uid(), name: finalName, key });
+  }
+  save(); closeModal(); render();
+  setTimeout(() => {
+    const el = document.getElementById('exb-' + (db.active.exercises.length - 1));
+    if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth' });
+  }, 80);
+}
+
+/* ---------- cronómetro por serie (ejercicios por tiempo) ---------- */
+let setTimerInt = null;
+let setTimerState = null;
+function startSetTimer(xi, si){
+  const ex = db.active && db.active.exercises[xi];
+  if(!ex) return;
+  const typed = parseInt(ex.sets[si].r, 10);
+  const target = (!isNaN(typed) && typed > 0) ? typed
+    : (ex.sugg && ex.sugg.reps ? ex.sugg.reps : effRange(ex.key).lo);
+  clearInterval(setTimerInt);
+  setTimerState = { xi, si, target, phase:'prep', count:3 };
+  openModal(`
+    <h2 style="text-align:center;font-size:17px">${esc(ex.name)} · serie ${si+1}</h2>
+    <div class="clock num" id="settimer" style="font-size:76px;text-align:center;margin:10px 0 2px">3</div>
+    <p class="tiny" id="settimerhint" style="text-align:center;margin-bottom:16px">Prepárate… objetivo: ${target} s</p>
+    <button class="btn" onclick="stopSetTimer(true)">✓ Terminar antes</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="stopSetTimer(false)">Cancelar</button>`);
+  setTimerInt = setInterval(() => {
+    const el = document.getElementById('settimer');
+    const st = setTimerState;
+    if(!el || !st){ clearInterval(setTimerInt); return; }
+    if(st.phase === 'prep'){
+      st.count--;
+      if(st.count <= 0){
+        st.phase = 'run'; st.count = st.target;
+        beep();
+        const h = document.getElementById('settimerhint');
+        if(h) h.textContent = '¡Sostén!';
+      }
+      el.textContent = st.count;
+    } else {
+      st.count--;
+      el.textContent = Math.max(0, st.count);
+      if(st.count <= 0) finishSetTimer(st.target);
+    }
+  }, 1000);
+}
+function finishSetTimer(seconds){
+  const st = setTimerState;
+  clearInterval(setTimerInt);
+  setTimerState = null;
+  if(!st) return;
+  beep();
+  setVal(st.xi, st.si, 'r', String(seconds));
+  closeModal(); render();
+}
+function stopSetTimer(early){
+  const st = setTimerState;
+  clearInterval(setTimerInt);
+  setTimerState = null;
+  if(early && st && st.phase === 'run'){
+    const elapsed = st.target - Math.max(0, st.count);
+    if(elapsed > 0){ setVal(st.xi, st.si, 'r', String(elapsed)); closeModal(); render(); return; }
+  }
+  closeModal();
 }
 
 function collectEntries(s){
   const entries = [];
   for(const ex of s.exercises){
-    const corp = exMeta(ex.key).type === 'corporal';
+    const corp = ['corporal','tiempo'].includes(exMeta(ex.key).type);
     const sets = ex.sets.map(st => {
       let w = parseFloat(st.w);
-      if(isNaN(w) && corp && st.r !== '' && st.r !== undefined) w = 0;  /* corporal: peso en blanco = 0 */
+      if(isNaN(w) && corp && st.r !== '' && st.r !== undefined) w = 0;  /* corporal/tiempo: peso en blanco = 0 */
       if(!isNaN(w)) w = Math.round(toKg(w)*1000)/1000;                  /* lo escrito está en la unidad activa → guardar en kg */
       const r = parseInt(st.r,10);
       const out = { w, r };
@@ -1653,12 +1882,12 @@ function askFinish(){
 
 /* mejor marca previa de un ejercicio: e1RM (normal) o reps máximas (corporal) */
 function bestMetricBefore(key){
-  const corporal = exMeta(key).type === 'corporal';
+  const repsMode = ['corporal','tiempo'].includes(exMeta(key).type);
   let best = 0;
   for(const h of db.history){
     const e = h.entries.find(x => x.key === key);
     if(!e) continue;
-    const v = corporal ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
+    const v = repsMode ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
     if(v > best) best = v;
   }
   return best;
@@ -1673,12 +1902,13 @@ function finishSession(){
   for(const e of entries){
     const meta = exMeta(e.key);
     if(meta.type === 'asistido') continue;   /* en asistidos el e1RM de la ayuda no significa nada */
-    const corporal = meta.type === 'corporal';
+    const repsMode = ['corporal','tiempo'].includes(meta.type);
     const prev = bestMetricBefore(e.key);
-    const now = corporal ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
+    const now = repsMode ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
     if(prev > 0 && now > prev){
-      const fv = v => corporal ? fmtNum(Math.round(v*10)/10) : fmtW(Math.round(v*10)/10);
-      prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${fv(now)} ${corporal ? 'reps' : uLabel()}</b> <span class="tiny">(antes ${fv(prev)})</span>`);
+      const fv = v => repsMode ? fmtNum(Math.round(v*10)/10) : fmtW(Math.round(v*10)/10);
+      const unit = meta.type === 'tiempo' ? 's' : (meta.type === 'corporal' ? 'reps' : uLabel());
+      prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${fv(now)} ${unit}</b> <span class="tiny">(antes ${fv(prev)})</span>`);
     }
   }
 
@@ -1787,6 +2017,12 @@ function warmupPlan(xi){
     }
   } else first = (xi === 0);
 
+  if(meta.type === 'tiempo'){
+    const target = ex.sugg ? ex.sugg.reps : hi;
+    const easy = Math.max(10, Math.round(target * 0.5 / 5) * 5);
+    return { rows: [`1 serie × ${easy} s suaves (misma posición, lejos del límite)`], first,
+             note: 'En isométricos basta una serie corta para activar el patrón.' };
+  }
   if(meta.type === 'corporal'){
     const target = ex.sugg ? ex.sugg.reps : hi;
     const easy = Math.max(3, Math.round(target * 0.5));

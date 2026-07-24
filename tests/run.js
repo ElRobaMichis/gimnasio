@@ -395,6 +395,106 @@ chk(daysSinceBackup() === null, 'sin respaldo: null');
 exportBackup();
 chk(daysSinceBackup() === 0, 'exportar registra la fecha');
 
+/* =====================================================================
+   LOTE 1: tope de máquina, ejercicios por tiempo, ejercicio en sesión
+   ===================================================================== */
+suite('Tope de máquina (peso máximo disponible)');
+resetDB();
+exMeta('crunch maquina').cap = 100;
+sess('crunch maquina', [S(95,12), S(95,12), S(95,12)]);
+s = computeSuggestion('crunch maquina');
+chk(s.type === 'up' && s.w === 97.5, 'bajo el tope: progresión normal (95 → 97,5)');
+resetDB();
+exMeta('crunch maquina').cap = 101;
+sess('crunch maquina', [S(100,12), S(100,12)]);
+s = computeSuggestion('crunch maquina');
+chk(s.type === 'up' && s.w === 101 && s.msg.includes('tope'), 'salto parcial: clava el último salto en el tope (100 → 101)');
+resetDB();
+exMeta('press pecho m').cap = 100;
+sess('press pecho m', [S(100,12), S(100,12), S(100,12)]);
+s = computeSuggestion('press pecho m');
+chk(s.type === 'reps' && s.w === 100 && s.reps === 13 && s.msg.includes('Tope'),
+    'en el tope + rango lleno → reps abiertas (12 → 13), no kilos imposibles');
+sess('press pecho m', [S(100,13,4), S(100,13,4), S(100,13)]);
+s = computeSuggestion('press pecho m');
+chk(s.w === 100, 'RIR alto en el tope NO dispara subida de peso');
+for(let i = 0; i < 4; i++) sess('press pecho m', [S(100,14), S(100,14), S(100,14)]);
+s = computeSuggestion('press pecho m');
+chk(s.sets === 4, 'estancado en el tope → suma serie (volumen sigue disponible)');
+
+suite('Ejercicios por tiempo');
+resetDB();
+exMeta('plancha').type = 'tiempo';
+chk(effRange('plancha').lo === 20 && effRange('plancha').hi === 45, 'rango por defecto 20–45 s');
+sess('plancha', [S(0,45), S(0,45), S(0,45)]);
+s = computeSuggestion('plancha');
+chk(s.type === 'up' && s.reps === 50 && s.w === 0 && s.msg.includes('s</b>'),
+    'tope del rango → +5 s (45 → 50), nunca kg');
+resetDB();
+exMeta('plancha').type = 'tiempo';
+sess('plancha', [S(0,30), S(0,25)]);
+s = computeSuggestion('plancha');
+chk(s.type === 'reps' && s.reps === 35, 'dentro del rango → +5 s sobre el mejor (30 → 35)');
+resetDB();
+exMeta('plancha').type = 'tiempo';
+sess('plancha', [S(0,15), S(0,12)]);
+chk(computeSuggestion('plancha').type === 'hold', 'bajo 20 s → consolidar');
+resetDB();
+exMeta('plancha').type = 'tiempo';
+sess('plancha', [S(0,40)], 20);
+s = computeSuggestion('plancha');
+chk(s.type === 'back' && s.reps === 35, 'vuelta tras pausa: 40 s → 35 s (redondeado a 5)');
+resetDB();
+exMeta('farmer').type = 'tiempo';
+sess('farmer', [S(20,45), S(20,45)]);
+s = computeSuggestion('farmer');
+chk(s.w === 20 && s.reps === 50, 'con lastre: mantiene el peso, suma segundos');
+exMeta('plancha').type = 'tiempo';
+chk(fmtSet('farmer', {w:20, r:45}) === '20+45s' && fmtSet('plancha', {w:0, r:30}) === '30s',
+    'formato: "20+45s" con lastre, "30s" sin él');
+chk(bestMetricBefore('farmer') === 45, 'récord por tiempo = mejores segundos');
+/* cronómetro de serie: abre modal y cancela sin dejar intervalos vivos */
+db.routines.push({ id:'rt', name:'Core', exercises:[{ id:'p1', name:'Plancha', key:'plancha' }] });
+startSession('rt');
+startSetTimer(0, 0);
+chk(els['modalhost'].innerHTML.includes('Prepárate'), 'cronómetro: modal con cuenta de preparación');
+stopSetTimer(false);
+chk(els['modalhost'].innerHTML === '', 'cancelar cierra sin registrar');
+db.active = null;
+/* guardar con lastre en blanco → 0 */
+exMeta('colgado').type = 'tiempo';
+db.routines.push({ id:'rc', name:'C2', exercises:[{ id:'c1', name:'Colgado', key:'colgado' }] });
+startSession('rc');
+db.active.exercises[0].sets[0] = { w:'', r:'40', rir:'' };
+chk(collectEntries(db.active)[0].sets[0].w === 0, 'tiempo: lastre en blanco = 0');
+db.active = null;
+
+suite('Agregar ejercicio a media sesión');
+resetDB();
+sess('press banca', [S(60,10), S(60,10)]);
+db.routines.push({ id:'r1', name:'Torso', exercises:[{ id:'a', name:'Remo', key:'remo' }] });
+startSession('r1');
+window.__keepRoutine = false;
+document.getElementById('sessnewex').value = 'press banca';
+sessionAddExercise({ preventDefault(){} });
+chk(db.active.exercises.length === 2, 'ejercicio agregado a la sesión');
+chk(db.active.exercises[1].sugg !== null && db.active.exercises[1].sugg.w > 0,
+    'trae la progresión del historial (era de otra rutina)');
+chk(db.routines[0].exercises.length === 1, '"solo por hoy": la rutina NO cambia');
+document.getElementById('sessnewex').value = 'Press Banca';
+sessionAddExercise({ preventDefault(){} });
+chk(db.active.exercises.length === 2 && els['modalhost'].innerHTML.includes('Ya está'),
+    'duplicado bloqueado (ignora mayúsculas)');
+window.__keepRoutine = true;
+document.getElementById('sessnewex').value = 'Curl bíceps';
+sessionAddExercise({ preventDefault(){} });
+chk(db.active.exercises.length === 3, 'segundo ejercicio agregado');
+chk(db.routines[0].exercises.length === 2 && db.routines[0].exercises[1].key === 'curl biceps',
+    '"guardar en rutina": la rutina crece');
+const entries2 = (db.active.exercises[1].sets[0] = { w:'62.5', r:'10', rir:'' }, collectEntries(db.active));
+chk(entries2.length === 1 && entries2[0].key === 'press banca', 'al guardar solo cuentan las series llenadas');
+db.active = null;
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
