@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#101216">
+<meta name="theme-color" content="#08080A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Hierro">
@@ -12,249 +12,429 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
 <style>
   :root{
-    --bg:#101216;
-    --panel:#181b21;
-    --panel-2:#1f232b;
-    --line:#2a2f3a;
-    --ink:#eae6dc;
-    --mut:#8e94a0;
-    --acc:#f5c242;
-    --acc-ink:#1a1608;
-    --good:#6cc283;
-    --warn:#e2984a;
-    --bad:#e25c5c;
-    --radius:14px;
+    --void:#08080A;
+    --surface:#0E0F11;
+    --surface-2:#141619;
+    --well:#1B1E22;
+    --line:rgba(255,255,255,.07);
+    --line-2:rgba(255,255,255,.13);
+    --bone:#F3F1EC;
+    --ash:#9A9DA4;
+    --dim:#5F6268;
+    --up:#7FD3A8;
+    --hold:#D7A44B;
+    --danger:#E4685A;
+    --sans:'Archivo',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
   html,body{height:100%}
   body{
-    background:var(--bg);
-    color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    font-size:16px;line-height:1.45;
+    background:var(--void);color:var(--bone);
+    font-family:var(--sans);font-synthesis:none;
+    font-size:15px;line-height:1.5;
     overscroll-behavior-y:contain;
   }
   #app{
-    max-width:560px;margin:0 auto;min-height:100dvh;
+    max-width:460px;margin:0 auto;min-height:100dvh;
     display:flex;flex-direction:column;
-    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+    padding-bottom:calc(78px + env(safe-area-inset-bottom));
   }
-  main{flex:1;padding:16px 16px 24px}
+  main{flex:1;padding:0 20px 32px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .num{font-variant-numeric:tabular-nums}
+  .grow{flex:1;min-width:0}
+  .row{display:flex;align-items:center;gap:10px}
+  .stack{display:flex;flex-direction:column;gap:10px}
+
+  /* ---------- moleteado (textura de barra) ---------- */
+  .knurl{
+    height:7px;flex:none;
+    background-image:
+      repeating-linear-gradient(45deg,var(--line-2) 0 1px,transparent 1px 5px),
+      repeating-linear-gradient(-45deg,var(--line-2) 0 1px,transparent 1px 5px);
+    opacity:.85;
+  }
+
+  /* ---------- cabecera ---------- */
+  header.app{
+    padding:calc(14px + env(safe-area-inset-top, 0px)) 20px 0;
+    flex:none;
+  }
+  header.app.sticky{position:sticky;top:0;z-index:30;background:var(--void)}
+  .head-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .mark{
+    font-size:10px;letter-spacing:.3em;font-weight:700;font-stretch:75%;
+    text-transform:uppercase;color:var(--dim);
+  }
+  .goal{
+    font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ash);border:1px solid var(--line);border-radius:999px;padding:5px 10px;white-space:nowrap;
+  }
+  .title{font-size:32px;font-weight:700;font-stretch:115%;letter-spacing:-.035em;line-height:1;margin:10px 0 12px}
+  .title.sm{font-size:25px;margin:0}
+  .title.big{font-size:27px;margin:12px 0 2px}
+  .title-sub{font-size:22px;font-weight:500;font-stretch:110%;letter-spacing:-.03em;color:var(--dim);line-height:1.1;margin-bottom:12px}
+  .back{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);display:flex;align-items:center;gap:7px;padding:2px 0 6px;
+  }
+  .meta{font-family:var(--mono);font-size:11px;color:var(--dim);margin:9px 0 12px}
+  .tools{display:flex;gap:16px;color:var(--dim);flex:none}
+  .tools button{display:flex;align-items:center;color:inherit}
+  .tools svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 
   /* ---------- tipografía utilitaria ---------- */
-  .eyebrow{
-    font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--mut);
+  .sect{
+    font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+    font-weight:600;font-stretch:80%;margin:26px 0 11px;
   }
-  h1{font-size:26px;font-weight:800;letter-spacing:-.01em}
-  h2{font-size:19px;font-weight:750;letter-spacing:-.01em}
-  .num{font-variant-numeric:tabular-nums}
-
-  /* ---------- header ---------- */
-  header.app{
-    padding:calc(18px + env(safe-area-inset-top, 0px)) 16px 6px;
-    display:flex;align-items:baseline;justify-content:space-between;gap:12px;
-  }
-  header.app .brand{display:flex;flex-direction:column;gap:2px}
-
-  /* ---------- cards / listas ---------- */
-  .card{
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    padding:14px 16px;
-  }
-  .stack{display:flex;flex-direction:column;gap:10px}
-  .row{display:flex;align-items:center;gap:10px}
-  .row > input{min-width:0}
-  .grow{flex:1;min-width:0}
-  .clickable{cursor:pointer;transition:border-color .12s ease, transform .05s ease}
-  .clickable:active{transform:scale(.985)}
-  .clickable:hover{border-color:#3a4150}
-  .muted{color:var(--mut);font-size:13.5px}
-  .tiny{font-size:12px;color:var(--mut)}
+  .sect:first-child{margin-top:18px}
+  .hint{font-size:11.5px;line-height:1.55;color:var(--dim);margin-top:9px}
+  .hint b{color:var(--ash);font-weight:500}
+  .muted{color:var(--ash);font-size:13.5px;line-height:1.55}
+  .tiny{font-size:11.5px;color:var(--dim);line-height:1.5}
   .linkish{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
 
   /* ---------- botones ---------- */
-  button{
-    font:inherit;color:inherit;background:none;border:none;cursor:pointer;
-    -webkit-tap-highlight-color:transparent;
-  }
-  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .clickable:focus-visible{
-    outline:2px solid var(--acc);outline-offset:2px;border-radius:8px;
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+  .clickable:focus-visible, summary:focus-visible{
+    outline:2px solid var(--hold);outline-offset:2px;border-radius:8px;
   }
   .btn{
-    display:flex;align-items:center;justify-content:center;gap:8px;
-    border-radius:12px;padding:13px 18px;font-weight:700;font-size:15.5px;
-    background:var(--panel-2);border:1px solid var(--line);width:100%;
-    transition:transform .05s ease;
+    display:block;width:100%;text-align:center;border-radius:13px;padding:17px;
+    font-size:14.5px;font-weight:600;letter-spacing:-.01em;
+    background:var(--bone);color:#0B0B0D;border:1px solid var(--bone);
+    transition:transform .06s ease;
   }
-  .btn:active{transform:scale(.98)}
-  .btn-acc{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
-  .btn-danger{color:var(--bad);border-color:#4a2f33}
-  .btn-ghost{background:transparent}
-  .iconbtn{
-    width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-    color:var(--mut);font-size:18px;flex:none;
+  .btn:active{transform:scale(.985)}
+  .btn.ghost{background:transparent;border-color:var(--line-2);color:var(--bone);font-weight:500}
+  .btn.quiet{background:var(--surface);border-color:var(--line);color:var(--bone);font-weight:500}
+  .btn.danger{background:transparent;border-color:rgba(228,104,90,.32);color:var(--danger);font-weight:500}
+  .btn.sm{padding:12px;font-size:13.5px;border-radius:11px}
+  .deload{
+    display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;width:100%;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
   }
-  .iconbtn:hover{color:var(--ink);background:var(--panel-2)}
+  .deload svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .dock{
+    position:sticky;bottom:calc(62px + env(safe-area-inset-bottom));z-index:20;
+    margin:18px -20px 0;padding:16px 20px 10px;
+    background:linear-gradient(transparent,var(--void) 26%);
+  }
+  .chev{color:var(--dim);font-size:15px;flex:none;line-height:1}
+  .xbtn{
+    color:var(--dim);font-size:13px;flex:none;line-height:1;padding:4px 2px;
+  }
+  .xbtn:hover{color:var(--danger)}
 
   /* ---------- inputs ---------- */
   input[type=text], input[type=number], select, textarea{
-    background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
-    color:var(--ink);padding:11px 12px;font:inherit;width:100%;
+    background:var(--well);border:1px solid transparent;border-radius:10px;
+    color:var(--bone);padding:12px;font:inherit;width:100%;
   }
-  textarea{resize:vertical;min-height:64px}
-  input::placeholder, textarea::placeholder{color:#5b6170}
-  input[type=number]{text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
-  /* placeholders de sugerencia = "shadow text" dorado */
-  input.sugg::placeholder{color:#8a7a45}
-  .field{display:flex;flex-direction:column;gap:5px}
-  .field > span{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  input[type=number]{font-family:var(--mono);text-align:center;font-variant-numeric:tabular-nums}
+  input::placeholder, textarea::placeholder{color:var(--dim)}
+  input.sugg::placeholder{color:#7a6635}
+  textarea{resize:vertical;min-height:70px;font-size:14px;line-height:1.55}
+  select{
+    -webkit-appearance:none;appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+    background-position:calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+    background-size:5px 5px, 5px 5px;background-repeat:no-repeat;padding-right:30px;
+  }
+  select.inline{
+    background-color:transparent;border-color:transparent;width:auto;flex:none;
+    font-family:var(--mono);font-size:13px;color:var(--ash);padding:6px 26px 6px 8px;text-align:right;
+  }
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field > span{font-size:10px;font-weight:600;font-stretch:80%;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .field > span.plain{text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px;line-height:1.5}
 
-  /* ---------- nav inferior ---------- */
+  /* ---------- resumen de la semana ---------- */
+  .strip{display:flex;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .strip div{flex:1;padding:16px 4px 14px;text-align:center;border-right:1px solid var(--line)}
+  .strip div:last-child{border-right:0}
+  .strip .n{font-family:var(--mono);font-size:20px;font-weight:500;letter-spacing:-.02em}
+  .strip .n i{font-style:normal;font-size:12px;color:var(--dim)}
+  .strip .l{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:7px}
+
+  /* ---------- filas simples ---------- */
+  .rowitem{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:17px 0;border-bottom:1px solid var(--line);width:100%;
+  }
+  .row-name{font-size:16px;font-weight:600;letter-spacing:-.015em}
+  .row-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px}
+
+  /* ---------- tarjeta de ejercicio ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:15px 16px;margin-bottom:10px;width:100%}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .ex-title{font-size:15px;font-weight:600;letter-spacing:-.015em;line-height:1.25}
+  .ex-title em{font-style:normal;color:var(--dim);font-weight:400}
+  .last{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:6px}
+  .last b{color:var(--ash);font-weight:400}
+  .exnote{font-size:11.5px;color:var(--dim);margin-top:7px;line-height:1.5}
+
+  .verdict{display:flex;align-items:baseline;gap:9px;margin-top:11px}
+  .dot{width:5px;height:5px;border-radius:50%;flex:none;transform:translateY(-2px)}
+  .dot.up{background:var(--up)}
+  .dot.hold{background:var(--hold)}
+  .v-text{font-size:13px;letter-spacing:-.005em;line-height:1.45}
+  .v-text b{font-family:var(--mono);font-weight:500}
+  .v-text.up b{color:var(--up)}
+  .v-text.hold b{color:var(--hold)}
+  .why{font-size:11.5px;line-height:1.5;color:var(--dim);margin-top:6px;padding-left:14px}
+
+  .steps{display:flex;align-items:center;gap:12px;margin-top:13px}
+  .bars{display:flex;gap:5px;flex:1}
+  .bars i{flex:1;height:3px;border-radius:2px;background:var(--well)}
+  .bars i.up{background:var(--up)}
+  .bars i.hold{background:var(--hold)}
+  .steps-v{font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
+  .steps-v b{color:var(--ash);font-weight:400}
+
+  /* ---------- avisos del coach ---------- */
+  .note{border-left:1px solid var(--hold);padding:2px 0 2px 14px;margin:18px 0}
+  .note.up{border-left-color:var(--up)}
+  .note.bad{border-left-color:var(--danger)}
+  .note-t{font-size:12.5px;color:var(--hold);line-height:1.45}
+  .note.up .note-t{color:var(--up)}
+  .note.bad .note-t{color:var(--danger)}
+  .note-d{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .note-a{
+    margin-top:9px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim);text-decoration:underline;text-underline-offset:3px;
+  }
+
+  /* ---------- pestañas inferiores ---------- */
   nav.tabs{
     position:fixed;bottom:0;left:0;right:0;z-index:40;
-    background:rgba(16,18,22,.92);backdrop-filter:blur(12px);
+    background:rgba(8,8,10,.94);backdrop-filter:blur(14px);
     border-top:1px solid var(--line);
     padding-bottom:env(safe-area-inset-bottom);
   }
-  nav.tabs .inner{max-width:560px;margin:0 auto;display:flex}
-  nav.tabs button{
-    flex:1;padding:11px 0 9px;display:flex;flex-direction:column;align-items:center;gap:3px;
-    color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.04em;
-  }
-  nav.tabs button .ic{font-size:19px;line-height:1}
-  nav.tabs button.on{color:var(--acc)}
+  nav.tabs .inner{max-width:460px;margin:0 auto;display:flex;padding:12px 0 10px}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--dim)}
+  .tab.on{color:var(--bone)}
+  .tab span{font-size:9px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-stretch:80%}
+  .tab svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 
-  /* ---------- barra de sesión (cronómetro + descanso) ---------- */
-  .sessionbar{
-    position:sticky;top:0;z-index:30;
-    background:linear-gradient(180deg,#15181d 0%, rgba(16,18,22,.97) 100%);
-    border-bottom:1px solid var(--line);
-    margin:-16px -16px 16px;
-    padding:calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
-    display:flex;flex-direction:column;gap:10px;
+  /* ---------- sesión en curso ---------- */
+  .sess-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .clock{font-family:var(--mono);font-size:36px;font-weight:400;letter-spacing:-.05em;line-height:1}
+  .sess-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-top:9px}
+  .sess-actions{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex:none}
+  .end{
+    border:1px solid rgba(228,104,90,.32);color:var(--danger);border-radius:999px;padding:9px 16px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
   }
-  .clock{
-    font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.01em;
-    line-height:1;
+  .unitbtn{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    border:1px solid var(--line);border-radius:999px;padding:6px 12px;
   }
-  .dot{
-    width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none;
-    animation:pulse 1.6s ease-in-out infinite;
-  }
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
-  @media (prefers-reduced-motion:reduce){ .dot{animation:none} }
-  .restchip{
-    width:100%;padding:9px;border:1px dashed var(--line);border-radius:10px;
-    color:var(--mut);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;
-  }
-  .restchip.on{border-style:solid;border-color:var(--acc);color:var(--acc);background:#241f10}
-  .restchip.done{border-style:solid;border-color:var(--good);color:var(--good);background:#132015}
+  .rest{margin:16px 0 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px 15px;width:100%}
+  .rest-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .rest-l{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  .rest-t{font-family:var(--mono);font-size:17px;color:var(--bone)}
+  .rest-track{height:2px;background:var(--well);border-radius:2px;margin-top:13px;overflow:hidden}
+  .rest-fill{height:100%;width:0%;background:var(--bone);border-radius:2px;transition:width .9s linear}
+  .rest.on .rest-t{color:var(--hold)}
+  .rest.on .rest-fill{background:var(--hold)}
+  .rest.done{border-color:rgba(127,211,168,.35)}
+  .rest.done .rest-t,.rest.done .rest-l{color:var(--up)}
+  .rest.done .rest-fill{background:var(--up)}
 
-  /* ---------- sugerencia del coach ---------- */
-  .coach{
-    border-left:3px solid var(--acc);
-    background:#1d1f22;
-    border-radius:8px;padding:9px 12px;margin-top:8px;
-    font-size:13.5px;
+  .ex-open{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-bottom:10px}
+  .ex-done,.ex-next{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:10px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
   }
-  .coach b{color:var(--acc)}
-  .coach.good{border-left-color:var(--good)} .coach.good b{color:var(--good)}
-  .coach.warn{border-left-color:var(--warn)} .coach.warn b{color:var(--warn)}
-  .coach .why{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+  .ex-done .ex-title{font-size:14px;color:var(--ash);font-weight:500}
+  .ex-next .ex-title{font-size:14px;font-weight:500}
+  .mini-check{width:20px;height:20px;border-radius:6px;background:var(--up);display:flex;align-items:center;justify-content:center;flex:none}
+  .mini-check svg{width:12px;height:12px;stroke:#0B0B0D;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 
-  /* ---------- filas de series ---------- */
-  .sethead, .setrow{display:grid;grid-template-columns:24px 1.15fr 1fr .95fr 32px;gap:7px;align-items:center}
-  .sethead{margin-top:12px}
-  .sethead span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;text-align:center;font-weight:700}
-  .setrow{margin-top:8px}
-  .setrow .idx{
-    text-align:center;color:var(--mut);font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;
+  .grid-h,.set{display:grid;grid-template-columns:14px 1fr 1fr .8fr 42px 20px;gap:6px;align-items:center}
+  .grid-h{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);margin:16px 0 9px;
   }
-  .setrow input{padding:11px 6px}
-  .addset{
-    margin-top:10px;width:100%;padding:9px;border:1px dashed var(--line);border-radius:10px;
-    color:var(--mut);font-weight:600;font-size:14px;
+  .grid-h span:nth-child(2),.grid-h span:nth-child(3),.grid-h span:nth-child(4){text-align:center}
+  .set{margin-bottom:8px}
+  .set .i{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center}
+  .set .i.play{color:var(--hold);font-size:13px;padding:0;text-align:center}
+  .cell{
+    background:var(--well);border-radius:10px;padding:12px 2px;text-align:center;
+    font-family:var(--mono);font-size:15px;border:1px solid transparent;color:var(--bone);
   }
-  .addset:hover{color:var(--acc);border-color:var(--acc)}
+  .cell::placeholder{color:var(--dim)}
+  .set.now .cell{border-color:var(--line-2);background:var(--surface-2)}
+  .set.done .cell{background:transparent;border-color:transparent;color:var(--ash)}
+  .ck{
+    height:42px;width:100%;border-radius:10px;border:1px solid var(--line-2);
+    display:flex;align-items:center;justify-content:center;color:var(--dim);
+  }
+  .ck svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .ck.on{background:var(--up);border-color:var(--up);color:#0B0B0D}
+  .ex-actions{
+    display:flex;gap:18px;border-top:1px solid var(--line);margin-top:14px;padding-top:14px;
+    font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    flex-wrap:wrap;
+  }
+  .ex-actions button{color:inherit}
+  .vschip{font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:center;margin-top:10px}
+  .addex{
+    width:100%;border:1px dashed var(--line-2);border-radius:14px;padding:15px;text-align:center;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  }
 
-  /* ---------- autocompletado de ejercicios ---------- */
+  /* ---------- objetivo / opciones tipo tarjeta ---------- */
+  .goals{display:flex;gap:8px}
+  .goal-c{flex:1;border:1px solid var(--line);border-radius:13px;padding:13px 12px;background:transparent}
+  .goal-c.on{border-color:rgba(215,164,75,.45);background:rgba(215,164,75,.06)}
+  .goal-c .g-t{font-size:14px;font-weight:600;letter-spacing:-.015em}
+  .goal-c.on .g-t{color:var(--hold)}
+  .goal-c .g-d{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px}
+
+  /* ---------- filas de ajuste ---------- */
+  .line{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 0;border-bottom:1px solid var(--line);width:100%}
+  .line:last-child{border-bottom:0}
+  .l-t{font-size:14.5px;font-weight:500;letter-spacing:-.01em}
+  .l-d{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .l-v{font-family:var(--mono);font-size:13px;color:var(--ash);display:flex;align-items:center;gap:8px;flex:none}
+  .l-v svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .l-v.dim{color:var(--dim)}
+  .list{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0 16px}
+  .list .line{padding:15px 0}
+  .pill-sw{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;flex:none}
+  .pill-sw button{font-family:var(--mono);font-size:12px;padding:8px 16px;border-radius:8px;color:var(--dim)}
+  .pill-sw button.on{background:var(--well);color:var(--bone);box-shadow:inset 0 0 0 1px var(--line-2)}
+  .tog{width:44px;height:26px;border-radius:999px;background:var(--well);position:relative;flex:none}
+  .tog i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--dim);transition:left .16s ease}
+  .tog.on{background:var(--hold)}
+  .tog.on i{left:21px;background:#0B0B0D}
+  .seg4{display:flex;background:var(--surface-2);border-radius:12px;padding:4px;gap:2px}
+  .seg4 button{flex:1;text-align:center;font-size:12.5px;padding:11px 2px;border-radius:9px;color:var(--dim)}
+  .seg4 button.on{background:var(--well);color:var(--bone);font-weight:600;box-shadow:inset 0 0 0 1px var(--line-2)}
+
+  /* ---------- ficha de ejercicio ---------- */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 16px 14px}
+  .pr{display:flex;align-items:flex-end;gap:9px}
+  .pr .n{font-family:var(--mono);font-size:46px;font-weight:400;letter-spacing:-.05em;line-height:.9}
+  .pr .u{font-family:var(--mono);font-size:13px;color:var(--dim);padding-bottom:5px}
+  .pr-d{font-size:12px;color:var(--ash);margin-top:11px;line-height:1.5}
+  .pr-d b{font-family:var(--mono);font-weight:400;color:var(--bone)}
+  .chart{margin-top:18px}
+  .chart canvas{display:block;width:100%;touch-action:pan-y}
+  .axis{
+    display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:14px;
+  }
+
+  /* ---------- volumen semanal ---------- */
+  .vol{display:flex;align-items:center;gap:12px;padding:10px 0}
+  .vol-n{width:66px;font-size:13px;color:var(--ash);flex:none}
+  .vol-track{flex:1;height:3px;background:var(--well);border-radius:2px;overflow:hidden}
+  .vol-fill{height:100%;background:var(--dim);border-radius:2px}
+  .vol-fill.ok{background:var(--up)}
+  .vol-fill.hi{background:var(--hold)}
+  .vol-v{width:62px;text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--dim);flex:none}
+  .vol-v b{color:var(--bone);font-weight:500}
+
+  /* ---------- historial ---------- */
+  details.hist{border-bottom:1px solid var(--line)}
+  details.hist summary{list-style:none;cursor:pointer}
+  details.hist summary::-webkit-details-marker{display:none}
+  .log{padding:16px 0;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .log-n{font-size:15px;font-weight:500;letter-spacing:-.01em}
+  .log-m{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px}
+  .log-v{font-family:var(--mono);font-size:13px;color:var(--ash);white-space:nowrap;flex:none}
+  .log-v i{font-style:normal;color:var(--dim);font-size:10px}
+  details.hist .body{padding:0 0 16px;font-size:13.5px}
+  .exline{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .exline:last-of-type{border-bottom:none}
+  .exline .sets{color:var(--dim);font-family:var(--mono);font-size:11px;text-align:right;flex:none}
+  .exline em{font-style:normal;color:var(--dim)}
+
+  /* ---------- autocompletado ---------- */
   .acwrap{position:relative;flex:1;min-width:0}
   .aclist{
-    position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:45;
-    background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
-    overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.5);
+    position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:45;
+    background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;
+    overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.6);
   }
   .aclist button{
     display:flex;justify-content:space-between;align-items:baseline;gap:8px;
-    width:100%;text-align:left;padding:11px 14px;font-size:14.5px;
-    border-bottom:1px solid #232833;
+    width:100%;text-align:left;padding:12px 14px;font-size:14px;
+    border-bottom:1px solid var(--line);
   }
   .aclist button:last-child{border-bottom:none}
-  .aclist button:hover, .aclist button:focus-visible{background:#262b35}
-  .aclist b{color:var(--acc)}
-  .aclist .from{color:var(--mut);font-size:11px;white-space:nowrap;flex:none}
-
-  /* ---------- volumen semanal ---------- */
-  .volrow{display:grid;grid-template-columns:82px 1fr 86px;gap:10px;align-items:center;padding:4px 0}
-  .volrow .lbl{font-size:13px}
-  .volbar{height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden}
-  .volbar i{display:block;height:100%;border-radius:3px}
-  .volrow .val{font-size:12px;color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-
-  /* ---------- gráfica ---------- */
-  .chartwrap{margin-top:10px}
-  .chartwrap canvas{display:block;width:100%;touch-action:pan-y;border-radius:8px}
-  .bignum{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
-  .bignum small{font-size:15px;font-weight:600;color:var(--mut)}
+  .aclist button:hover, .aclist button:focus-visible{background:var(--well)}
+  .aclist b{color:var(--hold);font-weight:600}
+  .aclist .from{color:var(--dim);font-family:var(--mono);font-size:10px;white-space:nowrap;flex:none}
 
   /* ---------- modal ---------- */
   .overlay{
-    position:fixed;inset:0;z-index:50;background:rgba(8,9,12,.72);
+    position:fixed;inset:0;z-index:50;background:rgba(4,4,6,.78);
     display:flex;align-items:flex-end;justify-content:center;
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
   }
   @media(min-width:480px){ .overlay{align-items:center} }
   .modal{
-    background:var(--panel);border:1px solid var(--line);
-    border-radius:18px 18px 0 0;width:100%;max-width:480px;
-    max-height:86dvh;overflow-y:auto;
-    padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+    background:var(--surface);border:1px solid var(--line-2);
+    border-radius:20px 20px 0 0;width:100%;max-width:460px;
+    max-height:88dvh;overflow-y:auto;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));
   }
-  @media(min-width:480px){ .modal{border-radius:18px;padding-bottom:22px} }
-  .modal h2{margin-bottom:6px}
-  .modal .muted{margin-bottom:16px}
+  @media(min-width:480px){ .modal{border-radius:20px;padding-bottom:24px} }
+  .modal h2{font-size:21px;font-weight:700;font-stretch:112%;letter-spacing:-.028em;line-height:1.1;margin-bottom:9px}
+  .modal .muted{margin-bottom:18px}
+  .modal .btn + .btn{margin-top:9px}
+  .modal .sect:first-child{margin-top:0}
 
-  /* ---------- opciones tipo tarjeta (objetivo, tipo de ejercicio) ---------- */
-  .goal-opt{
-    display:flex;flex-direction:column;gap:2px;text-align:left;width:100%;
-    background:var(--panel-2);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;
+  /* ---------- estado vacío ---------- */
+  .empty{text-align:center;padding:56px 16px 44px}
+  .empty .big{
+    font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:14px;
   }
-  .goal-opt.on{border-color:var(--acc);background:#242113}
-  .goal-opt b{font-size:15px}
-  .goal-opt span{font-size:12.5px;color:var(--mut)}
-
-  .empty{text-align:center;padding:44px 20px;color:var(--mut)}
-  .empty .big{font-size:40px;margin-bottom:10px}
+  .empty p{font-size:15px;font-weight:600;letter-spacing:-.015em}
+  .empty .muted{margin-top:8px;font-size:12.5px;color:var(--dim)}
 
   .pill{
-    display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;
-    background:var(--panel-2);border:1px solid var(--line);border-radius:99px;
-    padding:2px 9px;color:var(--mut);white-space:nowrap;
+    display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.12em;
+    text-transform:uppercase;border:1px solid var(--line);border-radius:999px;
+    padding:3px 8px;color:var(--dim);white-space:nowrap;
   }
-  .pill.acc{color:var(--acc-ink);background:var(--acc);border-color:var(--acc)}
+  .pill.hold{color:var(--hold);border-color:rgba(215,164,75,.35)}
 
-  details.hist{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
-  details.hist summary{
-    list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;
+  /* ---------- opción de tarjeta ancha (modales) ---------- */
+  .opt{
+    display:flex;flex-direction:column;gap:4px;text-align:left;width:100%;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:14px 15px;
   }
-  details.hist summary::-webkit-details-marker{display:none}
-  details.hist .body{border-top:1px solid var(--line);padding:12px 16px 14px;font-size:14px}
-  details.hist .exline{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #232833}
-  details.hist .exline:last-child{border-bottom:none}
-  details.hist .exline .sets{color:var(--mut);font-variant-numeric:tabular-nums;text-align:right}
+  .opt.on{border-color:rgba(215,164,75,.45);background:rgba(215,164,75,.06)}
+  .opt b{font-size:14.5px;font-weight:600;letter-spacing:-.015em}
+  .opt.on b{color:var(--hold)}
+  .opt span{font-size:12px;color:var(--dim);line-height:1.5}
+  h1,h2{font-size:21px;font-weight:700;font-stretch:112%;letter-spacing:-.028em;line-height:1.15}
+  .l-v input{width:52px;padding:8px 4px;font-size:13px;background:var(--well)}
+  .why b{color:var(--ash);font-weight:500}
+  .note-d b{color:var(--ash);font-weight:500}
+  .modal p{font-size:13.5px;line-height:1.6;color:var(--ash)}
+  .modal p b{color:var(--bone);font-weight:600}
+  .modal .tiny{color:var(--dim);font-size:11.5px}
+  .modal textarea{margin-top:4px}
+  .modal .stack{gap:9px}
 </style>
 </head>
 <body>
@@ -670,7 +850,7 @@ function computeSuggestion(key){
     }
   }
   if(p.stall >= 6 && sugg.type !== 'up'){
-    sugg.why = `🔁 Lleva ${p.stall} sesiones estancado: considera rotarlo por una variante del mismo músculo durante 4–6 semanas — un estímulo nuevo suele reactivar el progreso. ` + sugg.why;
+    sugg.why = `Lleva ${p.stall} sesiones estancado: considera rotarlo por una variante del mismo músculo durante 4–6 semanas — un estímulo nuevo suele reactivar el progreso. ` + sugg.why;
   }
   return sugg;
 }
@@ -717,6 +897,77 @@ function updateProgress(key, newSets, dateISO){
    ===================================================================== */
 function go(v){ view = v; render(); window.scrollTo(0,0); }
 
+/* ---------- iconografía de línea (un solo trazo en toda la app) ---------- */
+const ICON = {
+  routines:'<path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/>',
+  session:'<circle cx="12" cy="13" r="8"/><path d="M12 13V9M9 2h6"/>',
+  history:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  settings:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/>',
+  sort:'<path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+  trash:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
+  down:'<path d="M12 4v11M12 15l-4-4M12 15l4-4M5 19h14"/>',
+  up:'<path d="M12 15V4M12 4L8 8M12 4l4 4M5 19h14"/>',
+  check:'<path d="M4 12.5l5.5 5.5L20 7"/>',
+  deload:'<path d="M12 5v14M12 19l-4-4M12 19l4-4"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+};
+function svgIcon(name){ return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name] || ''}</svg>`; }
+
+/* el equipo entre paréntesis («(Dumbbell)») baja a segunda línea en gris */
+function exTitleHTML(name){
+  const m = /^(.*?)\s*(\([^()]*\))\s*$/.exec(name);
+  return m && m[1] ? `${esc(m[1])} <em>${esc(m[2])}</em>` : esc(name);
+}
+function exBaseName(name){
+  const m = /^(.*?)\s*\([^()]*\)\s*$/.exec(name);
+  return (m && m[1]) ? m[1] : name;
+}
+function exEquip(name){
+  const m = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(name);
+  return (m && m[1]) ? m[2] : '';
+}
+
+/* barras segmentadas = el rango de reps, llenas con lo de la última sesión */
+function rangeBarsHTML(key, sugg){
+  const last = lastEntry(key);
+  if(!last) return '';
+  const { lo, hi } = effRange(key);
+  const sets = last.entry.sets;
+  const w = workWeight(sets);
+  const reps = sets.filter(s => s.w === w).map(s => s.r).sort((a,b) => a - b);
+  if(!reps.length) return '';
+  const minR = reps.length >= 4 ? reps[1] : reps[0];
+  const span = Math.max(1, hi - lo + 1);
+  const n = Math.min(span, 6);
+  let filled = Math.round((minR - lo + 1) / span * n);
+  filled = Math.max(0, Math.min(n, filled));
+  const cls = (sugg && sugg.type === 'up') ? 'up' : 'hold';
+  const bars = Array.from({length:n}, (_,i) => `<i class="${i < filled ? cls : ''}"></i>`).join('');
+  const u = exMeta(key).type === 'tiempo' ? ' s' : '';
+  return `<div class="steps">
+    <div class="bars">${bars}</div>
+    <div class="steps-v"><b>${minR}</b>/${hi}${u}${filled >= n ? ' · rango lleno' : ''}</div>
+  </div>`;
+}
+
+/* «ÚLTIMA · 18×12 · 18×12» */
+function lastLineHTML(key, label){
+  const last = lastEntry(key);
+  if(!last) return `<div class="last">Sin registros todavía</div>`;
+  const sets = last.entry.sets;
+  const shown = sets.slice(0, 4).map(s => `<b>${fmtSet(key, s)}</b>`).join(' · ');
+  return `<div class="last">${label || 'Última'} · ${shown}${sets.length > 4 ? ' · …' : ''}</div>`;
+}
+
+/* veredicto del coach: punto de color + frase corta + el porqué */
+function verdictHTML(sugg, why){
+  if(!sugg) return '';
+  const k = sugg.type === 'up' ? 'up' : 'hold';
+  return `<div class="verdict"><i class="dot ${k}"></i><div class="v-text ${k}">${sugg.msg}</div></div>
+    ${why ? `<div class="why">${sugg.why}</div>` : ''}`;
+}
+
 function render(){
   clearInterval(timerInt); timerInt = null;
   renderTop(); renderTabs();
@@ -732,32 +983,33 @@ function render(){
 
 function renderTop(){
   const t = document.getElementById('topbar');
-  if((view.name === 'session' && db.active) || view.name === 'exercise'){
-    t.innerHTML = ''; t.style.display = 'none'; return;
-  }
   t.style.display = '';
+  t.className = 'app';
+  if(view.name === 'session' && db.active){ t.className = 'app sticky'; t.innerHTML = sessionHeadHTML(); return; }
+  if(view.name === 'routine'){ t.innerHTML = routineHeadHTML(); return; }
+  if(view.name === 'exercise'){ t.innerHTML = exerciseHeadHTML(); return; }
   const goal = db.settings.goal ? GOALS[db.settings.goal].label : null;
+  const title = view.name === 'history' ? 'Historial' : (view.name === 'settings' ? 'Ajustes' : 'Rutinas');
   t.innerHTML = `
-    <div class="brand">
-      <span class="eyebrow">Hierro</span>
-      <h1>${view.name==='history' ? 'Historial' : view.name==='settings' ? 'Ajustes' : 'Tus rutinas'}</h1>
+    <div class="head-row">
+      <div class="mark">Hierro</div>
+      ${goal ? `<div class="goal">${goal}</div>` : ''}
     </div>
-    ${goal ? `<span class="pill">${goal}</span>` : ''}`;
+    <div class="title">${title}</div>
+    <div class="knurl"></div>`;
 }
 
 function renderTabs(){
   const inSession = !!db.active;
   const rutinasOn = ['home','routine','exercise'].includes(view.name);
+  const tab = (icon, label, on, fn) =>
+    `<button class="tab ${on ? 'on' : ''}" onclick="${fn}">${svgIcon(icon)}<span>${label}</span></button>`;
   document.getElementById('tabs').innerHTML = `
     <div class="inner">
-      <button onclick="go({name:'home'})" class="${rutinasOn?'on':''}">
-        <span class="ic">🏋️</span>Rutinas</button>
-      ${inSession ? `<button onclick="go({name:'session'})" class="${view.name==='session'?'on':''}">
-        <span class="ic">⏱️</span>Sesión</button>` : ''}
-      <button onclick="go({name:'history'})" class="${view.name==='history'?'on':''}">
-        <span class="ic">📅</span>Historial</button>
-      <button onclick="go({name:'settings'})" class="${view.name==='settings'?'on':''}">
-        <span class="ic">⚙️</span>Ajustes</button>
+      ${tab('routines','Rutinas', rutinasOn, "go({name:'home'})")}
+      ${inSession ? tab('session','Sesión', view.name === 'session', "go({name:'session'})") : ''}
+      ${tab('history','Historial', view.name === 'history', "go({name:'history'})")}
+      ${tab('settings','Ajustes', view.name === 'settings', "go({name:'settings'})")}
     </div>`;
 }
 
@@ -817,76 +1069,100 @@ function dismissRIR(){
 }
 
 /* ---------- HOME ---------- */
+/* resumen de los últimos 7 días para la tira superior */
+function weekStats(){
+  const cut = new Date(Date.now() - 7*864e5).toISOString();
+  let sessions = 0, sets = 0, vol = 0;
+  for(const h of db.history){
+    if(h.date < cut) continue;
+    sessions++;
+    for(const e of h.entries){
+      sets += e.sets.length;
+      for(const st of e.sets) vol += st.w * st.r;
+    }
+  }
+  return { sessions, sets, vol };
+}
+function fmtVolShort(kg){
+  const v = fromKg(kg);
+  if(v >= 1000) return `${fmtNum(Math.round(v/100)/10)}<i>${db.settings.unit === 'lb' ? 'k' : 't'}</i>`;
+  return `${Math.round(v)}<i>${uLabel()}</i>`;
+}
+
 function viewHome(){
-  let cards = db.routines.map(r => {
+  const rows = db.routines.map(r => {
     const lastS = [...db.history].reverse().find(h => h.routineId === r.id || h.routineName === r.name);
     return `
-    <div class="card clickable" role="button" tabindex="0" onclick="go({name:'routine', id:'${r.id}'})"
-         onkeydown="if(event.key==='Enter')go({name:'routine', id:'${r.id}'})">
-      <div class="row">
-        <div class="grow">
-          <h2>${esc(r.name)}</h2>
-          <div class="muted">${r.exercises.length} ejercicio${r.exercises.length===1?'':'s'}
-            ${lastS ? ` · última vez: ${fmtDate(lastS.date)}` : ''}</div>
-        </div>
-        <span style="color:var(--mut);font-size:20px">›</span>
-      </div>
-    </div>`;
+    <button class="rowitem" onclick="go({name:'routine', id:'${r.id}'})">
+      <span class="grow">
+        <span class="row-name" style="display:block">${esc(r.name)}</span>
+        <span class="row-sub" style="display:block">${r.exercises.length} ejercicio${r.exercises.length===1?'':'s'}${lastS ? ` · ${fmtDate(lastS.date)}` : ''}</span>
+      </span>
+      <span class="chev">›</span>
+    </button>`;
   }).join('');
 
-  if(!db.routines.length){
-    cards = `<div class="empty">
-      <div class="big">🏋️</div>
-      <p><b>Todavía no tienes rutinas.</b></p>
-      <p class="muted">Crea la primera — por ejemplo “Torso”, “Pierna” o “Full body”.</p>
-    </div>`;
-  }
+  const w = weekStats();
+  const strip = w.sessions ? `
+    <div class="sect">Esta semana</div>
+    <div class="strip">
+      <div><div class="n">${w.sessions}</div><div class="l">Sesiones</div></div>
+      <div><div class="n">${w.sets}</div><div class="l">Series</div></div>
+      <div><div class="n">${fmtVolShort(w.vol)}</div><div class="l">Volumen</div></div>
+    </div>` : '';
+
   const resume = db.active ? `
-    <button class="btn btn-acc" onclick="go({name:'session'})">
-      ⏱️ Continuar sesión en curso — ${esc(db.active.routineName)}
+    <button class="btn" style="margin-top:18px" onclick="go({name:'session'})">
+      Continuar sesión — ${esc(db.active.routineName)}
     </button>` : '';
 
   const fat = systemicFatigue();
   const fatBanner = fat ? `
-    <div class="coach warn" style="margin-top:0">
-      🪫 Señal de fatiga acumulada: retrocediste en <b>${fat.regressed} de ${fat.evaluated}</b> ejercicios recientes.
-      <span class="why">Cuando cae casi todo a la vez, el problema no es un ejercicio: es falta de recuperación.
-      Lo que mejor funciona: una semana de descarga o 2–3 días extra de descanso y sueño.
-      Tip: en cada rutina tienes <b>“Empezar como descarga”</b> — el coach calcula solo los pesos
-      y series suaves, y tu progresión no se toca.</span>
-      <button class="btn btn-ghost" style="margin-top:8px;padding:7px;font-size:13px" onclick="dismissFatigue()">Entendido — ocultar 10 días</button>
+    <div class="note">
+      <div class="note-t">Señal de fatiga acumulada: ${fat.regressed} de ${fat.evaluated} ejercicios a la baja</div>
+      <div class="note-d">Cuando cae casi todo a la vez, el problema no es un ejercicio: es falta de recuperación.
+        Lo que mejor funciona es una semana de descarga o 2–3 días extra de descanso y sueño.
+        En cada rutina tienes <b>“Empezar como descarga”</b>: el coach calcula solo los pesos y series suaves,
+        y tu progresión no se toca.</div>
+      <button class="note-a" onclick="dismissFatigue()">Entendido — ocultar 10 días</button>
     </div>` : '';
 
   const fh = failureHabit();
   const rirBanner = fh ? `
-    <div class="coach warn" style="margin-top:0">
-      🛑 Vienes llegando al fallo (RIR 0) en ${fh.failSessions} de tus últimas sesiones.
-      <span class="why">Ir al fallo da casi el mismo músculo que parar a 1–3 reps en reserva, pero tu cuerpo
-      tarda 24–48 h más en recuperarse — incluso con el mismo volumen total. Deja 1–2 reps en reserva
-      en la mayoría de las series; si acaso, guarda el fallo para la última serie de máquinas o aislamientos.</span>
-      <button class="btn btn-ghost" style="margin-top:8px;padding:7px;font-size:13px" onclick="dismissRIR()">Entendido — ocultar 14 días</button>
+    <div class="note bad">
+      <div class="note-t">Vienes llegando al fallo (RIR 0) en ${fh.failSessions} de tus últimas sesiones</div>
+      <div class="note-d">Ir al fallo da casi el mismo músculo que parar a 1–3 reps en reserva, pero tu cuerpo
+        tarda 24–48 h más en recuperarse — incluso con el mismo volumen total. Deja 1–2 reps en reserva en la
+        mayoría de las series; si acaso, guarda el fallo para la última serie de máquinas o aislamientos.</div>
+      <button class="note-a" onclick="dismissRIR()">Entendido — ocultar 14 días</button>
     </div>` : '';
 
   const dsb = daysSinceBackup();
   const backupBanner = (db.history.length >= 5 && (dsb === null || dsb >= 30)) ? `
-    <div class="card" style="border-color:#4a4630">
-      <div class="row">
-        <div class="grow">
-          <b style="font-size:14.5px">💾 ${dsb === null ? 'Aún no tienes respaldo de tus datos' : `Hace ${dsb} días del último respaldo`}</b>
-          <div class="tiny">Tus datos viven solo en este dispositivo. Un respaldo (.json) te protege.</div>
-        </div>
-        <button class="btn" style="width:auto;flex:none;padding:9px 12px;font-size:13px" onclick="exportBackup()">Descargar</button>
-      </div>
+    <div class="note">
+      <div class="note-t">${dsb === null ? 'Aún no tienes respaldo de tus datos' : `Hace ${dsb} días del último respaldo`}</div>
+      <div class="note-d">Tus datos viven solo en este dispositivo. Un respaldo (.json) te protege.</div>
+      <button class="note-a" onclick="exportBackup()">Descargar respaldo</button>
     </div>` : '';
 
-  return `<div class="stack">
+  if(!db.routines.length){
+    return `${resume}${fatBanner}${rirBanner}${backupBanner}
+      <div class="empty">
+        <div class="big">Sin rutinas</div>
+        <p>Empieza por crear la primera.</p>
+        <p class="muted">Por ejemplo “Torso”, “Pierna” o “Full body”. Después le agregas los ejercicios.</p>
+      </div>
+      <button class="btn" onclick="promptNewRoutine()">Nueva rutina</button>`;
+  }
+
+  return `
     ${resume}
-    ${fatBanner}
-    ${rirBanner}
-    ${backupBanner}
-    ${cards}
-    <button class="btn" onclick="promptNewRoutine()">＋ Nueva rutina</button>
-  </div>`;
+    ${strip}
+    ${fatBanner}${rirBanner}${backupBanner}
+    <div class="sect">Tus rutinas</div>
+    ${rows}
+    <div style="margin-top:20px"><button class="btn ghost" onclick="promptNewRoutine()">Nueva rutina</button></div>
+    <div class="hint">Toca una rutina para revisar las sugerencias del coach antes de empezar.</div>`;
 }
 
 /* ---------- RUTINA ---------- */
@@ -895,77 +1171,90 @@ function typePill(key){
   return TYPE_LABEL[t] ? `<span class="pill">${TYPE_LABEL[t]}</span>` : '';
 }
 
+function routineHeadHTML(){
+  const r = db.routines.find(x => x.id === view.id);
+  if(!r) return '';
+  const g = goalRange();
+  if(view.sort) return `
+    <button class="back" onclick="toggleSort()">‹ ${esc(r.name)}</button>
+    <div class="title sm">Ordenar</div>
+    <div class="meta">El orden es el que verás durante la sesión.</div>
+    <div class="knurl"></div>`;
+  return `
+    <button class="back" onclick="go({name:'home'})">‹ Rutinas</button>
+    <div class="head-row">
+      <div class="title sm">${esc(r.name)}</div>
+      <div class="tools">
+        ${r.exercises.length > 1 ? `<button aria-label="Reordenar ejercicios" onclick="toggleSort()">${svgIcon('sort')}</button>` : ''}
+        <button aria-label="Duplicar rutina" onclick="duplicateRoutine('${r.id}')">${svgIcon('copy')}</button>
+        <button aria-label="Eliminar rutina" onclick="deleteRoutine('${r.id}')">${svgIcon('trash')}</button>
+      </div>
+    </div>
+    <div class="meta">${r.exercises.length} ejercicio${r.exercises.length===1?'':'s'} · ${g.lo}–${g.hi} reps · 1–3 RIR</div>
+    <div class="knurl"></div>`;
+}
+
 function viewRoutine(){
   const r = db.routines.find(x => x.id === view.id);
   if(!r) return viewHome();
-  const goal = goalRange();
 
   /* modo reordenar: solo nombres con flechas ↑↓ */
   if(view.sort){
     const sortItems = r.exercises.map((ex, i) => `
-      <div class="card"><div class="row">
-        <b class="grow">${i+1}. ${esc(ex.name)}</b>
-        <button class="iconbtn" aria-label="Subir" ${i===0?'disabled style="opacity:.25"':''}
+      <div class="rowitem">
+        <span class="grow"><span class="row-name">${i+1}. ${esc(exBaseName(ex.name))}</span></span>
+        <button class="chev" style="font-size:17px" aria-label="Subir" ${i===0?'disabled style="opacity:.25;font-size:17px"':''}
           onclick="moveEx('${r.id}',${i},-1)">↑</button>
-        <button class="iconbtn" aria-label="Bajar" ${i===r.exercises.length-1?'disabled style="opacity:.25"':''}
+        <button class="chev" style="font-size:17px" aria-label="Bajar" ${i===r.exercises.length-1?'disabled style="opacity:.25;font-size:17px"':''}
           onclick="moveEx('${r.id}',${i},1)">↓</button>
-      </div></div>`).join('');
-    return `<div class="stack">
-      <div class="row">
-        <h2 class="grow">Ordenar — ${esc(r.name)}</h2>
-      </div>
-      ${sortItems}
-      <button class="btn btn-acc" onclick="toggleSort()">✓ Listo</button>
-    </div>`;
+      </div>`).join('');
+    return `<div style="margin-top:18px">${sortItems}</div>
+      <div class="dock"><button class="btn" onclick="toggleSort()">Listo</button></div>`;
   }
 
   const items = r.exercises.map(ex => {
     const sugg = computeSuggestion(ex.key);
-    const last = lastEntry(ex.key);
     const notes = exMeta(ex.key).notes;
     return `
-    <div class="card clickable" role="button" tabindex="0" onclick="openExercise('${r.id}','${ex.id}')"
-         onkeydown="if(event.key==='Enter')openExercise('${r.id}','${ex.id}')">
-      <div class="row">
-        <div class="grow">
-          <div class="row" style="gap:8px"><b>${esc(ex.name)}</b>${typePill(ex.key)}</div>
-          <div class="tiny">${ last
-            ? `Última vez: ${last.entry.sets.map(s => fmtSet(ex.key, s)).join(' · ')}`
-            : 'Sin registros todavía — toca para configurar' }</div>
-          ${notes ? `<div class="tiny">📝 ${esc(notes)}</div>` : ''}
-        </div>
-        <span style="color:var(--mut);font-size:18px">›</span>
-        <button class="iconbtn" aria-label="Eliminar ejercicio"
-          onclick="event.stopPropagation(); removeExercise('${r.id}','${ex.id}')">✕</button>
+    <div class="card">
+      <div class="card-top">
+        <button class="grow" style="min-width:0" onclick="openExercise('${r.id}','${ex.id}')">
+          <div class="ex-title">${exTitleHTML(ex.name)} ${typePill(ex.key)}</div>
+        </button>
+        <button class="xbtn" aria-label="Quitar de la rutina"
+          onclick="removeExercise('${r.id}','${ex.id}')">✕</button>
+        <button class="chev" aria-label="Ver ficha" onclick="openExercise('${r.id}','${ex.id}')">›</button>
       </div>
-      ${ sugg ? `<div class="coach ${sugg.type==='up'?'good':((sugg.type==='deload'||sugg.type==='back')?'warn':'')}">
-          ${sugg.msg}<span class="why">${sugg.why}</span></div>` : '' }
+      ${lastLineHTML(ex.key)}
+      ${notes ? `<div class="exnote">${esc(notes)}</div>` : ''}
+      ${verdictHTML(sugg, true)}
+      ${rangeBarsHTML(ex.key, sugg)}
     </div>`;
   }).join('');
 
-  return `<div class="stack">
-    <button class="btn-ghost row" style="color:var(--mut);font-weight:600;width:auto" onclick="go({name:'home'})">‹ Rutinas</button>
-    <div class="row">
-      <h2 class="grow">${esc(r.name)}</h2>
-      ${r.exercises.length > 1 ? `<button class="iconbtn" aria-label="Reordenar ejercicios" onclick="toggleSort()">↕️</button>` : ''}
-      <button class="iconbtn" aria-label="Duplicar rutina" onclick="duplicateRoutine('${r.id}')">⧉</button>
-      <button class="iconbtn" aria-label="Eliminar rutina" onclick="deleteRoutine('${r.id}')">🗑️</button>
-    </div>
-    ${items || `<div class="empty"><p class="muted">Agrega los ejercicios de esta rutina.</p></div>`}
-    <form class="row" onsubmit="addExercise(event,'${r.id}')" autocomplete="off">
+  const empty = `<div class="empty">
+    <div class="big">Rutina vacía</div>
+    <p>Agrega los ejercicios de esta rutina.</p>
+    <p class="muted">Escribe el nombre abajo — si ya lo entrenaste antes, el coach trae su progresión.</p>
+  </div>`;
+
+  return `
+    <div style="margin-top:2px">${items || empty}</div>
+    <form class="row" style="margin-top:14px" onsubmit="addExercise(event,'${r.id}')" autocomplete="off">
       <div class="acwrap">
-        <input type="text" id="newex" placeholder="Nombre del ejercicio (ej. Press banca)" autocomplete="off"
+        <input type="text" id="newex" placeholder="Agregar ejercicio (ej. Press banca)" autocomplete="off"
           oninput="acUpdate('${r.id}')" onfocus="acUpdate('${r.id}')" onblur="acHide()">
         <div class="aclist" id="aclist" style="display:none" role="listbox"></div>
       </div>
-      <button class="btn" style="width:auto;flex:none" type="submit">Agregar</button>
+      <button class="btn quiet" style="width:auto;flex:none;padding:12px 16px;font-size:13.5px" type="submit">Agregar</button>
     </form>
     ${ r.exercises.length ? `
-      <button class="btn btn-acc" style="font-size:17px;padding:16px" onclick="startSession('${r.id}')">▶ &nbsp;Empezar sesión</button>
-      <button class="linkish tiny" style="margin:2px auto 0;display:block" onclick="confirmModal('¿Sesión de descarga?','El coach recalcula todo: ~10 % menos carga y la mitad de las series. Ideal tras semanas duras o cuando aparece el aviso de fatiga. No afecta tu progresión: la próxima sesión normal retoma donde ibas.','Empezar descarga',() => startSession('${r.id}', true), true)">🪫 Empezar como descarga</button>
-      <p class="tiny" style="text-align:center">Rango objetivo según tu meta: ${goal.lo}–${goal.hi} reps por serie, dejando 1–3 en reserva.
-        Toca un ejercicio para ver su progreso y ajustes.</p>` : '' }
-  </div>`;
+      <div class="dock">
+        <button class="btn" onclick="startSession('${r.id}')">Empezar sesión</button>
+        <button class="deload" onclick="confirmModal('¿Sesión de descarga?','El coach recalcula todo: ~10 % menos carga y la mitad de las series. Ideal tras semanas duras o cuando aparece el aviso de fatiga. No afecta tu progresión: la próxima sesión normal retoma donde ibas.','Empezar descarga',() => startSession('${r.id}', true), true)">
+          ${svgIcon('deload')} Empezar como descarga
+        </button>
+      </div>` : '' }`;
 }
 
 /* ---------- FICHA DE EJERCICIO (progreso + ajustes) ---------- */
@@ -986,6 +1275,22 @@ function exerciseHistory(key){
   return out;
 }
 
+function exerciseHeadHTML(){
+  const eq = exEquip(view.exname);
+  return `
+    <button class="back" onclick="go({name:'routine', id:'${view.rid}'})">‹ Volver</button>
+    <div class="title big">${esc(exBaseName(view.exname))}</div>
+    ${eq ? `<div class="title-sub">${esc(eq)}</div>` : '<div style="height:12px"></div>'}
+    <div class="knurl"></div>`;
+}
+
+const TYPE_HINT = {
+  normal:   'Tú levantas la carga. Progresas subiendo kilos cuando llenas el rango de reps.',
+  asistido: 'Una máquina o banda te ayuda. Los kg que anotas son la ayuda: progresar = usar menos kg.',
+  corporal: 'Sin peso externo. Progresas sumando reps o series; si usas lastre, anótalo como peso.',
+  tiempo:   'Isométricos y sostenidos: mides segundos, no reps. Cada serie trae cronómetro con alarma.',
+};
+
 function viewExercise(){
   const key = view.key, meta = exMeta(key);
   const g = goalRange();
@@ -1002,137 +1307,129 @@ function viewExercise(){
   window.__chartUnit = porTiempo ? 's' : (corporal ? 'reps' : uLabel());
   const best = pts.length ? Math.max(...pts.map(p => p.v)) : 0;
 
+  const headLabel = porTiempo ? 'Tu mejor tiempo' : (corporal ? 'Tu récord de reps' : '1RM estimado');
+  const unitLabel = porTiempo ? 's' : (corporal ? 'reps' : uLabel());
+
+  /* «tu carga de trabajo es el X % de esa marca» */
+  let pctLine = '';
+  if(!repsMode && meta.type !== 'asistido' && hist.length){
+    const wNow = workWeight(hist[hist.length-1].sets);
+    const bestKg = Math.max(0, ...hist.map(h => bestE1RM(h.sets)));
+    if(wNow > 0 && bestKg > 0){
+      pctLine = `<div class="pr-d">Tu carga de trabajo (${fmtW(wNow)} ${uLabel()}) es el
+        <b>${Math.round(wNow / bestKg * 100)} %</b> de esa marca.</div>`;
+    }
+  }
+  const whatIs = porTiempo
+    ? `<div class="pr-d">Tu mejor tiempo sostenido en una serie.</div>`
+    : corporal
+    ? `<div class="pr-d">Tus mejores reps en una serie.</div>`
+    : `<div class="pr-d">El peso máximo que podrías levantar una sola vez, calculado desde tus series.
+        <span class="linkish" role="button" tabindex="0" onclick="e1rmInfo()">¿Cómo se calcula?</span></div>`;
+
+  const panel = pts.length ? `
+    <div class="panel">
+      <div class="pr"><div class="n">${fmtNum(best)}</div><div class="u">${unitLabel}</div></div>
+      ${pctLine || whatIs}
+      ${ pts.length >= 2 ? `
+        <div class="chart"><canvas id="exchart" height="120"></canvas></div>
+        <div class="axis">
+          <span>${fmtDateShort(pts[0].date)}</span>
+          <span id="charttip">${pts.length} sesiones</span>
+          <span>${fmtDateShort(pts[pts.length-1].date)}</span>
+        </div>`
+        : `<div class="hint">Registra al menos 2 sesiones para ver la gráfica.</div>` }
+    </div>`
+    : `<div class="panel"><div class="muted">Todavía no hay registros de este ejercicio.
+        Cuando entrenes, aquí verás tu progreso.</div></div>`;
+
+  const rotation = (p.stall >= 6 && meta.muscle && meta.muscle !== 'none') ? (() => {
+    const vars = [...allExerciseNames()]
+      .filter(([k]) => k !== key && exMeta(k).muscle === meta.muscle)
+      .slice(0, 3).map(([, info]) => esc(exBaseName(info.name)));
+    return `<div class="note">
+      <div class="note-t">Rotación sugerida · ${p.stall} sesiones sin avanzar</div>
+      <div class="note-d">Cambiarlo por una variante del mismo músculo durante 4–6 semanas suele reactivar
+        el progreso (estímulo nuevo, mismas ganancias). Después puedes volver.
+        ${vars.length ? `Variantes que ya conoces: <b>${vars.join(', ')}</b>.` : ''}</div>
+    </div>`;
+  })() : '';
+
+  const seg = ['normal','asistido','corporal','tiempo'].map(t => {
+    const label = { normal:'Normal', asistido:'Asistido', corporal:'Corporal', tiempo:'Tiempo' }[t];
+    return `<button class="${meta.type===t?'on':''}" onclick="setExType('${key}','${t}')">${label}</button>`;
+  }).join('');
+
   const recent = [...hist].reverse().slice(0, 6).map(h => `
-    <div class="exline" style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #232833">
+    <div class="exline">
       <span class="tiny">${fmtDate(h.date)}</span>
-      <span class="tiny num" style="text-align:right">${h.sets.map(s => fmtSet(key, s) + (s.rir != null ? `@${s.rir}` : '')).join(' · ')}</span>
+      <span class="sets">${h.sets.map(s => fmtSet(key, s) + (s.rir != null ? `@${s.rir}` : '')).join(' · ')}</span>
     </div>`).join('');
 
-  return `<div class="stack" style="padding-top:calc(16px + env(safe-area-inset-top, 0px))">
-    <button class="btn-ghost row" style="color:var(--mut);font-weight:600;width:auto"
-      onclick="go({name:'routine', id:'${view.rid}'})">‹ Volver</button>
-    <div class="row" style="gap:8px"><h2 class="grow">${esc(view.exname)}</h2>${typePill(key)}</div>
+  return `
+    <div class="sect">${headLabel}</div>
+    ${panel}
+    ${rotation}
 
-    <div class="card">
-      <p class="eyebrow">Progreso</p>
-      ${ pts.length ? `
-        <div class="row" style="margin-top:8px;align-items:baseline">
-          <div class="bignum grow">${fmtNum(best)} <small>${porTiempo ? 'segundos (tu récord)' : (corporal ? 'reps (tu récord)' : uLabel())}</small></div>
+    <div class="sect">Cómo se progresa</div>
+    <div class="seg4">${seg}</div>
+    <div class="hint">${TYPE_HINT[meta.type] || ''}</div>
+
+    <div class="sect">Ajustes del ejercicio</div>
+    <div class="list">
+      <div class="line">
+        <div class="l-t">${porTiempo ? 'Rango de segundos' : 'Rango de reps'}</div>
+        <div class="l-v">
+          <input type="number" inputmode="numeric" min="1" placeholder="${porTiempo ? TIEMPO_RANGE.lo : g.lo}"
+            value="${meta.lo ?? ''}" aria-label="Mínimo" oninput="setExRange('${key}','lo',this.value)">
+          <span style="color:var(--dim)">–</span>
+          <input type="number" inputmode="numeric" min="2" placeholder="${porTiempo ? TIEMPO_RANGE.hi : g.hi}"
+            value="${meta.hi ?? ''}" aria-label="Máximo" oninput="setExRange('${key}','hi',this.value)">
         </div>
-        <p class="tiny">${porTiempo
-          ? 'Tu mejor tiempo sostenido en una serie.'
-          : corporal
-          ? 'Tus mejores reps en una serie.'
-          : `Tu récord de <span class="linkish" role="button" tabindex="0" onclick="e1rmInfo()">1RM estimado ⓘ</span> — el peso máximo que podrías levantar una sola vez, calculado desde tus series.`}</p>
-        ${ (() => {
-          if(repsMode || meta.type === 'asistido' || !hist.length) return '';
-          const wNow = workWeight(hist[hist.length-1].sets);
-          const bestKg = Math.max(0, ...hist.map(h => bestE1RM(h.sets)));
-          if(!(wNow > 0) || !(bestKg > 0)) return '';
-          return `<p class="tiny" style="margin-top:4px">Tu peso de trabajo actual (${fmtW(wNow)} ${uLabel()})
-            ≈ <b style="color:var(--ink)">${Math.round(wNow / bestKg * 100)} %</b> de tu 1RM estimado.</p>`;
-        })() }
-        ${ pts.length >= 2 ? `
-          <div class="chartwrap"><canvas id="exchart" height="190"></canvas></div>
-          <p class="tiny" id="charttip" style="text-align:center;margin-top:6px">Toca la gráfica para ver cada sesión</p>`
-          : `<p class="tiny" style="margin-top:8px">Registra al menos 2 sesiones para ver la gráfica.</p>` }`
-        : `<p class="muted" style="margin-top:8px">Todavía no hay registros de este ejercicio. Cuando entrenes, aquí verás tu progreso.</p>` }
-    </div>
-
-    ${ (p.stall >= 6 && meta.muscle && meta.muscle !== 'none') ? (() => {
-        const vars = [...allExerciseNames()]
-          .filter(([k, info]) => k !== key && exMeta(k).muscle === meta.muscle)
-          .slice(0, 3).map(([k, info]) => esc(info.name));
-        return `<div class="card">
-          <p class="eyebrow" style="margin-bottom:6px">🔁 Rotación sugerida</p>
-          <p class="muted" style="font-size:13.5px;line-height:1.6">
-            Este ejercicio lleva <b style="color:var(--ink)">${p.stall} sesiones sin avanzar</b> a pesar del volumen extra.
-            Cambiarlo por una variante del mismo músculo durante 4–6 semanas suele reactivar el progreso
-            (estímulo nuevo, mismas ganancias). Después puedes volver.
-            ${vars.length ? `Variantes que ya conoces: <b style="color:var(--ink)">${vars.join(', ')}</b>.` : ''}
-          </p>
-        </div>`;
-      })() : '' }
-
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">¿Cómo se progresa en este ejercicio?</p>
-      <div class="stack">
-        <button class="goal-opt ${meta.type==='normal'?'on':''}" onclick="setExType('${key}','normal')">
-          <b>Normal ${meta.type==='normal'?'✓':''}</b>
-          <span>Levantas el peso tú. Progresar = subir kg. (La mayoría: press, remo, sentadilla…)</span>
-        </button>
-        <button class="goal-opt ${meta.type==='asistido'?'on':''}" onclick="setExType('${key}','asistido')">
-          <b>Asistido ${meta.type==='asistido'?'✓':''}</b>
-          <span>Una máquina o banda te AYUDA (dominadas/fondos asistidos). Los kg que anotas son la ayuda, no la carga: progresar = usar MENOS kg.</span>
-        </button>
-        <button class="goal-opt ${meta.type==='corporal'?'on':''}" onclick="setExType('${key}','corporal')">
-          <b>Peso corporal ${meta.type==='corporal'?'✓':''}</b>
-          <span>Sin peso externo (flexiones, dominadas libres). Progresar = más reps o series. Puedes dejar el peso en blanco; si usas lastre, anótalo.</span>
-        </button>
-        <button class="goal-opt ${meta.type==='tiempo'?'on':''}" onclick="setExType('${key}','tiempo')">
-          <b>Por tiempo ${meta.type==='tiempo'?'✓':''}</b>
-          <span>Isométricos y sostenidos (plancha, colgado, farmer carry, estiramientos): mides segundos, no reps. Con cronómetro y alarma integrados. Lastre opcional.</span>
-        </button>
       </div>
-    </div>
-
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:10px">Ajustes finos (opcional)</p>
-      <div class="row" style="align-items:flex-end">
-        <div class="field grow"><span>${meta.type==='tiempo' ? 'Seg' : 'Reps'} mín.</span>
-          <input type="number" inputmode="numeric" min="1" placeholder="${meta.type==='tiempo' ? TIEMPO_RANGE.lo : g.lo}" value="${meta.lo ?? ''}"
-            oninput="setExRange('${key}','lo',this.value)"></div>
-        <div class="field grow"><span>${meta.type==='tiempo' ? 'Seg' : 'Reps'} máx.</span>
-          <input type="number" inputmode="numeric" min="2" placeholder="${meta.type==='tiempo' ? TIEMPO_RANGE.hi : g.hi}" value="${meta.hi ?? ''}"
-            oninput="setExRange('${key}','hi',this.value)"></div>
-        <div class="field grow"><span>Salto mínimo</span>
-          <select onchange="setExStep('${key}',this.value)">
-            ${stepOptionsHTML(meta.step)}
-          </select></div>
+      <div class="line">
+        <div class="l-t">Salto mínimo</div>
+        <div class="l-v"><select class="inline" onchange="setExStep('${key}',this.value)">${stepOptionsHTML(meta.step)}</select></div>
       </div>
       ${ meta.type === 'normal' ? `
-      <div class="field" style="margin-top:10px"><span>Peso máximo disponible (${uLabel()})</span>
-        <input type="number" inputmode="decimal" step="any" min="0" placeholder="—"
-          value="${meta.cap != null ? inputW(meta.cap) : ''}"
-          oninput="setExCap('${key}',this.value)">
-        <span style="text-transform:none;letter-spacing:0;font-weight:400">
-          Si la máquina o tus mancuernas llegan hasta cierto peso, anótalo: al alcanzarlo, el coach
-          progresa por reps y series en vez de pedirte kilos imposibles.</span>
+      <div class="line">
+        <div><div class="l-t">Peso máximo</div><div class="l-d">El tope de esa máquina o mancuerna</div></div>
+        <div class="l-v">
+          <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" style="width:66px"
+            value="${meta.cap != null ? inputW(meta.cap) : ''}" aria-label="Peso máximo"
+            oninput="setExCap('${key}',this.value)">
+          <span style="color:var(--dim)">${uLabel()}</span>
+        </div>
       </div>` : '' }
-      <div class="field" style="margin-top:10px"><span>Grupo muscular</span>
-        <select onchange="setExMuscle('${key}',this.value)">
+      <div class="line">
+        <div class="l-t">Grupo muscular</div>
+        <div class="l-v"><select class="inline" onchange="setExMuscle('${key}',this.value)">
           <option value="none" ${!meta.muscle || meta.muscle==='none' ? 'selected':''}>Sin grupo</option>
           ${MUSCLES.map(([k,l]) => `<option value="${k}" ${meta.muscle===k?'selected':''}>${l}</option>`).join('')}
-        </select>
-        <span style="text-transform:none;letter-spacing:0;font-weight:400">Alimenta el resumen semanal de volumen (pestaña Historial).</span>
+        </select></div>
       </div>
-      <div class="field" style="margin-top:10px"><span>Descanso entre series de este ejercicio</span>
-        <select onchange="setExRest('${key}',this.value)">
-          <option value="auto" ${!meta.rest?'selected':''}>Igual que el general (Ajustes)</option>
+      <div class="line">
+        <div class="l-t">Descanso</div>
+        <div class="l-v"><select class="inline" onchange="setExRest('${key}',this.value)">
+          <option value="auto" ${!meta.rest?'selected':''}>General</option>
           ${[45,60,90,120,150,180,240].map(s => `
-            <option value="${s}" ${String(meta.rest)===String(s)?'selected':''}>${fmtClock(s)} min</option>`).join('')}
-        </select>
+            <option value="${s}" ${String(meta.rest)===String(s)?'selected':''}>${fmtClock(s)}</option>`).join('')}
+        </select></div>
       </div>
-      <p class="tiny" style="margin-top:8px">
-        El rango de reps viene de tu objetivo (${g.lo}–${g.hi}); cámbialo solo para casos especiales
-        (ej. abdominales 15–25). “Salto mínimo” = el aumento más pequeño posible en tu gimnasio
-        (en kg: mancuernas de 2 en 2, barra de 2,5 en 2,5 · en lb: de 5 en 5). El descanso propio es útil
-        para básicos pesados (sentadilla → 3:00) o accesorios ligeros (curl → 1:00).
-      </p>
     </div>
+    <div class="hint">El rango viene de tu objetivo (${g.lo}–${g.hi}); cámbialo solo para casos especiales
+      (ej. abdominales 15–25). El salto mínimo es el aumento más pequeño posible en tu gimnasio.
+      Si marcas el peso máximo, al alcanzarlo el coach progresa por reps y series en vez de pedirte kilos imposibles.</div>
 
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">Notas</p>
-      <textarea placeholder="Ej. agarre ancho, asiento en 4, bajar lento…"
-        oninput="setExNotes('${key}',this.value)">${esc(meta.notes || '')}</textarea>
-      <p class="tiny" style="margin-top:6px">Las verás durante la sesión, debajo del nombre del ejercicio.</p>
-    </div>
+    <div class="sect">Notas</div>
+    <textarea placeholder="Ej. agarre ancho, asiento en 4, bajar lento…"
+      oninput="setExNotes('${key}',this.value)">${esc(meta.notes || '')}</textarea>
+    <div class="hint">Las verás durante la sesión, debajo del nombre del ejercicio.</div>
 
-    ${ recent ? `<div class="card">
-      <p class="eyebrow" style="margin-bottom:6px">Últimas sesiones</p>${recent}
-      <p class="tiny" style="margin-top:6px">Formato: kg×reps. El “@2” es tu RIR (reps que te quedaban).</p>
-    </div>` : '' }
-  </div>`;
+    ${ recent ? `
+      <div class="sect">Últimas sesiones</div>
+      <div class="list" style="padding:4px 16px">${recent}</div>
+      <div class="hint">Formato: ${uLabel()}×reps. El “@2” es tu RIR — las reps que te quedaban.</div>` : '' }`;
 }
 
 function setExType(key, t){ exMeta(key).type = t; save(); render(); }
@@ -1174,83 +1471,189 @@ function setExCap(key, val){
 }
 
 /* ---------- SESIÓN ACTIVA ---------- */
+/* un ejercicio terminado = todas sus series marcadas o con reps anotadas */
+function exDone(ex){
+  return ex.sets.length > 0 && ex.sets.every(st => st.done || parseInt(st.r, 10) > 0);
+}
+/* solo un ejercicio abierto a la vez: el primero sin terminar, o el que elijas */
+function sessionOpenIdx(){
+  const s = db.active;
+  if(typeof s.open === 'number' && s.exercises[s.open]) return s.open;
+  const i = s.exercises.findIndex(ex => !exDone(ex));
+  return i < 0 ? 0 : i;
+}
+function openSessionEx(i){
+  db.active.open = i; save(); render();
+  setTimeout(() => {
+    const el = document.getElementById('exb-' + i);
+    if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'center' });
+  }, 60);
+}
+/* el check cierra la serie y arranca el descanso */
+function toggleSetDone(xi, si){
+  const ex = db.active.exercises[xi];
+  const st = ex.sets[si];
+  if(st.done){ st.done = false; save(); render(); return; }
+  const r = parseInt(st.r, 10);
+  if(isNaN(r) || r <= 0){
+    const row = document.getElementById(`set-${xi}-${si}`);
+    const inp = row && row.querySelectorAll ? row.querySelectorAll('input')[1] : null;
+    if(inp && inp.focus) inp.focus();
+    return;
+  }
+  st.done = true;
+  db.active.lastLog = Date.now();
+  if(!restUntil) startRestAuto(ex.key);
+  if(ex.sets.every(x => x.done)){
+    const next = db.active.exercises.findIndex((e, i) => i !== xi && !exDone(e));
+    if(next >= 0) db.active.open = next;
+  }
+  save(); render();
+}
+function editExNotes(xi){
+  const ex = db.active.exercises[xi];
+  openModal(`
+    <h2>Notas — ${esc(exBaseName(ex.name))}</h2>
+    <p class="muted">Se guardan en el ejercicio y las verás cada vez que lo entrenes.</p>
+    <textarea id="exnotes" placeholder="Ej. agarre ancho, asiento en 4, bajar lento…">${esc(exMeta(ex.key).notes || '')}</textarea>
+    <button class="btn" style="margin-top:16px" onclick="saveExNotes('${ex.key}')">Guardar</button>
+    <button class="btn ghost" onclick="closeModal()">Cancelar</button>`);
+  setTimeout(() => document.getElementById('exnotes')?.focus(), 60);
+}
+function saveExNotes(key){
+  const t = document.getElementById('exnotes');
+  if(t) setExNotes(key, t.value);
+  closeModal(); render();
+}
+
+function sessionHeadHTML(){
+  const s = db.active;
+  const total = s.exercises.reduce((a, ex) => a + ex.sets.length, 0);
+  const done = s.exercises.reduce((a, ex) => a + ex.sets.filter(st => parseInt(st.r, 10) > 0).length, 0);
+  const rest = restSecs();
+  return `
+    <div class="sess-top">
+      <div class="grow">
+        <div class="clock" id="clock">0:00</div>
+        <div class="sess-meta">${esc(s.routineName)} · ${done} de ${total} series${s.deload ? ' · descarga' : ''}</div>
+      </div>
+      <div class="sess-actions">
+        <button class="end" onclick="askFinish()">Terminar</button>
+        <button class="unitbtn" aria-label="Cambiar unidad de peso" onclick="askUnitSwitch()">${uLabel()} ⇄</button>
+      </div>
+    </div>
+    ${ rest ? `
+    <button class="rest" id="rest" onclick="toggleRest()">
+      <div class="rest-row">
+        <span class="rest-l" id="restlabel">Descanso</span>
+        <span class="rest-t" id="resttime">${fmtClock(rest)}</span>
+      </div>
+      <div class="rest-track"><div class="rest-fill" id="restfill"></div></div>
+    </button>` : '<div style="height:16px"></div>' }`;
+}
+
 function viewSession(){
   const s = db.active;
+  const openIdx = sessionOpenIdx();
+
   const blocks = s.exercises.map((ex, xi) => {
     const meta = exMeta(ex.key);
     const t = meta.type;
     const { lo, hi } = effRange(ex.key);
-    const firstTime = !ex.sugg;
+
+    if(xi !== openIdx){
+      if(exDone(ex)){
+        const hecho = ex.sets.filter(st => parseInt(st.r,10) > 0)
+          .map(st => `<b>${fmtSet(ex.key, { w: toKg(parseFloat(st.w) || 0), r: parseInt(st.r,10) })}</b>`).join(' · ');
+        return `
+        <button class="ex-done" id="exb-${xi}" onclick="openSessionEx(${xi})">
+          <span class="grow">
+            <span class="ex-title" style="display:block">${exTitleHTML(ex.name)}</span>
+            <span class="last" style="display:block">Hecho · ${hecho}</span>
+          </span>
+          <span class="mini-check">${svgIcon('check')}</span>
+        </button>`;
+      }
+      const next = ex.sugg
+        ? `Siguiente · <b>${fmtSet(ex.key, { w: ex.sugg.w, r: ex.sugg.reps })}</b>`
+        : 'Siguiente · primera vez';
+      return `
+      <button class="ex-next" id="exb-${xi}" onclick="openSessionEx(${xi})">
+        <span class="grow">
+          <span class="ex-title" style="display:block">${exTitleHTML(ex.name)}</span>
+          <span class="last" style="display:block">${next}</span>
+        </span>
+        <span class="chev">›</span>
+      </button>`;
+    }
+
     let firstMsg = '';
-    if(firstTime){
+    if(!ex.sugg){
       if(t === 'corporal') firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). El peso puedes dejarlo en blanco; si usas lastre, anótalo.`;
       else if(t === 'tiempo') firstMsg = `Primera vez. Mide los segundos que sostienes con buena técnica (ideal ${lo}–${hi} s). Toca el ▶ de cada serie para usar el cronómetro con alarma.`;
-      else if(t === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina/banda (en ${uLabel()}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
+      else if(t === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina o banda (en ${uLabel()}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
       else firstMsg = `Primera vez con este ejercicio. Elige un peso con el que puedas hacer ${lo}–${hi} reps quedándote 1–3 en reserva (sin llegar al fallo). Desde la próxima, te sugiero la progresión.`;
     }
+
     return `
-    <div class="card" id="exb-${xi}">
-      <div class="row" style="gap:8px"><b style="font-size:16px" class="grow">${esc(ex.name)}</b>${typePill(ex.key)}</div>
-      ${ meta.notes ? `<div class="tiny">📝 ${esc(meta.notes)}</div>` : '' }
-      ${ ex.sugg ? `<div class="coach ${ex.sugg.type==='up'?'good':((ex.sugg.type==='deload'||ex.sugg.type==='back')?'warn':'')}">
-          Hoy: ${ex.sugg.msg}<span class="why">${ex.sugg.why}</span></div>`
-        : `<div class="coach">${firstMsg}</div>` }
-      <button class="linkish tiny" style="margin-top:8px" onclick="showWarmup(${xi})">🔥 Calentamiento sugerido</button>
-      <div class="sethead"><span>${t==='tiempo' ? '▶' : '#'}</span><span>${(t==='corporal'||t==='tiempo') ? 'lastre' : (t==='asistido' ? 'ayuda' : uLabel())}</span><span>${t==='tiempo' ? 'seg' : 'reps'}</span><span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir ⓘ</span><span></span></div>
+    <div class="ex-open" id="exb-${xi}">
+      <div class="ex-title">${exTitleHTML(ex.name)} ${typePill(ex.key)}</div>
+      ${lastLineHTML(ex.key)}
+      ${ meta.notes ? `<div class="exnote">${esc(meta.notes)}</div>` : '' }
+      ${ ex.sugg ? verdictHTML(ex.sugg, true) : `<div class="why" style="padding-left:0;margin-top:10px">${firstMsg}</div>` }
+      <div class="grid-h">
+        <span>${t === 'tiempo' ? '▶' : '#'}</span>
+        <span>${(t === 'corporal' || t === 'tiempo') ? 'lastre' : (t === 'asistido' ? 'ayuda' : uLabel())}</span>
+        <span>${t === 'tiempo' ? 'seg' : 'reps'}</span>
+        <span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir</span>
+        <span></span><span></span>
+      </div>
       <div id="sets-${xi}">
         ${ ex.sets.map((st, si) => setRowHTML(xi, si, st, ex.sugg, t)).join('') }
       </div>
-      <div class="tiny num" id="vs-${xi}" style="margin-top:7px;text-align:center"></div>
-      <button class="addset" onclick="addSet(${xi})">＋ Agregar serie</button>
+      <div class="vschip" id="vs-${xi}"></div>
+      <div class="ex-actions">
+        <button onclick="addSet(${xi})">+ Serie</button>
+        <button onclick="showWarmup(${xi})">Calentamiento</button>
+        <button onclick="editExNotes(${xi})">Notas</button>
+      </div>
     </div>`;
   }).join('');
-  const addExBtn = `<button class="addset" style="border-style:solid" onclick="promptAddExercise()">＋ Agregar ejercicio a la sesión</button>`;
 
-  const rest = restSecs();
-  return `
-    <div class="sessionbar">
-      <div class="row" style="width:100%">
-        <span class="dot" aria-hidden="true"></span>
-        <div class="grow">
-          <div class="clock num" id="clock">0:00</div>
-          <div class="tiny">${esc(s.routineName)}${s.deload ? ' · <b style="color:var(--warn)">DESCARGA</b>' : ' · en curso'}</div>
-        </div>
-        <button class="btn btn-danger" style="width:auto;padding:10px 16px" onclick="askFinish()">Terminar</button>
-      </div>
-      <div class="row">
-        ${ rest ? `<button class="restchip" id="restchip" style="width:auto;flex:1" onclick="toggleRest()">▶ Descanso (${fmtClock(rest)})</button>` : '<span class="grow"></span>' }
-        <button class="btn" style="width:auto;padding:9px 13px;font-size:13px;flex:none"
-          aria-label="Cambiar unidad de peso" onclick="askUnitSwitch()">${uLabel()} ⇄</button>
-      </div>
-    </div>
-    <div class="stack">${blocks}${addExBtn}</div>`;
+  return `<div style="margin-top:2px">${blocks}
+    <button class="addex" onclick="promptAddExercise()">+ Agregar ejercicio a la sesión</button>
+  </div>`;
 }
 
 function setRowHTML(xi, si, st, sugg, t){
   const tiempo = t === 'tiempo';
   const pw = sugg ? fmtW(sugg.w) : ((t === 'corporal' || tiempo) ? '0' : uLabel());
   const pr = sugg ? sugg.reps : (tiempo ? 'seg' : 'reps');
-  const cls = sugg ? 'class="sugg"' : '';
+  const cls = sugg ? ' sugg' : '';
+  const done = !!st.done;
+  const ex = db.active ? db.active.exercises[xi] : null;
+  const firstOpen = ex ? ex.sets.findIndex(x => !x.done) : -1;
+  const now = !done && si === firstOpen;
   const idxCell = tiempo
-    ? `<button class="idx linkish" style="background:none;border:none;color:var(--acc);cursor:pointer"
-         aria-label="Cronómetro serie ${si+1}" onclick="startSetTimer(${xi},${si})">▶</button>`
-    : `<span class="idx">${si+1}</span>`;
+    ? `<button class="i play" aria-label="Cronómetro serie ${si+1}" onclick="startSetTimer(${xi},${si})">▶</button>`
+    : `<span class="i">${si+1}</span>`;
   return `
-  <div class="setrow" id="set-${xi}-${si}">
+  <div class="set${done ? ' done' : ''}${now ? ' now' : ''}" id="set-${xi}-${si}">
     ${idxCell}
-    <input type="number" inputmode="decimal" step="any" min="0" ${cls}
+    <input class="cell${cls}" type="number" inputmode="decimal" step="any" min="0"
       placeholder="${pw}" value="${st.w ?? ''}"
       aria-label="Peso serie ${si+1}"
       oninput="setVal(${xi},${si},'w',this.value)">
-    <input type="number" inputmode="numeric" step="1" min="0" ${cls}
+    <input class="cell${cls}" type="number" inputmode="numeric" step="1" min="0"
       placeholder="${pr}" value="${st.r ?? ''}"
       aria-label="${tiempo ? 'Segundos' : 'Reps'} serie ${si+1}"
       oninput="setVal(${xi},${si},'r',this.value)">
-    <input type="number" inputmode="numeric" step="1" min="0" max="9"
+    <input class="cell" type="number" inputmode="numeric" step="1" min="0" max="9"
       placeholder="1–3" value="${st.rir ?? ''}"
       aria-label="Reps en reserva serie ${si+1}"
       oninput="setVal(${xi},${si},'rir',this.value)">
-    <button class="iconbtn" aria-label="Quitar serie" onclick="removeSet(${xi},${si})">✕</button>
+    <button class="ck${done ? ' on' : ''}" aria-label="Cerrar serie ${si+1}" onclick="toggleSetDone(${xi},${si})">${svgIcon('check')}</button>
+    <button class="xbtn" aria-label="Quitar serie ${si+1}" onclick="removeSet(${xi},${si})">✕</button>
   </div>`;
 }
 
@@ -1276,39 +1679,44 @@ function volumeCardHTML(){
     }
   }
   if(!any) return '';
-  const rows = MUSCLES.filter(([k]) => counts[k]).map(([k,l]) => {
-    const c = counts[k];
-    const pct = Math.min(100, c/20*100);
-    const color = c > 20 ? 'var(--warn)' : (c >= 10 ? 'var(--good)' : '#5b6170');
-    const tag = c > 20 ? 'alto' : (c >= 10 ? '✓ óptimo' : 'bajo');
-    return `<div class="volrow">
-      <span class="lbl">${l}</span>
-      <span class="volbar"><i style="width:${pct}%;background:${color}"></i></span>
-      <span class="val num">${c} · ${tag}</span>
-    </div>`;
-  }).join('');
+  /* ordenadas por volumen, no alfabéticamente */
+  const rows = MUSCLES.filter(([k]) => counts[k])
+    .sort((a,b) => counts[b[0]] - counts[a[0]])
+    .map(([k,l]) => {
+      const c = counts[k];
+      const pct = Math.min(100, c/20*100);
+      const cls = c > 20 ? 'hi' : (c >= 10 ? 'ok' : '');
+      const tag = c > 20 ? 'alto' : (c >= 10 ? 'óptimo' : 'bajo');
+      return `<div class="vol">
+        <span class="vol-n">${l}</span>
+        <span class="vol-track"><span class="vol-fill ${cls}" style="width:${pct}%;display:block"></span></span>
+        <span class="vol-v"><b>${c}</b> ${tag}</span>
+      </div>`;
+    }).join('');
+
   let imb = '';
   if(push + pull >= 24 && (push > pull*1.75 || pull > push*1.75)){
     const masEmpuje = push > pull;
-    imb = `<div class="coach warn" style="margin-top:10px">
-      ⚖️ Desbalance (14 días): <b>${masEmpuje?'empuje':'jalón'} ${masEmpuje?push:pull} series</b> vs ${masEmpuje?'jalón':'empuje'} ${masEmpuje?pull:push}.
-      <span class="why">Empuje = pecho/hombros/tríceps · jalón = espalda/bíceps. Mantenerlos cerca de 1:1 protege tus hombros:
-      suma ${masEmpuje?'remos y jalones':'presses y aperturas'}.</span></div>`;
+    imb = `<div class="note">
+      <div class="note-t">Empuje ${push} · jalón ${pull}</div>
+      <div class="note-d">Llevas casi el doble de ${masEmpuje?'empuje':'jalón'} que de ${masEmpuje?'jalón':'empuje'} en 14 días.
+        Empuje = pecho/hombros/tríceps · jalón = espalda/bíceps. Mantenerlos cerca de 1:1 protege tus hombros:
+        suma ${masEmpuje?'remos y jalones':'presses y aperturas'}.</div>
+    </div>`;
   }
-  return `<div class="card">
-    <p class="eyebrow" style="margin-bottom:8px">Series · últimos 7 días</p>
-    ${rows || '<p class="muted">Asigna un grupo muscular a tus ejercicios (tocándolos en su rutina) para ver este resumen.</p>'}
-    ${rows ? '<p class="tiny" style="margin-top:8px">La evidencia: 10–20 series semanales por grupo es la zona óptima; más da retornos decrecientes.</p>' : ''}
-    ${untagged ? `<p class="tiny">${untagged} series sin grupo asignado (se asigna en la ficha de cada ejercicio).</p>` : ''}
-    ${imb}
-  </div>`;
+  return `
+    <div class="sect">Series por grupo · 7 días</div>
+    ${rows || '<div class="muted">Asigna un grupo muscular a tus ejercicios (tocándolos en su rutina) para ver este resumen.</div>'}
+    ${rows ? '<div class="hint">La zona óptima está entre 10 y 20 series semanales por grupo.</div>' : ''}
+    ${untagged ? `<div class="hint">${untagged} series sin grupo asignado.</div>` : ''}
+    ${imb}`;
 }
 
 function viewHistory(){
   if(!db.history.length) return `<div class="empty">
-    <div class="big">📅</div>
-    <p><b>Sin sesiones todavía.</b></p>
-    <p class="muted">Cuando termines tu primera sesión, la verás aquí.</p></div>`;
+    <div class="big">Sin sesiones</div>
+    <p>Todavía no has entrenado.</p>
+    <p class="muted">Cuando termines tu primera sesión, la verás aquí con su volumen y duración.</p></div>`;
 
   const items = [...db.history].reverse().map(h => {
     const nSets = h.entries.reduce((a,e) => a + e.sets.length, 0);
@@ -1316,26 +1724,30 @@ function viewHistory(){
     return `
     <details class="hist">
       <summary>
-        <div class="grow">
-          <b>${esc(h.routineName)}</b>${h.deload ? ' <span class="pill" style="color:var(--warn);border-color:#4a4630">Descarga</span>' : ''}
-          <div class="tiny">${fmtDate(h.date)}${h.duration ? ` · ${fmtDur(h.duration)}` : ''} · ${nSets} series${vol ? ` · ${fmtNum(Math.round(fromKg(vol)))} ${uLabel()} movidos` : ''}</div>
+        <div class="log">
+          <div class="grow">
+            <div class="log-n">${esc(h.routineName)}${h.deload ? ' <span class="pill hold">Descarga</span>' : ''}</div>
+            <div class="log-m">${fmtDate(h.date)}${h.duration ? ` · ${fmtDur(h.duration)}` : ''} · ${nSets} series</div>
+          </div>
+          ${vol ? `<div class="log-v">${fmtNum(Math.round(fromKg(vol)))} <i>${uLabel()}</i></div>` : `<div class="chev">▾</div>`}
         </div>
-        <span style="color:var(--mut)">▾</span>
       </summary>
       <div class="body">
         ${h.entries.map(e => `
           <div class="exline">
-            <span>${esc(e.name)}</span>
-            <span class="sets num">${e.sets.map(s => fmtSet(e.key, s)).join(' · ')}</span>
+            <span>${exTitleHTML(e.name)}</span>
+            <span class="sets">${e.sets.map(s => fmtSet(e.key, s)).join(' · ')}</span>
           </div>`).join('')}
-        <div class="row" style="margin-top:12px">
-          <button class="btn" style="padding:9px;font-size:13.5px" onclick="editSession('${h.id}')">✏️ Editar</button>
-          <button class="btn btn-danger" style="padding:9px;font-size:13.5px" onclick="deleteSession('${h.id}')">🗑️ Borrar</button>
+        <div class="row" style="margin-top:14px;gap:9px">
+          <button class="btn quiet sm" onclick="editSession('${h.id}')">Editar</button>
+          <button class="btn danger sm" onclick="deleteSession('${h.id}')">Borrar</button>
         </div>
       </div>
     </details>`;
   }).join('');
-  return `<div class="stack">${volumeCardHTML()}${items}</div>`;
+  return `${volumeCardHTML()}
+    <div class="sect">Sesiones</div>
+    ${items}`;
 }
 
 /* ---------- editar / borrar sesiones ---------- */
@@ -1387,24 +1799,25 @@ function renderEditModal(){
     <div class="stack">
     ${ed.entries.map((e, ei) => `
       <div>
-        <b style="font-size:14.5px">${esc(e.name)}</b>
-        <div class="sethead"><span>#</span><span>${uLabel()}</span><span>reps</span><span>rir</span><span></span></div>
+        <div class="ex-title" style="margin-bottom:2px">${exTitleHTML(e.name)}</div>
+        <div class="grid-h" style="grid-template-columns:14px 1fr 1fr .8fr 20px">
+          <span>#</span><span>${uLabel()}</span><span>reps</span><span>rir</span><span></span></div>
         ${e.sets.map((st, si) => `
-          <div class="setrow">
-            <span class="idx">${si+1}</span>
-            <input type="number" inputmode="decimal" step="any" min="0" value="${st.w}"
+          <div class="set" style="grid-template-columns:14px 1fr 1fr .8fr 20px">
+            <span class="i">${si+1}</span>
+            <input class="cell" type="number" inputmode="decimal" step="any" min="0" value="${st.w}"
               aria-label="Peso en ${uLabel()}" oninput="editVal(${ei},${si},'w',this.value)">
-            <input type="number" inputmode="numeric" step="1" min="0" value="${st.r}"
+            <input class="cell" type="number" inputmode="numeric" step="1" min="0" value="${st.r}"
               aria-label="Reps" oninput="editVal(${ei},${si},'r',this.value)">
-            <input type="number" inputmode="numeric" step="1" min="0" max="9" value="${st.rir}" placeholder="–"
+            <input class="cell" type="number" inputmode="numeric" step="1" min="0" max="9" value="${st.rir}" placeholder="–"
               aria-label="RIR" oninput="editVal(${ei},${si},'rir',this.value)">
-            <button class="iconbtn" aria-label="Quitar serie" onclick="editRemoveSet(${ei},${si})">✕</button>
+            <button class="xbtn" aria-label="Quitar serie" onclick="editRemoveSet(${ei},${si})">✕</button>
           </div>`).join('')}
-        <button class="addset" onclick="editAddSet(${ei})">＋ Agregar serie</button>
+        <button class="addex" style="padding:11px;margin-top:4px" onclick="editAddSet(${ei})">+ Agregar serie</button>
       </div>`).join('')}
     </div>
-    <button class="btn btn-acc" style="margin-top:16px" onclick="saveEditedSession()">Guardar cambios</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+    <button class="btn" style="margin-top:16px" onclick="saveEditedSession()">Guardar cambios</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
 }
 function editVal(ei, si, field, val){ window.__edit.entries[ei].sets[si][field] = val; }
 function editAddSet(ei){
@@ -1445,116 +1858,88 @@ function saveEditedSession(){
 function viewSettings(){
   const g = db.settings.goal;
   const rest = db.settings.rest;
-  return `<div class="stack">
-    <p class="eyebrow" style="margin-top:4px">Tu objetivo</p>
-    ${Object.entries(GOALS).map(([k,v]) => `
-      <button class="goal-opt ${g===k?'on':''}" onclick="setGoal('${k}')">
-        <b>${v.label} ${g===k?'✓':''}</b><span>${v.desc}</span>
-      </button>`).join('')}
+  const dsb = daysSinceBackup();
+  const notifOn = canNotify();
+  const screenOn = db.settings.screenOn !== 'off';
 
-    <div class="card" style="margin-top:8px">
-      <p class="eyebrow" style="margin-bottom:8px">Unidad de peso</p>
-      <div class="row">
-        <button class="goal-opt ${db.settings.unit==='kg'?'on':''}" style="flex:1" onclick="askUnitSwitch('kg')">
-          <b>Kilos (kg) ${db.settings.unit==='kg'?'✓':''}</b>
-        </button>
-        <button class="goal-opt ${db.settings.unit==='lb'?'on':''}" style="flex:1" onclick="askUnitSwitch('lb')">
-          <b>Libras (lb) ${db.settings.unit==='lb'?'✓':''}</b>
-        </button>
-      </div>
-      <p class="tiny" style="margin-top:8px">
-        Tus registros se guardan siempre en kg internamente: cambiar la unidad solo cambia cómo se
-        muestran y cómo escribes — puedes alternar mil veces sin que nada se corrompa. Durante una
-        sesión también puedes cambiarla con el botón “${uLabel()} ⇄” (útil si entrenas en otro gimnasio).
-      </p>
+  return `
+    <div class="sect">Objetivo</div>
+    <div class="goals">
+      ${Object.entries(GOALS).map(([k,v]) => `
+        <button class="goal-c ${g===k?'on':''}" onclick="setGoal('${k}')">
+          <div class="g-t">${v.label}</div>
+          <div class="g-d">${v.lo}–${v.hi} reps</div>
+        </button>`).join('')}
     </div>
+    <div class="hint">Define el rango de reps de todos los ejercicios y el descanso automático.
+      Cada ejercicio puede tener el suyo propio desde su ficha.</div>
 
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">Descanso entre series</p>
-      <select onchange="setRest(this.value)">
-        <option value="auto" ${rest==='auto'?'selected':''}>Automático según objetivo (recomendado)</option>
+    <div class="sect">Sesión</div>
+    <div class="line">
+      <div><div class="l-t">Unidad de peso</div><div class="l-d">Todo se guarda en kg; solo cambia cómo lo ves</div></div>
+      <div class="pill-sw">
+        <button class="${db.settings.unit==='kg'?'on':''}" onclick="askUnitSwitch('kg')">kg</button>
+        <button class="${db.settings.unit==='lb'?'on':''}" onclick="askUnitSwitch('lb')">lb</button>
+      </div>
+    </div>
+    <div class="line">
+      <div><div class="l-t">Descanso entre series</div><div class="l-d">Arranca solo al cerrar una serie</div></div>
+      <div class="l-v"><select class="inline" onchange="setRest(this.value)">
+        <option value="auto" ${rest==='auto'?'selected':''}>Automático</option>
         ${[60,90,120,150,180,240].map(s => `
-          <option value="${s}" ${String(rest)===String(s)?'selected':''}>${fmtClock(s)} min</option>`).join('')}
-        <option value="off" ${rest==='off'?'selected':''}>Sin timer de descanso</option>
-      </select>
-      <p class="tiny" style="margin-top:8px">
-        El timer arranca solo al anotar las reps de una serie, y te avisa con sonido y vibración.
-        Automático: Fuerza 3:00 · Hipertrofia 1:30 · Ambas 2:00 — lo que la evidencia recomienda para cada meta.
-        También puedes darle un descanso propio a cada ejercicio desde su ficha.
-      </p>
+          <option value="${s}" ${String(rest)===String(s)?'selected':''}>${fmtClock(s)}</option>`).join('')}
+        <option value="off" ${rest==='off'?'selected':''}>Sin timer</option>
+      </select></div>
+    </div>
+    <div class="line">
+      <div><div class="l-t">Avisos de descanso</div><div class="l-d">Notificación cuando la app no está a la vista</div></div>
+      <button class="tog ${notifOn?'on':''}" role="switch" aria-checked="${notifOn}" aria-label="Avisos de descanso"
+        onclick="${notifOn ? 'disableNotifications()' : 'enableNotifications()'}"><i></i></button>
+    </div>
+    <div class="line">
+      <div><div class="l-t">Pantalla encendida</div><div class="l-d">El teléfono no se bloquea durante la sesión</div></div>
+      <button class="tog ${screenOn?'on':''}" role="switch" aria-checked="${screenOn}" aria-label="Pantalla encendida"
+        onclick="setScreenOn('${screenOn ? 'off' : 'on'}')"><i></i></button>
+    </div>
+    <div class="hint">Automático: Fuerza 3:00 · Hipertrofia 1:30 · Ambas 2:00.
+      En iPhone las notificaciones requieren la app instalada en la pantalla de inicio (iOS 16.4+).</div>
+
+    <div class="sect">Guía rápida</div>
+    <div class="list">
+      <button class="line" onclick="rirInfo()"><div class="l-t">¿Qué es el RIR?</div><div class="chev">›</div></button>
+      <button class="line" onclick="e1rmInfo()"><div class="l-t">¿Qué es el 1RM estimado?</div><div class="chev">›</div></button>
+      <button class="line" onclick="asistInfo()"><div class="l-t">¿Qué son los asistidos?</div><div class="chev">›</div></button>
+      <button class="line" onclick="coachInfo()"><div class="l-t">¿Cómo me sugiere progresar el coach?</div><div class="chev">›</div></button>
     </div>
 
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">Notificaciones</p>
-      ${ canNotify() ? `
-        <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
-          Activadas ✓ — te aviso cuando termina el descanso y si una sesión queda abierta sin actividad
-          (solo cuando la app no está a la vista).
-        </p>
-        <button class="btn" onclick="disableNotifications()">Desactivar</button>` : `
-        <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
-          Recibe un aviso cuando termine tu descanso o si tu sesión queda olvidada — útil si cambias
-          de app mientras descansas.
-        </p>
-        <button class="btn btn-acc" onclick="enableNotifications()">Activar notificaciones</button>` }
-      <p class="tiny" style="margin-top:8px">
-        En iPhone requiere la app instalada en la pantalla de inicio (iOS 16.4+). Con la app a la vista
-        no notifica: el sonido y la vibración ya avisan. Si el teléfono está bloqueado, iOS puede pausar
-        la app — la opción “pantalla encendida durante la sesión” evita justo eso.
-      </p>
+    <div class="sect">Tus datos</div>
+    <div class="line">
+      <div><div class="l-t">Respaldo</div><div class="l-d">${dsb === null ? 'Nunca' : `Último hace ${dsb} día${dsb===1?'':'s'}`} · viven solo en este navegador</div></div>
+      <div class="l-v dim">.json</div>
     </div>
+    <button class="line" onclick="exportBackup()">
+      <div class="l-t">Descargar respaldo</div>
+      <div class="l-v">${svgIcon('down')}</div>
+    </button>
+    <button class="line" onclick="document.getElementById('backupfile').click()">
+      <div class="l-t">Restaurar respaldo</div>
+      <div class="l-v">${svgIcon('up')}</div>
+    </button>
+    <input type="file" id="backupfile" accept=".json,application/json" style="display:none"
+      onchange="importBackup(this.files[0]); this.value=''">
+    <button class="line" onclick="document.getElementById('hevyfile').click()">
+      <div class="l-t">Importar desde Hevy</div>
+      <div class="l-v">${svgIcon('up')}</div>
+    </button>
+    <input type="file" id="hevyfile" accept=".csv,text/csv" style="display:none"
+      onchange="importHevy(this.files[0]); this.value=''">
+    <button class="line" onclick="askWipe()">
+      <div class="l-t" style="color:var(--danger)">Borrar todo</div>
+      <div class="chev">›</div>
+    </button>
+    <div class="hint">El CSV de Hevy se saca en Perfil → Ajustes → Export data. Importar dos veces no duplica nada.</div>
 
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">Pantalla durante la sesión</p>
-      <button class="goal-opt ${db.settings.screenOn !== 'off' ? 'on' : ''}"
-        onclick="setScreenOn(db.settings.screenOn === 'off' ? 'on' : 'off')">
-        <b>Mantener la pantalla encendida ${db.settings.screenOn !== 'off' ? '✓' : ''}</b>
-        <span>Mientras hay una sesión en curso, el teléfono no se bloquea: siempre ves el cronómetro
-        y el descanso sin tocar nada. Se libera al terminar la sesión.</span>
-      </button>
-    </div>
-
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">Guía rápida (para empezar sin dudas)</p>
-      <div class="stack">
-        <button class="btn" onclick="rirInfo()">¿Qué es el RIR?</button>
-        <button class="btn" onclick="e1rmInfo()">¿Qué es el 1RM estimado?</button>
-        <button class="btn" onclick="asistInfo()">¿Qué son los ejercicios asistidos?</button>
-        <button class="btn" onclick="coachInfo()">¿Cómo me sugiere progresar el coach?</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">Respaldo de tus datos</p>
-      <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
-        Tus datos viven solo en este navegador. Descarga un respaldo de vez en cuando
-        (o antes de cambiar de teléfono) y restáuralo donde quieras.
-        <b style="color:var(--ink)">${daysSinceBackup() === null ? 'Todavía no has descargado ninguno.' : `Último respaldo: hace ${daysSinceBackup()} día${daysSinceBackup()===1?'':'s'}.`}</b>
-        Si pasan 30 días sin respaldo, te lo recuerdo en la pantalla de inicio.
-      </p>
-      <div class="stack">
-        <button class="btn" onclick="exportBackup()">⬇️ Descargar respaldo (.json)</button>
-        <button class="btn" onclick="document.getElementById('backupfile').click()">⬆️ Restaurar respaldo</button>
-        <input type="file" id="backupfile" accept=".json,application/json" style="display:none"
-          onchange="importBackup(this.files[0]); this.value=''">
-      </div>
-    </div>
-
-    <div class="card">
-      <p class="eyebrow" style="margin-bottom:8px">Importar desde Hevy</p>
-      <p class="muted" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
-        Sube la exportación CSV de Hevy (en Hevy: Perfil → Ajustes → Export data).
-        Se agregan las sesiones a tu historial, se crean las rutinas que falten y las
-        sugerencias se recalculan con todo tu historial. Importar dos veces no duplica nada.
-      </p>
-      <button class="btn" onclick="document.getElementById('hevyfile').click()">📥 Elegir archivo CSV</button>
-      <input type="file" id="hevyfile" accept=".csv,text/csv" style="display:none"
-        onchange="importHevy(this.files[0]); this.value=''">
-    </div>
-
-    <button class="btn btn-danger" onclick="askWipe()">Borrar todos los datos</button>
-    <p class="tiny" style="text-align:center">Hierro v2 · datos guardados en este dispositivo.</p>
-  </div>`;
+    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v3 · datos guardados en este dispositivo</div>`;
 }
 
 /* =====================================================================
@@ -1566,8 +1951,8 @@ function promptNewRoutine(){
     <p class="muted">Ponle un nombre, después le agregas los ejercicios.</p>
     <form onsubmit="createRoutine(event)" class="stack">
       <input type="text" id="newroutine" placeholder="Ej. Torso, Pierna, Full body" autocomplete="off">
-      <button class="btn btn-acc" type="submit">Crear rutina</button>
-      <button class="btn btn-ghost" type="button" onclick="closeModal()">Cancelar</button>
+      <button class="btn" type="submit">Crear rutina</button>
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
     </form>`);
   setTimeout(() => document.getElementById('newroutine')?.focus(), 60);
 }
@@ -1754,10 +2139,10 @@ function updateVsChip(xi){
   if(!el) return;
   const info = vsLastInfo(xi);
   if(!info){ el.textContent = ''; return; }
-  el.style.color = info.beat ? 'var(--good)' : 'var(--mut)';
+  el.style.color = info.beat ? 'var(--up)' : 'var(--dim)';
   el.textContent = info.beat
-    ? `✓ Superaste el volumen de la última sesión (${info.pct} %)`
-    : `Volumen vs última sesión: ${info.pct} %`;
+    ? `Superaste el volumen de la última sesión · ${info.pct} %`
+    : `Volumen vs última sesión · ${info.pct} %`;
 }
 
 /* al escribir peso o reps, las series vacías siguientes heredan ese valor como sugerencia */
@@ -1807,12 +2192,12 @@ function promptAddExercise(){
           oninput="acUpdateSession()" onfocus="acUpdateSession()" onblur="acHideSession()">
         <div class="aclist" id="aclist2" style="display:none" role="listbox"></div>
       </div>
-      <button class="goal-opt" type="button" id="keepRoutineBtn" onclick="toggleKeepRoutine()">
+      <button class="opt" type="button" id="keepRoutineBtn" onclick="toggleKeepRoutine()">
         <b id="keepRoutineLabel">Solo por hoy</b>
         <span>Toca para alternar: solo esta sesión, o guardarlo también en la rutina.</span>
       </button>
-      <button class="btn btn-acc" type="submit">Agregar a la sesión</button>
-      <button class="btn btn-ghost" type="button" onclick="closeModal()">Cancelar</button>
+      <button class="btn" type="submit">Agregar a la sesión</button>
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
     </form>`);
   setTimeout(() => document.getElementById('sessnewex')?.focus(), 60);
 }
@@ -1906,8 +2291,8 @@ function startSetTimer(xi, si){
     <h2 style="text-align:center;font-size:17px">${esc(ex.name)} · serie ${si+1}</h2>
     <div class="clock num" id="settimer" style="font-size:76px;text-align:center;margin:10px 0 2px">3</div>
     <p class="tiny" id="settimerhint" style="text-align:center;margin-bottom:16px">Prepárate… objetivo: ${target} s</p>
-    <button class="btn" onclick="stopSetTimer(true)">✓ Terminar antes</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="stopSetTimer(false)">Cancelar</button>`);
+    <button class="btn" onclick="stopSetTimer(true)">Terminar antes</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="stopSetTimer(false)">Cancelar</button>`);
   setTimerInt = setInterval(() => {
     const el = document.getElementById('settimer');
     const st = setTimerState;
@@ -2023,7 +2408,7 @@ function finishSession(){
       const prevBest = bestAssistBefore(e.key);
       const nowBest = Math.min(...e.sets.filter(st => st.r >= lo).map(st => st.w), Infinity);
       if(prevBest !== Infinity && nowBest < prevBest - 1e-9){
-        prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${nowBest === 0 ? '¡sin asistencia!' : fmtW(nowBest) + ' ' + uLabel() + ' de ayuda'}</b> <span class="tiny">(antes ${fmtW(prevBest)})</span>`);
+        prs.push(`${esc(e.name)}: <b style="color:var(--hold)">${nowBest === 0 ? '¡sin asistencia!' : fmtW(nowBest) + ' ' + uLabel() + ' de ayuda'}</b> <span class="tiny">(antes ${fmtW(prevBest)})</span>`);
       }
       continue;
     }
@@ -2033,7 +2418,7 @@ function finishSession(){
     if(prev > 0 && now > prev){
       const fv = v => repsMode ? fmtNum(Math.round(v*10)/10) : fmtW(Math.round(v*10)/10);
       const unit = meta.type === 'tiempo' ? 's' : (meta.type === 'corporal' ? 'reps' : uLabel());
-      prs.push(`${esc(e.name)}: <b style="color:var(--acc)">${fv(now)} ${unit}</b> <span class="tiny">(antes ${fv(prev)})</span>`);
+      prs.push(`${esc(e.name)}: <b style="color:var(--hold)">${fv(now)} ${unit}</b> <span class="tiny">(antes ${fv(prev)})</span>`);
     }
   }
 
@@ -2048,11 +2433,11 @@ function finishSession(){
   const rirAll = entries.flatMap(e => e.sets).filter(s => s.rir !== undefined && s.rir !== null);
   const zeros = rirAll.filter(s => s.rir === 0).length;
   const failNote = (rirAll.length >= 4 && zeros / rirAll.length >= 0.7) ? `
-    <div class="coach warn" style="margin-bottom:16px">
-      Hoy llegaste al fallo (RIR 0) en ${zeros} de ${rirAll.length} series registradas.
-      <span class="why">La evidencia: ir al fallo da casi el mismo músculo que quedarte a 1–3 reps de él,
-      pero alarga la recuperación 24–48 h. Prueba dejar 1–2 reps en reserva en la mayoría de series —
-      progresarás igual y llegarás más fresca a la próxima sesión.</span>
+    <div class="note" style="margin:0 0 18px">
+      <div class="note-t">Hoy llegaste al fallo (RIR 0) en ${zeros} de ${rirAll.length} series</div>
+      <div class="note-d">Ir al fallo da casi el mismo músculo que quedarte a 1–3 reps de él,
+        pero alarga la recuperación 24–48 h. Prueba dejar 1–2 reps en reserva en la mayoría de series —
+        progresarás igual y llegarás con más energía a la próxima sesión.</div>
     </div>` : '';
 
   db.history.push(rec);
@@ -2064,22 +2449,23 @@ function finishSession(){
   closeModal();
   if(isDeload){
     openModal(`
-      <h2>Descarga guardada 🪫→🔋</h2>
+      <h2>Descarga guardada</h2>
       <p class="muted">${fmtDur(rec.duration)} · ${entries.reduce((a,e)=>a+e.sets.length,0)} series suaves.
         Esta sesión no toca tu progresión ni tus récords: la próxima sesión normal retoma
         exactamente donde ibas, con el cuerpo más fresco.</p>
-      <button class="btn btn-acc" onclick="closeModal(); go({name:'home'})">Listo</button>`);
+      <button class="btn" onclick="closeModal(); go({name:'home'})">Listo</button>`);
     return;
   }
   openModal(`
-    <h2>${prs.length ? '🏆 ¡Sesión con récord!' : 'Sesión guardada 💪'}</h2>
+    <h2>${prs.length ? '¡Sesión con récord!' : 'Sesión guardada'}</h2>
     <p class="muted">${fmtDur(rec.duration)} · ${entries.reduce((a,e)=>a+e.sets.length,0)} series.
       ${prs.length ? '' : 'La próxima vez verás las sugerencias actualizadas en cada ejercicio.'}</p>
-    ${prs.length ? `<div class="coach good" style="margin-bottom:16px">
-      Nuevo récord${prs.length===1?'':'s'}:<br>${prs.join('<br>')}</div>` : ''}
+    ${prs.length ? `<div class="note up" style="margin:0 0 18px">
+      <div class="note-t">${prs.length===1?'Nuevo récord':'Nuevos récords'}</div>
+      <div class="note-d">${prs.join('<br>')}</div></div>` : ''}
     ${failNote}
-    <button class="btn btn-acc" onclick="closeModal(); go({name:'history'})">Ver historial</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'home'})">Volver al inicio</button>`);
+    <button class="btn" onclick="closeModal(); go({name:'history'})">Ver historial</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="closeModal(); go({name:'home'})">Volver al inicio</button>`);
 }
 
 function setGoal(k){ db.settings.goal = k; save(); render(); }
@@ -2197,19 +2583,19 @@ function showWarmup(xi){
     return;
   }
   const list = plan.rows.map((r, i) => `
-    <div class="row" style="padding:6px 0;border-bottom:1px dashed #232833">
-      <span style="width:22px;text-align:center;color:var(--mut);font-weight:700" class="num">${i+1}</span>
-      <b class="num">${r}</b>
+    <div class="exline">
+      <span class="tiny">Serie ${i+1}</span>
+      <span class="sets" style="font-size:13px;color:var(--bone)">${r}</span>
     </div>`).join('')
     + (plan.W && plan.rows.length ? `
-    <div class="row" style="padding:8px 0">
-      <span style="width:22px;text-align:center;color:var(--good)">→</span>
-      <b>Series de trabajo: ${fmtW(plan.W)} ${uLabel()}</b>
+    <div class="exline">
+      <span class="tiny" style="color:var(--up)">Trabajo</span>
+      <span class="sets" style="font-size:13px;color:var(--up)">${fmtW(plan.W)} ${uLabel()}</span>
     </div>` : '');
   openModal(`
-    <h2>🔥 Calentamiento — ${esc(ex.name)}</h2>
+    <h2>Calentamiento — ${esc(exBaseName(ex.name))}</h2>
     ${ plan.first ? '' : `<p class="muted" style="margin-bottom:10px">Este músculo ya viene caliente de un ejercicio anterior: con menos alcanza.</p>` }
-    ${ list ? `<div style="margin-bottom:12px">${list}</div>` : '' }
+    ${ list ? `<div class="list" style="padding:4px 16px;margin-bottom:14px">${list}</div>` : '' }
     ${ plan.note ? `<p class="muted" style="margin-bottom:12px">${plan.note}</p>` : '' }
     <p class="tiny" style="line-height:1.6;margin-bottom:14px">
       Descansa solo 30–60 s entre series de calentamiento y mueve el peso con <b>intención de velocidad</b>
@@ -2288,7 +2674,7 @@ function checkIdleSession(){
   if(Date.now() - last > 15*60*1000 && !(db.active.idleNotified > last)){
     db.active.idleNotified = Date.now();
     save();
-    notify('⏱️ Tu sesión sigue en curso',
+    notify('Tu sesión sigue en curso',
       'Llevas 15 min sin anotar series. ¿Seguimos? Si ya acabaste, entra y toca “Terminar” para guardarla.', 'hierro-idle');
   }
 }
@@ -2324,27 +2710,49 @@ function beep(){
   }catch(e){}
 }
 function tickRest(){
-  const el = document.getElementById('restchip');
-  if(!el) return;
-  const total = restSecs();
+  const box = document.getElementById('rest');
+  if(!box) return;
+  const t = document.getElementById('resttime');
+  const l = document.getElementById('restlabel');
+  const f = document.getElementById('restfill');
+  const total = restSecs() || 0;
   if(restUntil === null){
-    if(el.className !== 'restchip'){ el.className = 'restchip'; el.textContent = `▶ Descanso (${fmtClock(total || 0)})`; }
+    if(box.className !== 'rest'){
+      box.className = 'rest';
+      if(l) l.textContent = 'Descanso';
+      if(t) t.textContent = fmtClock(total);
+      if(f) f.style.width = '0%';
+    }
     return;
   }
   const rem = Math.ceil((restUntil - Date.now())/1000);
   if(rem <= 0){
     restUntil = null;
     beep();
-    notify('✅ Descanso listo', '¡A la siguiente serie!', 'hierro-rest');
-    el.className = 'restchip done';
-    el.textContent = '✓ Descanso listo — ¡a la siguiente serie!';
+    notify('Descanso listo', '¡A la siguiente serie!', 'hierro-rest');
+    box.className = 'rest done';
+    if(l) l.textContent = 'Listo';
+    if(t) t.textContent = '¡Vamos!';
+    if(f) f.style.width = '100%';
     setTimeout(() => { if(restUntil === null) tickRest(); }, 4000);
-    /* forzar refresco del texto al estado normal después del aviso */
-    setTimeout(() => { const e2 = document.getElementById('restchip'); if(e2 && restUntil === null){ e2.className='restchip'; e2.textContent = `▶ Descanso (${fmtClock(restSecs() || 0)})`; } }, 4200);
+    setTimeout(() => {
+      const b2 = document.getElementById('rest');
+      if(b2 && restUntil === null){
+        b2.className = 'rest';
+        const l2 = document.getElementById('restlabel');
+        const t2 = document.getElementById('resttime');
+        const f2 = document.getElementById('restfill');
+        if(l2) l2.textContent = 'Descanso';
+        if(t2) t2.textContent = fmtClock(restSecs() || 0);
+        if(f2) f2.style.width = '0%';
+      }
+    }, 4200);
     return;
   }
-  el.className = 'restchip on';
-  el.textContent = `⏸ Descanso: ${fmtClock(rem)}`;
+  box.className = 'rest on';
+  if(l) l.textContent = 'Descansando';
+  if(t) t.textContent = fmtClock(rem);
+  if(f) f.style.width = (total ? Math.max(0, Math.min(100, (1 - rem/total) * 100)) : 0) + '%';
 }
 
 /* =====================================================================
@@ -2355,62 +2763,49 @@ function drawChart(){
   if(!cv) return;
   const pts = window.__chartPts || [];
   if(pts.length < 2) return;
-  const W = cv.parentElement.clientWidth, H = 190;
+  const W = cv.parentElement.clientWidth, H = 120;
   const dpr = window.devicePixelRatio || 1;
   cv.width = W*dpr; cv.height = H*dpr;
   cv.style.width = W+'px'; cv.style.height = H+'px';
   const ctx = cv.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const padL = 38, padR = 14, padT = 16, padB = 22;
+  const padL = 4, padR = 8, padT = 10, padB = 10;
   const dmin = Math.min(...pts.map(p=>p.v)), dmax = Math.max(...pts.map(p=>p.v));
   let lo = dmin, hi = dmax;
   if(lo === hi){ lo -= 1; hi += 1; }
-  const span = hi - lo; lo -= span*0.12; hi += span*0.12;
+  const span = hi - lo; lo -= span*0.14; hi += span*0.14;
   const X = i => padL + (W-padL-padR) * (pts.length === 1 ? 0.5 : i/(pts.length-1));
   const Y = v => padT + (H-padT-padB) * (1 - (v-lo)/(hi-lo));
 
-  /* rejilla recesiva: 3 líneas con valor */
-  ctx.font = '10px -apple-system, sans-serif';
-  ctx.lineWidth = 1;
-  for(const v of [dmin, (dmin+dmax)/2, dmax]){
-    const y = Y(v);
-    ctx.strokeStyle = '#262b34';
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
-    ctx.fillStyle = '#8e94a0'; ctx.textAlign = 'left';
-    ctx.fillText(fmtNum(Math.round(v*10)/10), 2, y+3.5);
+  /* rejilla recesiva: tres líneas sin números — el valor vive en el titular */
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
+  for(const frac of [0, 0.5, 1]){
+    const y = padT + (H-padT-padB) * frac;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
   /* línea de la serie */
-  ctx.strokeStyle = '#f5c242'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.strokeStyle = '#F3F1EC'; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.beginPath();
   pts.forEach((p,i) => i ? ctx.lineTo(X(i), Y(p.v)) : ctx.moveTo(X(0), Y(p.v)));
   ctx.stroke();
-  /* puntos: discretos, último enfatizado con anillo de superficie */
+  /* cada punto es una sesión; el último se resalta */
   pts.forEach((p,i) => {
     const last = i === pts.length-1;
     ctx.beginPath();
-    ctx.arc(X(i), Y(p.v), last ? 4.5 : 2.5, 0, 7);
-    ctx.fillStyle = '#f5c242'; ctx.fill();
-    if(last){ ctx.strokeStyle = '#181b21'; ctx.lineWidth = 2; ctx.stroke(); }
+    ctx.arc(X(i), Y(p.v), last ? 3.6 : 2.4, 0, 7);
+    ctx.fillStyle = last ? '#F3F1EC' : '#8B8E94';
+    ctx.fill();
   });
-  /* etiqueta directa solo en el último punto */
-  const lastP = pts[pts.length-1];
-  ctx.fillStyle = '#eae6dc'; ctx.font = '700 12px -apple-system, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(fmtNum(lastP.v), Math.min(X(pts.length-1)+4, W-padR), Math.max(12, Y(lastP.v)-9));
-  /* fechas primera y última */
-  ctx.fillStyle = '#8e94a0'; ctx.font = '10px -apple-system, sans-serif';
-  ctx.textAlign = 'left';  ctx.fillText(fmtDateShort(pts[0].date), padL, H-6);
-  ctx.textAlign = 'right'; ctx.fillText(fmtDateShort(lastP.date), W-padR, H-6);
 
-  /* interacción: tocar/mover muestra el detalle de la sesión más cercana */
+  /* interacción: tocar o arrastrar muestra el detalle de la sesión más cercana */
   const pick = ev => {
     const rect = cv.getBoundingClientRect();
     const x = ev.clientX - rect.left;
     let i = Math.round((x - padL) / ((W-padL-padR) / (pts.length-1)));
     i = Math.max(0, Math.min(pts.length-1, i));
     const tip = document.getElementById('charttip');
-    if(tip) tip.innerHTML = `<b style="color:var(--ink)">${fmtDate(pts[i].date)}</b> · ${fmtNum(pts[i].v)} ${window.__chartUnit}`;
+    if(tip) tip.innerHTML = `${fmtDateShort(pts[i].date)} · ${fmtNum(pts[i].v)} ${window.__chartUnit}`;
   };
   cv.onpointerdown = pick;
   cv.onpointermove = ev => { if(ev.buttons || ev.pointerType === 'mouse') pick(ev); };
@@ -2568,13 +2963,13 @@ function importHevy(file){
       const nSets = news.reduce((a,s) => a + [...s.ex.values()].reduce((b,x) => b + x.length, 0), 0);
       openModal(`
         <h2>Importar de Hevy</h2>
-        <p class="muted">${news.length ? `Se encontraron <b style="color:var(--ink)">${news.length} sesiones</b> nuevas (${nSets} series) de: ${titles.map(esc).join(', ')}.` : ''}
-          ${repairs.length ? `<b style="color:var(--acc)">${repairs.length} sesiones que se habían importado sin pesos se repararán</b> con los pesos correctos del archivo.` : ''}
-          Pesos del archivo detectados en <b style="color:var(--ink)">${wUnit === 'lb' ? 'libras' : 'kilos'}</b>${wUnit === 'lb' ? ' — se convierten automáticamente (internamente todo vive en kg)' : ''}.
+        <p class="muted">${news.length ? `Se encontraron <b style="color:var(--bone)">${news.length} sesiones</b> nuevas (${nSets} series) de: ${titles.map(esc).join(', ')}.` : ''}
+          ${repairs.length ? `<b style="color:var(--hold)">${repairs.length} sesiones que se habían importado sin pesos se repararán</b> con los pesos correctos del archivo.` : ''}
+          Pesos del archivo detectados en <b style="color:var(--bone)">${wUnit === 'lb' ? 'libras' : 'kilos'}</b>${wUnit === 'lb' ? ' — se convierten automáticamente (internamente todo vive en kg)' : ''}.
           ${skippedWarmup ? `Se omiten ${skippedWarmup} series de calentamiento.` : ''}
           Las rutinas que no existan se crean con los ejercicios de la sesión más reciente.</p>
-        <button class="btn btn-acc" onclick="applyHevyImport()">Importar todo</button>
-        <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+        <button class="btn" onclick="applyHevyImport()">Importar todo</button>
+        <button class="btn ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
     }catch(err){
       infoModal('No se pudo importar', 'El archivo no se pudo procesar: ' + esc(err.message));
     }
@@ -2649,12 +3044,12 @@ function applyHevyImport(){
   window.__hevyImport = null;
   save(); closeModal();
   openModal(`
-    <h2>Importación lista 💪</h2>
+    <h2>Importación lista</h2>
     <p class="muted">${news.length ? `${news.length} sesiones agregadas al historial` : ''}${news.length && newRoutines ? ` y ${newRoutines} rutina${newRoutines===1?'':'s'} creada${newRoutines===1?'':'s'}` : ''}${news.length && repairs.length ? '. ' : ''}
       ${repairs.length ? `${repairs.length} sesiones reparadas con sus pesos correctos.` : ''}
       Los ejercicios asistidos y de peso corporal se detectaron solos, y las sugerencias del coach ya usan todo tu historial.</p>
-    <button class="btn btn-acc" onclick="closeModal(); go({name:'home'})">Ver rutinas</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal(); go({name:'history'})">Ver historial</button>`);
+    <button class="btn" onclick="closeModal(); go({name:'home'})">Ver rutinas</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="closeModal(); go({name:'history'})">Ver historial</button>`);
 }
 
 /* =====================================================================
@@ -2671,8 +3066,8 @@ function confirmModal(title, body, actionLabel, fn, accent){
   openModal(`
     <h2>${title}</h2>
     <p class="muted">${body}</p>
-    <button class="btn ${accent?'btn-acc':'btn-danger'}" onclick="window.__confirmFn()">${actionLabel}</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+    <button class="btn ${accent?'':'danger'}" onclick="window.__confirmFn()">${actionLabel}</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="closeModal()">Cancelar</button>`);
 }
 function infoModal(title, body){
   openModal(`
@@ -2683,34 +3078,34 @@ function infoModal(title, body){
 
 function rirInfo(){
   infoModal('¿Qué es el RIR?', `
-    <b style="color:var(--ink)">RIR = “reps en reserva”</b>: cuántas repeticiones MÁS podrías haber hecho
+    <b style="color:var(--bone)">RIR = “reps en reserva”</b>: cuántas repeticiones MÁS podrías haber hecho
     al terminar la serie.<br><br>
     · Hiciste 10 reps pero podías hacer 12 → RIR 2.<br>
     · No podías hacer ni una más → RIR 0 (llegaste al fallo).<br><br>
-    <b style="color:var(--ink)">¿Para qué sirve?</b> La ciencia dice que lo ideal es entrenar dejando
+    <b style="color:var(--bone)">¿Para qué sirve?</b> La ciencia dice que lo ideal es entrenar dejando
     1–3 reps en reserva: suficiente esfuerzo para crecer, sin el desgaste de ir al fallo siempre.<br><br>
-    <b style="color:var(--ink)">Es opcional</b>, pero si lo anotas el coach afina mejor: si pones RIR 4+
+    <b style="color:var(--bone)">Es opcional</b>, pero si lo anotas el coach afina mejor: si pones RIR 4+
     (te sobraban muchas reps), te sugerirá subir el peso antes; si pones RIR 0 seguido, sabrá que ese peso
     te queda pesado.`);
 }
 function e1rmInfo(){
   infoModal('¿Qué es el 1RM estimado?', `
-    Tu <b style="color:var(--ink)">1RM</b> (repetición máxima) es el peso más pesado que podrías levantar
+    Tu <b style="color:var(--bone)">1RM</b> (repetición máxima) es el peso más pesado que podrías levantar
     UNA sola vez. No hace falta probarlo de verdad (¡ni es recomendable!): se puede
-    <b style="color:var(--ink)">estimar</b> desde cualquier serie con una fórmula
+    <b style="color:var(--bone)">estimar</b> desde cualquier serie con una fórmula
     (Epley: peso × (1 + reps/30)).<br><br>
     Por ejemplo: 60 kg × 10 reps ≈ 80 kg de 1RM estimado.<br><br>
-    <b style="color:var(--ink)">¿Para qué sirve?</b> Es la mejor forma de ver tu progreso real:
+    <b style="color:var(--bone)">¿Para qué sirve?</b> Es la mejor forma de ver tu progreso real:
     aunque una semana hagas 8 reps y otra 11, o cambies de rango, el 1RM estimado
     los vuelve comparables. La gráfica de cada ejercicio muestra cómo evoluciona.`);
 }
 function asistInfo(){
   infoModal('¿Qué son los ejercicios asistidos?', `
-    Son ejercicios donde una máquina o banda elástica <b style="color:var(--ink)">te ayuda</b> a completar
+    Son ejercicios donde una máquina o banda elástica <b style="color:var(--bone)">te ayuda</b> a completar
     el movimiento, típicamente dominadas y fondos asistidos.<br><br>
-    <b style="color:var(--ink)">Clave:</b> los kg que marcas en la máquina son la AYUDA que recibes,
+    <b style="color:var(--bone)">Clave:</b> los kg que marcas en la máquina son la AYUDA que recibes,
     no el peso que levantas. Por eso aquí el progreso funciona al revés:<br><br>
-    · Menos kg de ayuda = más difícil = <b style="color:var(--ink)">progreso</b> ✓<br>
+    · Menos kg de ayuda = más difícil = <b style="color:var(--bone)">progreso</b> ✓<br>
     · Más kg de ayuda = más fácil.<br><br>
     Si marcas un ejercicio como “Asistido” (tocándolo en su rutina), el coach lo entiende y te sugiere
     ir bajando la ayuda hasta que puedas hacerlo libre. Los importados de Hevy con “(Assisted)” se
@@ -2718,7 +3113,7 @@ function asistInfo(){
 }
 function coachInfo(){
   infoModal('¿Cómo me sugiere progresar el coach?', `
-    Usa <b style="color:var(--ink)">doble progresión</b>, el método con más respaldo científico:<br><br>
+    Usa <b style="color:var(--bone)">doble progresión</b>, el método con más respaldo científico:<br><br>
     1. Cada ejercicio tiene un rango de reps según tu objetivo (ej. 8–12).<br>
     2. Con el mismo peso, intenta sumar reps sesión a sesión.<br>
     3. Cuando llegas al tope del rango en TODAS las series → sube el peso (~2,5 %) y vuelve a empezar
@@ -2727,7 +3122,7 @@ function coachInfo(){
     si no sostienes el rango 2 veces seguidas, te propone bajar ~5 % y reconstruir; si te estancas
     varias sesiones, te suma una serie (más volumen = más progreso). En peso corporal progresas por
     reps y en asistidos bajando la ayuda.<br><br>
-    Sobre las series: la zona ideal es <b style="color:var(--ink)">2–4 series por ejercicio</b> —
+    Sobre las series: la zona ideal es <b style="color:var(--bone)">2–4 series por ejercicio</b> —
     a partir de la 4ª el beneficio por sesión cae en picada. Si vienes haciendo 5 o más, el coach
     te sugerirá concentrar el trabajo en menos series más intensas. Con 4+ series, la peor no cuenta
     para evaluar tu progreso (que la última se caiga es fatiga normal).<br><br>
@@ -2796,7 +3191,7 @@ function migrateTypes(){
       <p class="muted">Define el rango de reps y cómo el coach te sugiere progresar. Lo puedes cambiar en Ajustes.</p>
       <div class="stack">
         ${Object.entries(GOALS).map(([k,v]) => `
-          <button class="goal-opt" onclick="setGoal('${k}'); closeModal()">
+          <button class="opt" onclick="setGoal('${k}'); closeModal()">
             <b>${v.label}</b><span>${v.desc}</span>
           </button>`).join('')}
       </div>`);
