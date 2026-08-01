@@ -1218,7 +1218,26 @@ function updateProgress(key, newSets, dateISO){
 /* =====================================================================
    NAVEGACIÓN / RENDER
    ===================================================================== */
-function go(v){ view = v; render(); window.scrollTo(0,0); }
+/* Cada pantalla recuerda por dónde ibas. Al volver de la ficha de un
+   ejercicio retomas la lista donde estaba, no arriba del todo. */
+const scrollMem = {};
+function viewKey(v){
+  if(!v || !v.name) return 'home';
+  if(v.name === 'routine')  return 'routine:' + v.id + (v.sort ? ':orden' : '');
+  if(v.name === 'exercise') return 'exercise:' + v.key;
+  if(v.name === 'gym')      return 'gym:' + (v.kind || 'plates');
+  return v.name;
+}
+function scrollNow(){ return window.scrollY || window.pageYOffset || 0; }
+function go(v){
+  scrollMem[viewKey(view)] = scrollNow();
+  view = v;
+  render();
+  const y = scrollMem[viewKey(v)] || 0;
+  window.scrollTo(0, y);
+  /* tras pintar, el alto puede cambiar (gráfica, fuentes): se reintenta */
+  if(typeof requestAnimationFrame === 'function') requestAnimationFrame(() => window.scrollTo(0, y));
+}
 
 /* ---------- iconografía de línea (un solo trazo en toda la app) ---------- */
 const ICON = {
@@ -3128,6 +3147,7 @@ function startSession(rid, deload){
     })
   };
   restUntil = null;
+  delete scrollMem.session;   /* una sesión nueva empieza arriba */
   save(); go({name:'session'});
 }
 

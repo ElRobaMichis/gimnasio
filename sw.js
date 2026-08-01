@@ -1,7 +1,7 @@
 /* Hierro — service worker: la app funciona 100 % sin conexión.
    Estrategia: cache-first con actualización en segundo plano
    (si hay internet, descarga la versión nueva para el próximo arranque). */
-const CACHE = 'hierro-v5';
+const CACHE = 'hierro-v6';
 /* las tipografías del rediseño viven en otro origen: se cachean aparte
    (cache-first) para que la app siga viéndose igual sin conexión */
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
