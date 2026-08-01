@@ -435,6 +435,32 @@
   .modal .tiny{color:var(--dim);font-size:11.5px}
   .modal textarea{margin-top:4px}
   .modal .stack{gap:9px}
+
+  /* ---------- equipo del gimnasio y calculadora de carga ---------- */
+  .plate-dot{width:15px;height:15px;border-radius:50%;flex:none}
+  .check{
+    width:23px;height:23px;border-radius:7px;border:1px solid var(--line-2);
+    display:flex;align-items:center;justify-content:center;color:transparent;flex:none;
+  }
+  .check.on{background:var(--bone);border-color:var(--bone);color:#0B0B0D}
+  .check svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .qty{display:flex;align-items:center;background:var(--surface-2);border-radius:9px;padding:2px;flex:none}
+  .qty button{
+    width:30px;height:28px;display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-family:var(--mono);font-size:15px;
+  }
+  .qty > span{min-width:22px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--bone)}
+
+  .load{display:block;width:100%;text-align:left;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+  .load-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .load-l{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .load-v{font-family:var(--mono);font-size:12.5px;color:var(--ash);display:flex;align-items:center;gap:6px}
+  .load-v b{color:var(--bone);font-weight:500}
+  .load svg{margin:4px 0}
+
+  .warm{border-top:1px solid var(--line);padding:14px 0 4px}
+  .warm.work{border-top-color:rgba(127,211,168,.3)}
+  .modal .warm:first-of-type{border-top:0;padding-top:4px}
 </style>
 </head>
 <body>
@@ -473,6 +499,53 @@ const MUSCLES = [
   ['gluteos','Glúteos'], ['core','Core']
 ];
 const PUSH_G = ['pecho','hombros','triceps'], PULL_G = ['espalda','biceps'];
+const LB_KG = 0.45359237;
+
+/* =====================================================================
+   EQUIPO DEL GIMNASIO
+   Todo se guarda en kg, como el resto de la app. Los colores son el
+   código internacional de discos: sirven para reconocerlos en el rack.
+   ===================================================================== */
+const PLATE_COLORS = {
+  kg: [[25,'#C0473E'],[20,'#3C6FA8'],[15,'#C2963A'],[10,'#4C9970'],[5,'#CFCCC4'],[2.5,'#A7ACB4'],[1.25,'#868B93']],
+  lb: [[55,'#C0473E'],[45,'#3C6FA8'],[35,'#C2963A'],[25,'#4C9970'],[10,'#CFCCC4'],[5,'#A7ACB4'],[2.5,'#868B93']],
+};
+/* diámetro y grosor del dibujo, de mayor a menor */
+const PLATE_DIMS = [[25,92,15],[20,92,13],[15,84,11],[10,72,9],[5,56,8],[2.5,44,6],[0,36,5]];
+const EQUIP_LABEL = { barra:'Barra', mancuerna:'Mancuernas', maquina:'Máquina', otro:'Otro' };
+/* el nombre casi siempre dice el implemento: Hevy lo pone en inglés y
+   quien escribe a mano lo pone en español */
+const EQUIP_HINTS = [
+  ['barra',     ['barbell','barra','ez bar','ez-bar','olympic','smith','multipower','landmine','trap bar','hex bar']],
+  ['mancuerna', ['dumbbell','dumbell','mancuerna','mancuernas',' db ']],
+  ['maquina',   ['machine','maquina','cable','polea','lever','hammer strength','pin loaded','selectorized','pec deck','crossover','prensa','multipress']],
+];
+function guessEquip(name){
+  const n = ' ' + acNorm(name) + ' ';
+  for(const [equip, words] of EQUIP_HINTS)
+    if(words.some(w => n.includes(w))) return equip;
+  return null;
+}
+/* inventario de arranque: el juego estándar del país según la unidad */
+function defaultGym(unit){
+  const lb = unit === 'lb';
+  const k = v => lb ? Math.round(v * LB_KG * 1000)/1000 : v;
+  const plates = (lb ? [45,35,25,10,5,2.5] : [25,20,15,10,5,2.5,1.25])
+    .map(v => ({ kg:k(v), pairs:2, on:true }));
+  const bars = (lb
+    ? [['oly','Olímpica',45,true,true],['short','Olímpica corta',35,true,false],['ez','Barra Z',15,true,false],
+       ['straight','Barra recta',25,false,false],['smith','Multipower',45,false,false]]
+    : [['oly','Olímpica',20,true,true],['short','Olímpica corta',15,true,false],['ez','Barra Z',7,true,false],
+       ['straight','Barra recta',10,false,false],['smith','Multipower',20,false,false]]
+  ).map(([id,name,kg,on,def]) => ({ id, name, kg:k(kg), on, def }));
+  const dumbbells = [];
+  if(lb){ for(let v = 5; v <= 50; v += 5) dumbbells.push({ kg:k(v), on:true }); }
+  else {
+    for(let v = 1; v <= 24; v++) dumbbells.push({ kg:v, on:true });
+    for(let v = 26; v <= 40; v += 2) dumbbells.push({ kg:v, on:true });
+  }
+  return { plates, bars, dumbbells };
+}
 
 /* ---------- estado ---------- */
 let db = load();
@@ -494,6 +567,10 @@ function normalize(d){
   d.progress = (d.progress && typeof d.progress === 'object') ? d.progress : {};
   d.exmeta   = (d.exmeta   && typeof d.exmeta   === 'object') ? d.exmeta   : {};
   d.active   = d.active || null;
+  d.gym = (d.gym && typeof d.gym === 'object') ? d.gym : {};
+  const def = defaultGym(d.settings.unit);
+  for(const k of ['plates','bars','dumbbells'])
+    if(!Array.isArray(d.gym[k]) || !d.gym[k].length) d.gym[k] = def[k];
   return d;
 }
 function load(){
@@ -520,7 +597,6 @@ function fmtDur(sec){
   return m >= 60 ? `${Math.floor(m/60)} h ${m%60} min` : `${m} min ${s} s`;
 }
 /* ---------- unidades: TODO se guarda en kg; la unidad solo cambia la vista ---------- */
-const LB_KG = 0.45359237;
 function uLabel(){ return db.settings.unit === 'lb' ? 'lb' : 'kg'; }
 function fromKg(kg){ return db.settings.unit === 'lb' ? kg / LB_KG : kg; }
 function toKg(x){ return db.settings.unit === 'lb' ? x * LB_KG : x; }
@@ -548,7 +624,7 @@ function prog(key){
 
 /* metadatos por ejercicio: tipo, rango de reps propio, salto de kg, notas */
 function exMeta(key){
-  if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'', rest:null, muscle:null };
+  if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'', rest:null, muscle:null, equip:null, bar:null };
   return db.exmeta[key];
 }
 
@@ -580,7 +656,10 @@ function effRange(key){
 }
 function effStep(key, w){
   const st = parseFloat(exMeta(key).step);
-  return (!isNaN(st) && st > 0) ? st : roundStep(w);
+  if(!isNaN(st) && st > 0) return st;
+  /* en barra, el salto mínimo real es el par de discos más pequeño */
+  if(effEquip(key) === 'barra'){ const s = barMinStep(); if(s > 0) return s; }
+  return roundStep(w);
 }
 
 /* 1RM estimado — fórmula de Epley: peso × (1 + reps/30) */
@@ -629,6 +708,7 @@ function deloadSugg(key, sugg){
   }
   let w = roundToStep(sugg.w * 0.9, effStep(key, sugg.w));
   if(w <= 0) w = sugg.w;
+  w = fitWeight(key, w) || w;
   return { w, reps: lo, sets, type:'hold',
     msg:`Descarga: <b>${fmtW(w)} ${uLabel()} × ${lo}</b> en ${sets} serie${sets===1?'':'s'}`, why };
 }
@@ -654,6 +734,114 @@ function roundStep(wKg){
   return wKg >= 20 ? 2.5 : (wKg >= 10 ? 1 : 0.5);
 }
 function roundToStep(w, st){ st = st || roundStep(w); return Math.round(w/st)*st; }
+
+/* =====================================================================
+   CALCULADORA DE CARGA
+   Con el inventario del gimnasio se sabe qué pesos existen de verdad:
+   sirven para redondear las sugerencias y para dibujar la barra.
+   ===================================================================== */
+function effEquip(key){
+  const e = exMeta(key).equip;
+  return (e === 'barra' || e === 'mancuerna' || e === 'maquina' || e === 'otro') ? e : null;
+}
+/* un par de discos = un disco por lado */
+function availablePlates(){
+  return db.gym.plates
+    .filter(p => p.on && p.kg > 0 && p.pairs > 0)
+    .map(p => ({ kg:p.kg, n:p.pairs }))
+    .sort((a,b) => b.kg - a.kg);
+}
+function availableBars(){ return db.gym.bars.filter(b => b.on && b.kg > 0); }
+function availableDumbbells(){
+  return db.gym.dumbbells.filter(d => d.on && d.kg > 0).map(d => d.kg).sort((a,b) => a - b);
+}
+/* la barra del ejercicio: la que fijó el usuario, o la predeterminada */
+function barFor(key){
+  const bars = availableBars();
+  if(!bars.length) return null;
+  const id = exMeta(key).bar;
+  return (id && bars.find(b => b.id === id)) || bars.find(b => b.def) || bars[0];
+}
+/* el salto más pequeño que se puede armar: el par de discos menor */
+function barMinStep(){
+  const p = availablePlates();
+  return p.length ? p[p.length-1].kg * 2 : 0;
+}
+
+/* todas las sumas por lado que se pueden armar → la combinación con menos
+   discos de cada una. Con 7 tipos × 2 pares son ~2000 casos: se cachea. */
+let _plateIdx = null;
+function plateIndex(){
+  const plates = availablePlates();
+  const ck = JSON.stringify(plates);
+  if(_plateIdx && _plateIdx.ck === ck) return _plateIdx;
+  const map = new Map([[0, []]]);
+  for(const p of plates){
+    for(const [sum, list] of [...map]){
+      let s = sum, l = list;
+      for(let i = 1; i <= p.n; i++){
+        s = Math.round((s + p.kg) * 1000) / 1000;
+        l = l.concat(p.kg);
+        const prev = map.get(s);
+        if(!prev || prev.length > l.length) map.set(s, l);
+      }
+    }
+  }
+  _plateIdx = { ck, map, sums: [...map.keys()].sort((a,b) => a - b) };
+  return _plateIdx;
+}
+function invalidatePlates(){ _plateIdx = null; }
+
+/* el valor de `list` más cercano a w; en empate gana el mayor (sobrecarga) */
+function nearestIn(list, w){
+  if(!list.length) return null;
+  let best = list[0];
+  for(const v of list){
+    const d = Math.abs(v - w), bd = Math.abs(best - w);
+    if(d < bd - 1e-9 || (Math.abs(d - bd) < 1e-9 && v > best)) best = v;
+  }
+  return best;
+}
+function nearestDumbbell(w){ return nearestIn(availableDumbbells(), w); }
+
+/*  barLoad(key, pesoKg) → null si no hay barra, o
+    { bar, plates:[kg por lado], perSide, total, exact, target }          */
+function barLoad(key, targetKg){
+  const bar = barFor(key);
+  if(!bar) return null;
+  const idx = plateIndex();
+  if(!idx.sums.length) return null;
+  const want = (targetKg - bar.kg) / 2;
+  if(want < 0) return { bar, plates:[], perSide:0, total:bar.kg, exact:false, target:targetKg };
+  const side = nearestIn(idx.sums, want);
+  const total = Math.round((bar.kg + 2 * side) * 1000) / 1000;
+  return { bar, plates: idx.map.get(side) || [], perSide: side, total,
+           exact: Math.abs(total - targetKg) < 1e-9, target: targetKg };
+}
+
+/* redondea un peso al más cercano que se pueda armar con el equipo */
+function fitWeight(key, w){
+  const eq = effEquip(key);
+  if(eq === 'barra'){ const l = barLoad(key, w); return l ? l.total : w; }
+  if(eq === 'mancuerna'){ const d = nearestDumbbell(w); return d == null ? w : d; }
+  return w;
+}
+/* ajusta la sugerencia del coach a un peso real y lo explica */
+function fitSuggestion(key, sugg){
+  const meta = exMeta(key);
+  if(!sugg || meta.type !== 'normal' || !(sugg.w > 0)) return sugg;
+  const eq = effEquip(key);
+  if(eq !== 'barra' && eq !== 'mancuerna') return sugg;
+  const fitted = fitWeight(key, sugg.w);
+  if(!(fitted > 0) || Math.abs(fitted - sugg.w) < 1e-9) return sugg;
+  const before = `${fmtW(sugg.w)} ${uLabel()}`, after = `${fmtW(fitted)} ${uLabel()}`;
+  if(before !== after) sugg.msg = sugg.msg.replace(before, after);
+  sugg.why = `${eq === 'barra' ? 'Con tus discos' : 'Con tus mancuernas'}, ` +
+    `${fmtW(fitted)} ${uLabel()} es lo más cercano a ${fmtW(sugg.w)}. ` + sugg.why;
+  sugg.wanted = sugg.w;
+  sugg.w = fitted;
+  return sugg;
+}
 
 /*  computeSuggestion(key) → null (primera vez) o
     { w, reps, sets, type, msg, why }                                   */
@@ -820,6 +1008,7 @@ function computeSuggestion(key){
     }
   }
 
+  fitSuggestion(key, sugg);
   sugg.sets = nSets;
   if(p.stall >= 3 && nSets < MAX_SETS_SUGG && sugg.type !== 'up' && sugg.type !== 'deload'){
     sugg.sets = nSets + 1;
@@ -960,6 +1149,77 @@ function lastLineHTML(key, label){
   return `<div class="last">${label || 'Última'} · ${shown}${sets.length > 4 ? ' · …' : ''}</div>`;
 }
 
+/* =====================================================================
+   DIBUJO DEL EQUIPO
+   ===================================================================== */
+function plateColor(kg){
+  const table = PLATE_COLORS[db.settings.unit === 'lb' ? 'lb' : 'kg'];
+  const v = fromKg(kg);
+  for(const [w, c] of table) if(Math.abs(v - w) < 0.05) return c;
+  return v >= 15 ? '#7E828A' : '#5F6268';
+}
+function plateDims(kg){
+  for(const [w, d, t] of PLATE_DIMS) if(kg >= w - 0.01) return { d, t };
+  return { d:36, t:5 };
+}
+/* la barra de frente: los discos de un lado se espejan en el otro */
+function barbellSVG(perSide, opts){
+  opts = opts || {};
+  const scale = opts.scale || 1, h = opts.h || 116;
+  const W = 340, cx = W/2, cy = h/2, collar = 30 * scale;
+  let out = `<rect x="10" y="${cy - 2.5*scale}" width="${W-20}" height="${5*scale}" rx="${2.5*scale}" fill="#6E727A"/>`;
+  for(const dir of [-1, 1])
+    out += `<rect x="${cx + dir*collar - (dir < 0 ? 5*scale : 0)}" y="${cy - 9*scale}" width="${5*scale}" height="${18*scale}" rx="1.5" fill="#8B8F96"/>`;
+  for(const dir of [-1, 1]){
+    let x = cx + dir*(collar + 3*scale);
+    for(const kg of perSide){
+      const dm = plateDims(kg);
+      /* a escala pequeña un disco de 1,25 sería un pelo: se le da grosor mínimo visible */
+      const t = Math.max(dm.t*scale, 4), d = dm.d*scale;
+      const px = dir > 0 ? x : x - t;
+      out += `<rect x="${px.toFixed(1)}" y="${(cy - d/2).toFixed(1)}" width="${t.toFixed(1)}" height="${d.toFixed(1)}" rx="${(2.5*scale).toFixed(1)}" fill="${plateColor(kg)}" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`;
+      x += dir*(t + 2*scale);
+    }
+    const cl = dir > 0 ? x : x - 6*scale;
+    out += `<rect x="${cl.toFixed(1)}" y="${(cy - 11*scale).toFixed(1)}" width="${Math.max(6*scale, 4).toFixed(1)}" height="${(22*scale).toFixed(1)}" rx="2" fill="#3E4247"/>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:${h}px;display:block" aria-hidden="true">${out}</svg>`;
+}
+function dumbbellSVG(kg, opts){
+  const h = (opts && opts.h) || 76;
+  const W = 340, cx = W/2, cy = h/2;
+  const v = fromKg(kg);
+  const d = v >= 20 ? 56 : (v >= 12 ? 48 : 40), t = 16;
+  let out = `<rect x="${cx-46}" y="${cy-4}" width="92" height="8" rx="4" fill="#6E727A"/>`;
+  for(const dir of [-1, 1]){
+    out += `<rect x="${dir > 0 ? cx+40 : cx-40-t}" y="${cy-d/2}" width="${t}" height="${d}" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/>`;
+    out += `<rect x="${dir > 0 ? cx+40+t+2 : cx-42-t*2}" y="${cy-d/2-5}" width="${t}" height="${d+10}" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:${h}px;display:block" aria-hidden="true">${out}</svg>`;
+}
+/* «20 + 5 + 1,25 kg» */
+function sideTextHTML(perSide){
+  return perSide.length
+    ? perSide.map(k => `<b>${fmtW(k)}</b>`).join(' + ') + ' ' + uLabel()
+    : '<b>solo la barra</b>';
+}
+/* lista de discos por lado, con su punto de color */
+function plateListHTML(perSide){
+  const counts = [];
+  for(const kg of perSide){
+    const hit = counts.find(c => Math.abs(c.kg - kg) < 1e-9);
+    if(hit) hit.n++; else counts.push({ kg, n:1 });
+  }
+  return counts.map(c => `
+    <div class="line">
+      <div class="row grow" style="gap:13px">
+        <i class="plate-dot" style="background:${plateColor(c.kg)}"></i>
+        <div class="l-t">${fmtW(c.kg)} ${uLabel()}</div>
+      </div>
+      <div class="l-v">×${c.n} <span style="color:var(--dim)">por lado</span></div>
+    </div>`).join('');
+}
+
 /* veredicto del coach: punto de color + frase corta + el porqué */
 function verdictHTML(sugg, why){
   if(!sugg) return '';
@@ -976,6 +1236,7 @@ function render(){
   else if(view.name === 'routine')         m.innerHTML = viewRoutine();
   else if(view.name === 'exercise')        m.innerHTML = viewExercise();
   else if(view.name === 'history')         m.innerHTML = viewHistory();
+  else if(view.name === 'gym')             m.innerHTML = viewGym();
   else if(view.name === 'settings')        m.innerHTML = viewSettings();
   else                                     m.innerHTML = viewHome();
   afterRender();
@@ -988,6 +1249,7 @@ function renderTop(){
   if(view.name === 'session' && db.active){ t.className = 'app sticky'; t.innerHTML = sessionHeadHTML(); return; }
   if(view.name === 'routine'){ t.innerHTML = routineHeadHTML(); return; }
   if(view.name === 'exercise'){ t.innerHTML = exerciseHeadHTML(); return; }
+  if(view.name === 'gym'){ t.innerHTML = gymHeadHTML(); return; }
   const goal = db.settings.goal ? GOALS[db.settings.goal].label : null;
   const title = view.name === 'history' ? 'Historial' : (view.name === 'settings' ? 'Ajustes' : 'Rutinas');
   t.innerHTML = `
@@ -1009,7 +1271,7 @@ function renderTabs(){
       ${tab('routines','Rutinas', rutinasOn, "go({name:'home'})")}
       ${inSession ? tab('session','Sesión', view.name === 'session', "go({name:'session'})") : ''}
       ${tab('history','Historial', view.name === 'history', "go({name:'history'})")}
-      ${tab('settings','Ajustes', view.name === 'settings', "go({name:'settings'})")}
+      ${tab('settings','Ajustes', view.name === 'settings' || view.name === 'gym', "go({name:'settings'})")}
     </div>`;
 }
 
@@ -1388,6 +1650,24 @@ function viewExercise(){
         </div>
       </div>
       <div class="line">
+        <div><div class="l-t">Equipo</div><div class="l-d">Define si se calcula la carga</div></div>
+        <div class="l-v"><select class="inline" onchange="setExEquip('${key}',this.value)">
+          <option value="none" ${!meta.equip ? 'selected' : ''}>Sin especificar</option>
+          ${Object.entries(EQUIP_LABEL).map(([k, l]) =>
+            `<option value="${k}" ${meta.equip === k ? 'selected' : ''}>${l}</option>`).join('')}
+        </select></div>
+      </div>
+      ${ meta.equip === 'barra' ? (() => {
+        const bars = availableBars(), cur = barFor(key);
+        return `<div class="line">
+          <div><div class="l-t">Barra</div><div class="l-d">${cur ? `${esc(cur.name)} · ${fmtW(cur.kg)} ${uLabel()}` : 'Ninguna disponible'}</div></div>
+          <div class="l-v"><select class="inline" onchange="setExBarSel('${key}',this.value)">
+            <option value="auto" ${!meta.bar ? 'selected' : ''}>Predeterminada</option>
+            ${bars.map(b => `<option value="${b.id}" ${meta.bar === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
+          </select></div>
+        </div>`;
+      })() : '' }
+      <div class="line">
         <div class="l-t">Salto mínimo</div>
         <div class="l-v"><select class="inline" onchange="setExStep('${key}',this.value)">${stepOptionsHTML(meta.step)}</select></div>
       </div>
@@ -1418,7 +1698,9 @@ function viewExercise(){
       </div>
     </div>
     <div class="hint">El rango viene de tu objetivo (${g.lo}–${g.hi}); cámbialo solo para casos especiales
-      (ej. abdominales 15–25). El salto mínimo es el aumento más pequeño posible en tu gimnasio.
+      (ej. abdominales 15–25). ${ meta.equip === 'barra' && barMinStep() > 0
+        ? `Con equipo <b>Barra</b>, el salto automático es tu par de discos más pequeño (<b>${fmtW(barMinStep())} ${uLabel()}</b>) y las sugerencias se redondean a pesos que puedes armar.`
+        : 'El salto mínimo es el aumento más pequeño posible en tu gimnasio.' }
       Si marcas el peso máximo, al alcanzarlo el coach progresa por reps y series en vez de pedirte kilos imposibles.</div>
 
     <div class="sect">Notas</div>
@@ -1433,6 +1715,12 @@ function viewExercise(){
 }
 
 function setExType(key, t){ exMeta(key).type = t; save(); render(); }
+function setExEquip(key, v){
+  exMeta(key).equip = (v === 'none') ? null : v;
+  if(v !== 'barra') exMeta(key).bar = null;
+  save(); render();
+}
+function setExBarSel(key, v){ exMeta(key).bar = (v === 'auto') ? null : v; save(); render(); }
 function setExRange(key, which, val){
   const v = parseInt(val,10);
   exMeta(key)[which] = isNaN(v) ? null : v;
@@ -1526,6 +1814,125 @@ function saveExNotes(key){
   closeModal(); render();
 }
 
+/* peso objetivo de hoy: lo escrito en la serie 1, o lo que sugiere el coach */
+function targetWeight(ex){
+  const typed = parseFloat(ex.sets[0] && ex.sets[0].w);
+  if(!isNaN(typed) && typed > 0) return toKg(typed);
+  if(ex.sugg && ex.sugg.w > 0) return ex.sugg.w;
+  return NaN;
+}
+/* la tira de «cómo cargar» que se cuela bajo el veredicto */
+function loadStripHTML(xi){
+  const ex = db.active.exercises[xi];
+  const key = ex.key;
+  if(exMeta(key).type !== 'normal') return '';
+  const eq = effEquip(key);
+  const w = targetWeight(ex);
+  if(!(w > 0)) return '';
+
+  if(eq === 'barra'){
+    const l = barLoad(key, w);
+    if(!l) return '';
+    const note = l.exact ? '' :
+      `Con tus discos, ${fmtW(l.total)} ${uLabel()} es lo más cercano a ${fmtW(w)}.`;
+    return `
+    <button class="load" onclick="showLoad(${xi})">
+      <div class="load-row">
+        <span class="load-l">Cargar la barra</span>
+        <span class="load-v">${fmtW(l.total)} ${uLabel()} <span class="chev">›</span></span>
+      </div>
+      ${barbellSVG(l.plates, { h:86, scale:0.72 })}
+      <div class="load-row" style="margin-top:8px">
+        <span class="load-l">Por lado</span>
+        <span class="load-v">${sideTextHTML(l.plates)}</span>
+      </div>
+      ${note ? `<div class="why" style="padding-left:0;margin-top:9px">${note}</div>` : ''}
+    </button>`;
+  }
+  if(eq === 'mancuerna'){
+    const d = nearestDumbbell(w);
+    if(d == null) return '';
+    const note = Math.abs(d - w) < 1e-9 ? '' :
+      `Tu gimnasio no tiene ${fmtW(w)} ${uLabel()}: lo más cercano es ${fmtW(d)}.`;
+    return `
+    <button class="load" onclick="showLoad(${xi})">
+      <div class="load-row">
+        <span class="load-l">Mancuernas</span>
+        <span class="load-v">2 × ${fmtW(d)} ${uLabel()} <span class="chev">›</span></span>
+      </div>
+      ${dumbbellSVG(d)}
+      ${note ? `<div class="why" style="padding-left:0;margin-top:6px">${note}</div>` : ''}
+    </button>`;
+  }
+  return '';
+}
+
+/* el detalle: la barra en grande y la cuenta completa */
+function showLoad(xi){
+  const ex = db.active.exercises[xi];
+  const key = ex.key, eq = effEquip(key);
+  const w = targetWeight(ex);
+  if(!(w > 0)) return;
+
+  if(eq === 'mancuerna'){
+    const d = nearestDumbbell(w);
+    if(d == null) return;
+    openModal(`
+      <h2>${fmtW(d)} ${uLabel()} por mano</h2>
+      <p class="muted">${esc(exBaseName(ex.name))} · serie de trabajo</p>
+      ${dumbbellSVG(d, { h:96 })}
+      <div class="hint">Dos mancuernas de ${fmtW(d)} ${uLabel()} = ${fmtW(d*2)} ${uLabel()} en total.
+        ${Math.abs(d - w) < 1e-9 ? '' : `El salto exacto pedía ${fmtW(w)} ${uLabel()}, pero tu gimnasio no lo tiene.`}</div>
+      <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
+      <button class="btn ghost" onclick="closeModal(); go({name:'gym', kind:'dumbbells'})">Editar mancuernas</button>`);
+    return;
+  }
+
+  const l = barLoad(key, w);
+  if(!l) {
+    infoModal('Sin barras configuradas',
+      'Marca al menos una barra en Ajustes → Mi equipo para que pueda calcular la carga.');
+    return;
+  }
+  openModal(`
+    <h2>Cargar ${fmtW(l.total)} ${uLabel()}</h2>
+    <p class="muted">${esc(exBaseName(ex.name))} · serie de trabajo</p>
+    ${barbellSVG(l.plates, { h:126 })}
+    <div class="sect">Por lado</div>
+    <div class="list">${plateListHTML(l.plates) ||
+      `<div class="line"><div class="l-t">Sin discos</div><div class="l-v">solo la barra</div></div>`}</div>
+    <div class="hint">${esc(l.bar.name)} <b>${fmtW(l.bar.kg)}</b> + discos <b>${fmtW(2*l.perSide)}</b>
+      (${fmtW(l.perSide)} por lado) = <b>${fmtW(l.total)} ${uLabel()}</b>.
+      ${l.exact ? '' : `El objetivo era ${fmtW(l.target)} ${uLabel()}; esto es lo más cercano que puedes armar.`}</div>
+    <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
+    <button class="btn ghost" onclick="closeModal(); pickBar('${key}')">Cambiar de barra</button>`);
+}
+
+/* elegir barra para este ejercicio, desde la sesión o desde la ficha */
+function pickBar(key){
+  const bars = availableBars();
+  if(!bars.length){
+    infoModal('Sin barras configuradas',
+      'Marca al menos una barra en Ajustes → Mi equipo.');
+    return;
+  }
+  const cur = barFor(key);
+  openModal(`
+    <h2>¿Con qué barra?</h2>
+    <p class="muted">Solo para este ejercicio. Cambia la cuenta de los discos, no tu historial.</p>
+    <div class="stack">
+      ${bars.map(b => `
+        <button class="opt ${cur && cur.id === b.id ? 'on' : ''}" onclick="setExBar('${key}','${b.id}')">
+          <b>${esc(b.name)}</b><span>${fmtW(b.kg)} ${uLabel()}${b.def ? ' · predeterminada' : ''}</span>
+        </button>`).join('')}
+    </div>
+    <button class="btn ghost" style="margin-top:14px" onclick="closeModal()">Cancelar</button>`);
+}
+function setExBar(key, id){
+  exMeta(key).bar = id;
+  save(); closeModal(); render();
+}
+
 function sessionHeadHTML(){
   const s = db.active;
   const total = s.exercises.reduce((a, ex) => a + ex.sets.length, 0);
@@ -1601,6 +2008,7 @@ function viewSession(){
       ${lastLineHTML(ex.key)}
       ${ meta.notes ? `<div class="exnote">${esc(meta.notes)}</div>` : '' }
       ${ ex.sugg ? verdictHTML(ex.sugg, true) : `<div class="why" style="padding-left:0;margin-top:10px">${firstMsg}</div>` }
+      ${ loadStripHTML(xi) }
       <div class="grid-h">
         <span>${t === 'tiempo' ? '▶' : '#'}</span>
         <span>${(t === 'corporal' || t === 'tiempo') ? 'lastre' : (t === 'asistido' ? 'ayuda' : uLabel())}</span>
@@ -1854,6 +2262,225 @@ function saveEditedSession(){
   rebuildProgress(); render();
 }
 
+/* ---------- MI EQUIPO ---------- */
+const GYM_TITLE = { plates:'Discos', bars:'Barras', dumbbells:'Mancuernas' };
+function gymKind(){ return GYM_TITLE[view.kind] ? view.kind : 'plates'; }
+
+function gymHeadHTML(){
+  const kind = gymKind();
+  let meta = '';
+  if(kind === 'plates'){
+    const on = db.gym.plates.filter(p => p.on);
+    const pairs = on.reduce((a, p) => a + (p.pairs || 0), 0);
+    meta = `${on.length} tipo${on.length===1?'':'s'} · ${pairs} par${pairs===1?'':'es'} en total`;
+  } else if(kind === 'bars'){
+    const def = db.gym.bars.find(b => b.on && b.def) || availableBars()[0];
+    meta = `${availableBars().length} de ${db.gym.bars.length}${def ? ` · ${esc(def.name).toLowerCase()} por defecto` : ''}`;
+  } else {
+    const d = availableDumbbells();
+    meta = d.length ? `${d.length} pares · ${fmtW(d[0])} – ${fmtW(d[d.length-1])} ${uLabel()}` : 'Ninguna marcada';
+  }
+  return `
+    <button class="back" onclick="go({name:'settings'})">‹ Mi equipo</button>
+    <div class="head-row">
+      <div class="title sm">${GYM_TITLE[kind]}</div>
+      <div class="tools"><button aria-label="Agregar" onclick="promptGymItem('${kind}')">${svgIcon('plus')}</button></div>
+    </div>
+    <div class="meta">${meta}</div>
+    <div class="knurl"></div>`;
+}
+
+const checkHTML = on => `<span class="check${on ? ' on' : ''}">${svgIcon('check')}</span>`;
+const unitPillHTML = () => `
+  <div class="pill-sw">
+    <button class="${db.settings.unit==='kg'?'on':''}" onclick="askUnitSwitch('kg')">kg</button>
+    <button class="${db.settings.unit==='lb'?'on':''}" onclick="askUnitSwitch('lb')">lb</button>
+  </div>`;
+
+function viewGym(){
+  const kind = gymKind();
+
+  if(kind === 'plates'){
+    const rows = db.gym.plates
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => b.p.kg - a.p.kg)
+      .map(({ p, i }) => `
+      <div class="line">
+        <button class="row grow" style="gap:14px${p.on ? '' : ';opacity:.4'}" onclick="toggleGym('plates',${i})">
+          <i class="plate-dot" style="background:${plateColor(p.kg)}"></i>
+          <span>
+            <span class="l-t" style="display:block">${fmtW(p.kg)} ${uLabel()}</span>
+            <span class="l-d" style="display:block">${p.on ? `${p.pairs} par${p.pairs===1?'':'es'} · ${p.pairs*2} discos` : 'No lo tienes'}</span>
+          </span>
+        </button>
+        <div class="row" style="flex:none;gap:12px">
+          ${p.on ? `<span class="qty">
+            <button aria-label="Menos pares" onclick="setPairs(${i},-1)">−</button>
+            <span>${p.pairs}</span>
+            <button aria-label="Más pares" onclick="setPairs(${i},1)">+</button>
+          </span>` : ''}
+          <button aria-label="Usar este disco" onclick="toggleGym('plates',${i})">${checkHTML(p.on)}</button>
+          ${p.custom ? `<button class="xbtn" aria-label="Quitar" onclick="removeGym('plates',${i})">✕</button>` : ''}
+        </div>
+      </div>`).join('');
+    return `
+      <div class="row" style="justify-content:space-between;margin:18px 0 4px">
+        <div class="sect" style="margin:0">Pesos disponibles</div>
+        ${unitPillHTML()}
+      </div>
+      ${rows}
+      <div class="hint">Los pares importan: si solo tienes un par de 20, la app no te propondrá cargar dos
+        por lado. El <b>+</b> de arriba sirve para discos raros — fraccionales o viejos en libras.</div>
+      <div class="dock"><button class="btn" onclick="go({name:'settings'})">Listo</button></div>`;
+  }
+
+  if(kind === 'bars'){
+    const rows = db.gym.bars.map((b, i) => `
+      <div class="line">
+        <button class="grow" style="${b.on ? '' : 'opacity:.4'}" onclick="toggleGym('bars',${i})">
+          <span class="l-t" style="display:block">${esc(b.name)} ${b.on && b.def ? '<span class="pill hold">Por defecto</span>' : ''}</span>
+          <span class="l-d" style="display:block">${b.on ? (b.def ? 'Se usa cuando el ejercicio no dice otra cosa' : 'Disponible') : 'No la tienes'}</span>
+        </button>
+        <div class="row" style="flex:none;gap:12px">
+          ${b.on && !b.def ? `<button class="note-a" style="margin:0" onclick="setDefaultBar(${i})">Usar por defecto</button>` : ''}
+          <span class="l-v">${fmtW(b.kg)} ${uLabel()}</span>
+          <button aria-label="Tengo esta barra" onclick="toggleGym('bars',${i})">${checkHTML(b.on)}</button>
+          ${b.custom ? `<button class="xbtn" aria-label="Quitar" onclick="removeGym('bars',${i})">✕</button>` : ''}
+        </div>
+      </div>`).join('');
+    return `
+      <div class="sect">Tus barras</div>
+      ${rows}
+      <div class="hint">Cada barra pesa distinto y eso cambia toda la cuenta. La multipower va aparte porque
+        su barra guiada suele pesar otra cosa: si no sabes cuánto, déjala fuera.</div>
+      <div class="dock"><button class="btn" onclick="go({name:'settings'})">Listo</button></div>`;
+  }
+
+  const rows = db.gym.dumbbells
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => a.d.kg - b.d.kg)
+    .map(({ d, i }) => `
+    <div class="line">
+      <button class="grow" style="${d.on ? '' : 'opacity:.4'}" onclick="toggleGym('dumbbells',${i})">
+        <span class="l-t" style="display:block">${fmtW(d.kg)} ${uLabel()}</span>
+        <span class="l-d" style="display:block">${d.on ? '1 par' : 'No la tienes'}</span>
+      </button>
+      <div class="row" style="flex:none;gap:12px">
+        <button aria-label="Tengo esta mancuerna" onclick="toggleGym('dumbbells',${i})">${checkHTML(d.on)}</button>
+        ${d.custom ? `<button class="xbtn" aria-label="Quitar" onclick="removeGym('dumbbells',${i})">✕</button>` : ''}
+      </div>
+    </div>`).join('');
+  return `
+    <div class="sect">Rango rápido</div>
+    <div class="list">
+      <div class="line"><div class="l-t">Desde</div>
+        <div class="l-v"><input type="number" inputmode="decimal" step="any" min="0" id="dbFrom" value="1"> ${uLabel()}</div></div>
+      <div class="line"><div class="l-t">Hasta</div>
+        <div class="l-v"><input type="number" inputmode="decimal" step="any" min="0" id="dbTo" value="24"> ${uLabel()}</div></div>
+      <div class="line"><div class="l-t">Salto</div>
+        <div class="l-v"><input type="number" inputmode="decimal" step="any" min="0" id="dbStep" value="1"> ${uLabel()}</div></div>
+    </div>
+    <button class="btn quiet sm" style="margin-top:10px" onclick="applyDbRange()">Generar la lista</button>
+    <div class="hint">Rehace la lista de golpe. Después destilda las que falten en tu gimnasio —
+      casi ninguno tiene la serie completa.</div>
+
+    <div class="row" style="justify-content:space-between;margin:26px 0 4px">
+      <div class="sect" style="margin:0">Las que tienes</div>
+      ${unitPillHTML()}
+    </div>
+    ${rows}
+    <div class="dock"><button class="btn" onclick="go({name:'settings'})">Listo</button></div>`;
+}
+
+function toggleGym(kind, i){
+  const it = db.gym[kind][i];
+  if(!it) return;
+  it.on = !it.on;
+  if(kind === 'bars' && !it.on && it.def){
+    it.def = false;
+    const next = db.gym.bars.find(b => b.on);
+    if(next) next.def = true;
+  }
+  if(kind === 'plates') invalidatePlates();
+  save(); render();
+}
+function setPairs(i, delta){
+  const p = db.gym.plates[i];
+  if(!p) return;
+  p.pairs = Math.max(1, Math.min(20, (p.pairs || 1) + delta));
+  invalidatePlates(); save(); render();
+}
+function setDefaultBar(i){
+  db.gym.bars.forEach((b, j) => { b.def = (j === i); });
+  save(); render();
+}
+function removeGym(kind, i){
+  db.gym[kind].splice(i, 1);
+  if(kind === 'plates') invalidatePlates();
+  if(kind === 'bars' && !db.gym.bars.some(b => b.def)){
+    const next = db.gym.bars.find(b => b.on);
+    if(next) next.def = true;
+  }
+  save(); render();
+}
+function promptGymItem(kind){
+  const t = { plates:'disco', bars:'barra', dumbbells:'mancuerna' }[kind];
+  openModal(`
+    <h2>Agregar ${t}</h2>
+    <p class="muted">Para lo que se sale del catálogo estándar: discos fraccionales, una barra vieja,
+      mancuernas sueltas. El peso se escribe en ${uLabel()}.</p>
+    <form onsubmit="addGymItem(event,'${kind}')" class="stack" autocomplete="off">
+      ${kind === 'bars' ? `<div class="field"><span>Nombre</span>
+        <input type="text" id="gymName" placeholder="Ej. Barra de trap" autocomplete="off"></div>` : ''}
+      <div class="field"><span>Peso (${uLabel()})</span>
+        <input type="number" inputmode="decimal" step="any" min="0" id="gymW" placeholder="0"></div>
+      <button class="btn" type="submit">Agregar</button>
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+    </form>`);
+  setTimeout(() => document.getElementById(kind === 'bars' ? 'gymName' : 'gymW')?.focus(), 60);
+}
+function addGymItem(ev, kind){
+  ev.preventDefault();
+  const v = parseFloat(document.getElementById('gymW').value);
+  if(isNaN(v) || v <= 0) return;
+  const kg = Math.round(toKg(v) * 1000) / 1000;
+  if(db.gym[kind].some(x => Math.abs(x.kg - kg) < 1e-9)){
+    closeModal();
+    infoModal('Ya lo tienes', `${fmtW(kg)} ${uLabel()} ya está en la lista.`);
+    return;
+  }
+  if(kind === 'plates') db.gym.plates.push({ kg, pairs:1, on:true, custom:true });
+  else if(kind === 'bars'){
+    const nm = (document.getElementById('gymName').value || '').trim();
+    db.gym.bars.push({ id:uid(), name: nm || `Barra de ${fmtW(kg)} ${uLabel()}`, kg, on:true, def:false, custom:true });
+  }
+  else db.gym.dumbbells.push({ kg, on:true, custom:true });
+  if(kind === 'plates') invalidatePlates();
+  save(); closeModal(); render();
+}
+function applyDbRange(){
+  const from = parseFloat(document.getElementById('dbFrom').value);
+  const to   = parseFloat(document.getElementById('dbTo').value);
+  const step = parseFloat(document.getElementById('dbStep').value);
+  if(isNaN(from) || isNaN(to) || isNaN(step) || step <= 0 || to < from){
+    infoModal('Rango no válido', 'Revisa los tres números: el salto tiene que ser mayor que cero y el final no puede ser menor que el inicio.');
+    return;
+  }
+  if((to - from) / step > 200){
+    infoModal('Rango demasiado largo', 'Salen más de 200 mancuernas. Sube el salto o acorta el rango.');
+    return;
+  }
+  confirmModal('¿Rehacer la lista?',
+    `Se reemplazan las mancuernas actuales por el rango ${fmtNum(from)} – ${fmtNum(to)} ${uLabel()} de ${fmtNum(step)} en ${fmtNum(step)}. Las que destildaste se pierden.`,
+    'Generar', () => {
+      const out = [];
+      for(let v = from; v <= to + 1e-9; v += step)
+        out.push({ kg: Math.round(toKg(v) * 1000) / 1000, on:true });
+      db.gym.dumbbells = out;
+      save(); render();
+    }, true);
+}
+
 /* ---------- AJUSTES ---------- */
 function viewSettings(){
   const g = db.settings.goal;
@@ -1903,6 +2530,37 @@ function viewSettings(){
     </div>
     <div class="hint">Automático: Fuerza 3:00 · Hipertrofia 1:30 · Ambas 2:00.
       En iPhone las notificaciones requieren la app instalada en la pantalla de inicio (iOS 16.4+).</div>
+
+    <div class="sect">Mi equipo</div>
+    <div class="list">
+      <button class="line" onclick="go({name:'gym', kind:'plates'})">
+        <div><div class="l-t">Discos</div><div class="l-d">${(() => {
+          const on = db.gym.plates.filter(p => p.on);
+          const pairs = on.reduce((a, p) => a + (p.pairs || 0), 0);
+          return `${on.length} tipo${on.length===1?'':'s'} · ${pairs} par${pairs===1?'':'es'}`;
+        })()}</div></div>
+        <div class="l-v">${(() => {
+          const on = db.gym.plates.filter(p => p.on).map(p => p.kg).sort((a,b) => a-b);
+          return on.length ? `${fmtW(on[0])} – ${fmtW(on[on.length-1])} ${uLabel()}` : '—';
+        })()} <span class="chev">›</span></div>
+      </button>
+      <button class="line" onclick="go({name:'gym', kind:'bars'})">
+        <div><div class="l-t">Barras</div><div class="l-d">${(() => {
+          const def = db.gym.bars.find(b => b.on && b.def);
+          return def ? `${esc(def.name)} ${fmtW(def.kg)} ${uLabel()} por defecto` : 'Ninguna marcada';
+        })()}</div></div>
+        <div class="l-v">${availableBars().length} <span class="chev">›</span></div>
+      </button>
+      <button class="line" onclick="go({name:'gym', kind:'dumbbells'})">
+        <div><div class="l-t">Mancuernas</div><div class="l-d">${availableDumbbells().length} pares marcados</div></div>
+        <div class="l-v">${(() => {
+          const d = availableDumbbells();
+          return d.length ? `${fmtW(d[0])} – ${fmtW(d[d.length-1])} ${uLabel()}` : '—';
+        })()} <span class="chev">›</span></div>
+      </button>
+    </div>
+    <div class="hint">Con esto la app te dice qué discos poner en cada lado — en las series de trabajo y en
+      el calentamiento — y redondea las sugerencias a pesos que de verdad puedes armar.</div>
 
     <div class="sect">Guía rápida</div>
     <div class="list">
@@ -1990,6 +2648,7 @@ function addExercise(ev, rid){
   r.exercises.push({ id:uid(), name: known ? known.name : name, key });
   if(/assisted|asistid/i.test(name)) exMeta(key).type = 'asistido';
   if(!exMeta(key).muscle){ const g = guessMuscle(name); if(g) exMeta(key).muscle = g; }
+  if(!exMeta(key).equip){ const e = guessEquip(name); if(e) exMeta(key).equip = e; }
   save(); render();
   setTimeout(() => { const i = document.getElementById('newex'); if(i){ i.focus(); } }, 30);
 }
@@ -2053,6 +2712,7 @@ function acPick(rid, i){
   const r = db.routines.find(x => x.id === rid);
   if(!r || r.exercises.some(e => e.key === c.key)) return;
   r.exercises.push({ id:uid(), name: c.name, key: c.key });
+  if(!exMeta(c.key).equip){ const e = guessEquip(c.name); if(e) exMeta(c.key).equip = e; }
   save(); render();
   setTimeout(() => { const inp = document.getElementById('newex'); if(inp) inp.focus(); }, 30);
 }
@@ -2261,6 +2921,7 @@ function sessionAddExercise(ev){
   const finalName = known ? known.name : name;
   if(exMeta(key).type === 'normal' && /assisted|asistid/i.test(finalName)) exMeta(key).type = 'asistido';
   if(!exMeta(key).muscle){ const g = guessMuscle(finalName); if(g) exMeta(key).muscle = g; }
+  if(!exMeta(key).equip){ const e = guessEquip(finalName); if(e) exMeta(key).equip = e; }
   const sugg = computeSuggestion(key);
   const n = sugg ? sugg.sets : 1;
   db.active.exercises.push({ key, name: finalName, sugg,
@@ -2564,15 +3225,32 @@ function warmupPlan(xi){
   const scheme = heavy
     ? (first ? [[0.4,5],[0.6,3],[0.8,2]] : [[0.55,3],[0.8,2]])
     : (first ? [[0.5,6],[0.75,3]]        : [[0.7,4]]);
-  const rows = [], seen = new Set();
+  const rows = [], steps = [], seen = new Set();
   for(const [pct, reps] of scheme){
-    const wk = roundToStep(W * pct);
+    let wk = roundToStep(W * pct);
+    wk = fitWeight(ex.key, wk) || wk;   /* que el escalón se pueda armar de verdad */
     if(wk <= 0 || wk >= W || seen.has(wk)) continue;
     seen.add(wk);
     rows.push(`${fmtW(wk)} ${uLabel()} × ${reps}`);
+    steps.push({ w:wk, reps });
   }
-  return { rows, first, W, heavy,
+  return { rows, steps, first, W, heavy,
            note: rows.length ? null : 'El peso de trabajo es tan bajo que no salen escalones útiles: 1 serie suave alcanza.' };
+}
+
+/* un escalón del calentamiento con su barra dibujada */
+function warmStepHTML(key, label, value, w, work){
+  const l = barLoad(key, w);
+  const plates = l ? l.plates : [];
+  return `
+  <div class="warm${work ? ' work' : ''}">
+    <div class="load-row">
+      <span class="load-l"${work ? ' style="color:var(--up)"' : ''}>${label}</span>
+      <span class="load-v"><b${work ? ' style="color:var(--up)"' : ''}>${value}</b></span>
+    </div>
+    ${barbellSVG(plates, { h:62, scale:0.52 })}
+    <div class="load-row"><span class="load-l">Por lado</span><span class="load-v">${sideTextHTML(plates)}</span></div>
+  </div>`;
 }
 
 function showWarmup(xi){
@@ -2582,20 +3260,25 @@ function showWarmup(xi){
     infoModal('Calentamiento', 'Escribe primero el peso de hoy en la serie 1 (o entrena una vez este ejercicio) y te calculo la escalera de calentamiento.');
     return;
   }
-  const list = plan.rows.map((r, i) => `
-    <div class="exline">
-      <span class="tiny">Serie ${i+1}</span>
-      <span class="sets" style="font-size:13px;color:var(--bone)">${r}</span>
-    </div>`).join('')
-    + (plan.W && plan.rows.length ? `
-    <div class="exline">
-      <span class="tiny" style="color:var(--up)">Trabajo</span>
-      <span class="sets" style="font-size:13px;color:var(--up)">${fmtW(plan.W)} ${uLabel()}</span>
-    </div>` : '');
+  const drawn = effEquip(ex.key) === 'barra' && (plan.steps || []).length && plan.W > 0;
+  const list = drawn
+    ? plan.steps.map((st, i) => warmStepHTML(ex.key, `Serie ${i+1}`, `${fmtW(st.w)} ${uLabel()} × ${st.reps}`, st.w, false)).join('')
+      + warmStepHTML(ex.key, 'Trabajo', `${fmtW(plan.W)} ${uLabel()}`, plan.W, true)
+    : plan.rows.map((r, i) => `
+      <div class="exline">
+        <span class="tiny">Serie ${i+1}</span>
+        <span class="sets" style="font-size:13px;color:var(--bone)">${r}</span>
+      </div>`).join('')
+      + (plan.W && plan.rows.length ? `
+      <div class="exline">
+        <span class="tiny" style="color:var(--up)">Trabajo</span>
+        <span class="sets" style="font-size:13px;color:var(--up)">${fmtW(plan.W)} ${uLabel()}</span>
+      </div>` : '');
   openModal(`
     <h2>Calentamiento — ${esc(exBaseName(ex.name))}</h2>
     ${ plan.first ? '' : `<p class="muted" style="margin-bottom:10px">Este músculo ya viene caliente de un ejercicio anterior: con menos alcanza.</p>` }
-    ${ list ? `<div class="list" style="padding:4px 16px;margin-bottom:14px">${list}</div>` : '' }
+    ${ list ? (drawn ? `<div style="margin-bottom:14px">${list}</div>`
+                     : `<div class="list" style="padding:4px 16px;margin-bottom:14px">${list}</div>`) : '' }
     ${ plan.note ? `<p class="muted" style="margin-bottom:12px">${plan.note}</p>` : '' }
     <p class="tiny" style="line-height:1.6;margin-bottom:14px">
       Descansa solo 30–60 s entre series de calentamiento y mueve el peso con <b>intención de velocidad</b>
@@ -3161,12 +3844,16 @@ function migrateTypes(){
     if(t.assisted){ exMeta(k).type = 'asistido'; changed = true; }
     else if(t.zero){ exMeta(k).type = 'corporal'; changed = true; }
   }
-  /* grupos musculares: adivinar donde falte (el usuario puede corregir en la ficha) */
+  /* grupo muscular y equipo: adivinar donde falten (corregibles en la ficha) */
   for(const [key, info] of allExerciseNames()){
     const m = exMeta(key);
     if(m.muscle === undefined || m.muscle === null){
       const g = guessMuscle(info.name);
       if(g){ m.muscle = g; changed = true; }
+    }
+    if(m.equip === undefined || m.equip === null){
+      const e = guessEquip(info.name);
+      if(e){ m.equip = e; changed = true; }
     }
   }
   if(changed) save();

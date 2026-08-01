@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hierro — propuesta: calculadora de carga</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --void:#08080A;
+    --surface:#0E0F11;
+    --surface-2:#141619;
+    --well:#1B1E22;
+    --line:rgba(255,255,255,.07);
+    --line-2:rgba(255,255,255,.13);
+    --bone:#F3F1EC;
+    --ash:#9A9DA4;
+    --dim:#5F6268;
+    --up:#7FD3A8;
+    --hold:#D7A44B;
+    --danger:#E4685A;
+    --sans:'Archivo',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  .scr{
+    background:var(--void);color:var(--bone);
+    font-family:var(--sans);font-synthesis:none;
+    font-size:15px;line-height:1.5;
+    overscroll-behavior-y:contain;
+  }
+  .appbox{
+    max-width:none;margin:0;min-height:100%;
+    display:flex;flex-direction:column;
+    padding-bottom:calc(78px + env(safe-area-inset-bottom));
+  }
+  .appbox main{flex:1;padding:0 20px 32px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .num{font-variant-numeric:tabular-nums}
+  .grow{flex:1;min-width:0}
+  .row{display:flex;align-items:center;gap:10px}
+  .stack{display:flex;flex-direction:column;gap:10px}
+
+  /* ---------- moleteado (textura de barra) ---------- */
+  .knurl{
+    height:7px;flex:none;
+    background-image:
+      repeating-linear-gradient(45deg,var(--line-2) 0 1px,transparent 1px 5px),
+      repeating-linear-gradient(-45deg,var(--line-2) 0 1px,transparent 1px 5px);
+    opacity:.85;
+  }
+
+  /* ---------- cabecera ---------- */
+  header.app{
+    padding:calc(14px + env(safe-area-inset-top, 0px)) 20px 0;
+    flex:none;
+  }
+  header.app.sticky{position:sticky;top:0;z-index:30;background:var(--void)}
+  .head-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .mark{
+    font-size:10px;letter-spacing:.3em;font-weight:700;font-stretch:75%;
+    text-transform:uppercase;color:var(--dim);
+  }
+  .goal{
+    font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ash);border:1px solid var(--line);border-radius:999px;padding:5px 10px;white-space:nowrap;
+  }
+  .title{font-size:32px;font-weight:700;font-stretch:115%;letter-spacing:-.035em;line-height:1;margin:10px 0 12px}
+  .title.sm{font-size:25px;margin:0}
+  .title.big{font-size:27px;margin:12px 0 2px}
+  .title-sub{font-size:22px;font-weight:500;font-stretch:110%;letter-spacing:-.03em;color:var(--dim);line-height:1.1;margin-bottom:12px}
+  .back{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);display:flex;align-items:center;gap:7px;padding:2px 0 6px;
+  }
+  .meta{font-family:var(--mono);font-size:11px;color:var(--dim);margin:9px 0 12px}
+  .tools{display:flex;gap:16px;color:var(--dim);flex:none}
+  .tools button{display:flex;align-items:center;color:inherit}
+  .tools svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---------- tipografía utilitaria ---------- */
+  .sect{
+    font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+    font-weight:600;font-stretch:80%;margin:26px 0 11px;
+  }
+  .sect:first-child{margin-top:18px}
+  .hint{font-size:11.5px;line-height:1.55;color:var(--dim);margin-top:9px}
+  .hint b{color:var(--ash);font-weight:500}
+  .muted{color:var(--ash);font-size:13.5px;line-height:1.55}
+  .tiny{font-size:11.5px;color:var(--dim);line-height:1.5}
+  .linkish{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+
+  /* ---------- botones ---------- */
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+  .clickable:focus-visible, summary:focus-visible{
+    outline:2px solid var(--hold);outline-offset:2px;border-radius:8px;
+  }
+  .btn{
+    display:block;width:100%;text-align:center;border-radius:13px;padding:17px;
+    font-size:14.5px;font-weight:600;letter-spacing:-.01em;
+    background:var(--bone);color:#0B0B0D;border:1px solid var(--bone);
+    transition:transform .06s ease;
+  }
+  .btn:active{transform:scale(.985)}
+  .btn.ghost{background:transparent;border-color:var(--line-2);color:var(--bone);font-weight:500}
+  .btn.quiet{background:var(--surface);border-color:var(--line);color:var(--bone);font-weight:500}
+  .btn.danger{background:transparent;border-color:rgba(228,104,90,.32);color:var(--danger);font-weight:500}
+  .btn.sm{padding:12px;font-size:13.5px;border-radius:11px}
+  .deload{
+    display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;width:100%;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  }
+  .deload svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .dock{
+    position:sticky;bottom:calc(62px + env(safe-area-inset-bottom));z-index:20;
+    margin:18px -20px 0;padding:16px 20px 10px;
+    background:linear-gradient(transparent,var(--void) 26%);
+  }
+  .chev{color:var(--dim);font-size:15px;flex:none;line-height:1}
+  .xbtn{
+    color:var(--dim);font-size:13px;flex:none;line-height:1;padding:4px 2px;
+  }
+  .xbtn:hover{color:var(--danger)}
+
+  /* ---------- inputs ---------- */
+  input[type=text], input[type=number], select, textarea{
+    background:var(--well);border:1px solid transparent;border-radius:10px;
+    color:var(--bone);padding:12px;font:inherit;width:100%;
+  }
+  input[type=number]{font-family:var(--mono);text-align:center;font-variant-numeric:tabular-nums}
+  input::placeholder, textarea::placeholder{color:var(--dim)}
+  input.sugg::placeholder{color:#7a6635}
+  textarea{resize:vertical;min-height:70px;font-size:14px;line-height:1.55}
+  select{
+    -webkit-appearance:none;appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+    background-position:calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+    background-size:5px 5px, 5px 5px;background-repeat:no-repeat;padding-right:30px;
+  }
+  select.inline{
+    background-color:transparent;border-color:transparent;width:auto;flex:none;
+    font-family:var(--mono);font-size:13px;color:var(--ash);padding:6px 26px 6px 8px;text-align:right;
+  }
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field > span{font-size:10px;font-weight:600;font-stretch:80%;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .field > span.plain{text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px;line-height:1.5}
+
+  /* ---------- resumen de la semana ---------- */
+  .strip{display:flex;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .strip div{flex:1;padding:16px 4px 14px;text-align:center;border-right:1px solid var(--line)}
+  .strip div:last-child{border-right:0}
+  .strip .n{font-family:var(--mono);font-size:20px;font-weight:500;letter-spacing:-.02em}
+  .strip .n i{font-style:normal;font-size:12px;color:var(--dim)}
+  .strip .l{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:7px}
+
+  /* ---------- filas simples ---------- */
+  .rowitem{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:17px 0;border-bottom:1px solid var(--line);width:100%;
+  }
+  .row-name{font-size:16px;font-weight:600;letter-spacing:-.015em}
+  .row-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px}
+
+  /* ---------- tarjeta de ejercicio ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:15px 16px;margin-bottom:10px;width:100%}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .ex-title{font-size:15px;font-weight:600;letter-spacing:-.015em;line-height:1.25}
+  .ex-title em{font-style:normal;color:var(--dim);font-weight:400}
+  .last{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:6px}
+  .last b{color:var(--ash);font-weight:400}
+  .exnote{font-size:11.5px;color:var(--dim);margin-top:7px;line-height:1.5}
+
+  .verdict{display:flex;align-items:baseline;gap:9px;margin-top:11px}
+  .dot{width:5px;height:5px;border-radius:50%;flex:none;transform:translateY(-2px)}
+  .dot.up{background:var(--up)}
+  .dot.hold{background:var(--hold)}
+  .v-text{font-size:13px;letter-spacing:-.005em;line-height:1.45}
+  .v-text b{font-family:var(--mono);font-weight:500}
+  .v-text.up b{color:var(--up)}
+  .v-text.hold b{color:var(--hold)}
+  .why{font-size:11.5px;line-height:1.5;color:var(--dim);margin-top:6px;padding-left:14px}
+
+  .steps{display:flex;align-items:center;gap:12px;margin-top:13px}
+  .bars{display:flex;gap:5px;flex:1}
+  .bars i{flex:1;height:3px;border-radius:2px;background:var(--well)}
+  .bars i.up{background:var(--up)}
+  .bars i.hold{background:var(--hold)}
+  .steps-v{font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
+  .steps-v b{color:var(--ash);font-weight:400}
+
+  /* ---------- avisos del coach ---------- */
+  .note{border-left:1px solid var(--hold);padding:2px 0 2px 14px;margin:18px 0}
+  .note.up{border-left-color:var(--up)}
+  .note.bad{border-left-color:var(--danger)}
+  .note-t{font-size:12.5px;color:var(--hold);line-height:1.45}
+  .note.up .note-t{color:var(--up)}
+  .note.bad .note-t{color:var(--danger)}
+  .note-d{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .note-a{
+    margin-top:9px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim);text-decoration:underline;text-underline-offset:3px;
+  }
+
+  /* ---------- pestañas inferiores ---------- */
+  nav.tabs{
+    position:fixed;bottom:0;left:0;right:0;z-index:40;
+    background:rgba(8,8,10,.94);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav.tabs .inner{max-width:none;margin:0 auto;display:flex;padding:12px 0 10px}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--dim)}
+  .tab.on{color:var(--bone)}
+  .tab span{font-size:9px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-stretch:80%}
+  .tab svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---------- sesión en curso ---------- */
+  .sess-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .clock{font-family:var(--mono);font-size:36px;font-weight:400;letter-spacing:-.05em;line-height:1}
+  .sess-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-top:9px}
+  .sess-actions{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex:none}
+  .end{
+    border:1px solid rgba(228,104,90,.32);color:var(--danger);border-radius:999px;padding:9px 16px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  }
+  .unitbtn{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    border:1px solid var(--line);border-radius:999px;padding:6px 12px;
+  }
+  .rest{margin:16px 0 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px 15px;width:100%}
+  .rest-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .rest-l{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  .rest-t{font-family:var(--mono);font-size:17px;color:var(--bone)}
+  .rest-track{height:2px;background:var(--well);border-radius:2px;margin-top:13px;overflow:hidden}
+  .rest-fill{height:100%;width:0%;background:var(--bone);border-radius:2px;transition:width .9s linear}
+  .rest.on .rest-t{color:var(--hold)}
+  .rest.on .rest-fill{background:var(--hold)}
+  .rest.done{border-color:rgba(127,211,168,.35)}
+  .rest.done .rest-t,.rest.done .rest-l{color:var(--up)}
+  .rest.done .rest-fill{background:var(--up)}
+
+  .ex-open{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-bottom:10px}
+  .ex-done,.ex-next{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:10px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+  }
+  .ex-done .ex-title{font-size:14px;color:var(--ash);font-weight:500}
+  .ex-next .ex-title{font-size:14px;font-weight:500}
+  .mini-check{width:20px;height:20px;border-radius:6px;background:var(--up);display:flex;align-items:center;justify-content:center;flex:none}
+  .mini-check svg{width:12px;height:12px;stroke:#0B0B0D;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+  .grid-h,.set{display:grid;grid-template-columns:14px 1fr 1fr .8fr 42px 20px;gap:6px;align-items:center}
+  .grid-h{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);margin:16px 0 9px;
+  }
+  .grid-h span:nth-child(2),.grid-h span:nth-child(3),.grid-h span:nth-child(4){text-align:center}
+  .set{margin-bottom:8px}
+  .set .i{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center}
+  .set .i.play{color:var(--hold);font-size:13px;padding:0;text-align:center}
+  .cell{
+    background:var(--well);border-radius:10px;padding:12px 2px;text-align:center;
+    font-family:var(--mono);font-size:15px;border:1px solid transparent;color:var(--bone);
+  }
+  .cell::placeholder{color:var(--dim)}
+  .set.now .cell{border-color:var(--line-2);background:var(--surface-2)}
+  .set.done .cell{background:transparent;border-color:transparent;color:var(--ash)}
+  .ck{
+    height:42px;width:100%;border-radius:10px;border:1px solid var(--line-2);
+    display:flex;align-items:center;justify-content:center;color:var(--dim);
+  }
+  .ck svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .ck.on{background:var(--up);border-color:var(--up);color:#0B0B0D}
+  .ex-actions{
+    display:flex;gap:18px;border-top:1px solid var(--line);margin-top:14px;padding-top:14px;
+    font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    flex-wrap:wrap;
+  }
+  .ex-actions button{color:inherit}
+  .vschip{font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:center;margin-top:10px}
+  .addex{
+    width:100%;border:1px dashed var(--line-2);border-radius:14px;padding:15px;text-align:center;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  }
+
+  /* ---------- objetivo / opciones tipo tarjeta ---------- */
+  .goals{display:flex;gap:8px}
+  .goal-c{flex:1;border:1px solid var(--line);border-radius:13px;padding:13px 12px;background:transparent}
+  .goal-c.on{border-color:rgba(215,164,75,.45);background:rgba(215,164,75,.06)}
+  .goal-c .g-t{font-size:14px;font-weight:600;letter-spacing:-.015em}
+  .goal-c.on .g-t{color:var(--hold)}
+  .goal-c .g-d{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px}
+
+  /* ---------- filas de ajuste ---------- */
+  .line{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 0;border-bottom:1px solid var(--line);width:100%}
+  .line:last-child{border-bottom:0}
+  .l-t{font-size:14.5px;font-weight:500;letter-spacing:-.01em}
+  .l-d{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .l-v{font-family:var(--mono);font-size:13px;color:var(--ash);display:flex;align-items:center;gap:8px;flex:none}
+  .l-v svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .l-v.dim{color:var(--dim)}
+  .list{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0 16px}
+  .list .line{padding:15px 0}
+  .pill-sw{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;flex:none}
+  .pill-sw button{font-family:var(--mono);font-size:12px;padding:8px 16px;border-radius:8px;color:var(--dim)}
+  .pill-sw button.on{background:var(--well);color:var(--bone);box-shadow:inset 0 0 0 1px var(--line-2)}
+  .tog{width:44px;height:26px;border-radius:999px;background:var(--well);position:relative;flex:none}
+  .tog i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--dim);transition:left .16s ease}
+  .tog.on{background:var(--hold)}
+  .tog.on i{left:21px;background:#0B0B0D}
+  .seg4{display:flex;background:var(--surface-2);border-radius:12px;padding:4px;gap:2px}
+  .seg4 button{flex:1;text-align:center;font-size:12.5px;padding:11px 2px;border-radius:9px;color:var(--dim)}
+  .seg4 button.on{background:var(--well);color:var(--bone);font-weight:600;box-shadow:inset 0 0 0 1px var(--line-2)}
+
+  /* ---------- ficha de ejercicio ---------- */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 16px 14px}
+  .pr{display:flex;align-items:flex-end;gap:9px}
+  .pr .n{font-family:var(--mono);font-size:46px;font-weight:400;letter-spacing:-.05em;line-height:.9}
+  .pr .u{font-family:var(--mono);font-size:13px;color:var(--dim);padding-bottom:5px}
+  .pr-d{font-size:12px;color:var(--ash);margin-top:11px;line-height:1.5}
+  .pr-d b{font-family:var(--mono);font-weight:400;color:var(--bone)}
+  .chart{margin-top:18px}
+  .chart canvas{display:block;width:100%;touch-action:pan-y}
+  .axis{
+    display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:14px;
+  }
+
+  /* ---------- volumen semanal ---------- */
+  .vol{display:flex;align-items:center;gap:12px;padding:10px 0}
+  .vol-n{width:66px;font-size:13px;color:var(--ash);flex:none}
+  .vol-track{flex:1;height:3px;background:var(--well);border-radius:2px;overflow:hidden}
+  .vol-fill{height:100%;background:var(--dim);border-radius:2px}
+  .vol-fill.ok{background:var(--up)}
+  .vol-fill.hi{background:var(--hold)}
+  .vol-v{width:62px;text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--dim);flex:none}
+  .vol-v b{color:var(--bone);font-weight:500}
+
+  /* ---------- historial ---------- */
+  details.hist{border-bottom:1px solid var(--line)}
+  details.hist summary{list-style:none;cursor:pointer}
+  details.hist summary::-webkit-details-marker{display:none}
+  .log{padding:16px 0;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .log-n{font-size:15px;font-weight:500;letter-spacing:-.01em}
+  .log-m{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px}
+  .log-v{font-family:var(--mono);font-size:13px;color:var(--ash);white-space:nowrap;flex:none}
+  .log-v i{font-style:normal;color:var(--dim);font-size:10px}
+  details.hist .body{padding:0 0 16px;font-size:13.5px}
+  .exline{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .exline:last-of-type{border-bottom:none}
+  .exline .sets{color:var(--dim);font-family:var(--mono);font-size:11px;text-align:right;flex:none}
+  .exline em{font-style:normal;color:var(--dim)}
+
+  /* ---------- autocompletado ---------- */
+  .acwrap{position:relative;flex:1;min-width:0}
+  .aclist{
+    position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:45;
+    background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;
+    overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.6);
+  }
+  .aclist button{
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    width:100%;text-align:left;padding:12px 14px;font-size:14px;
+    border-bottom:1px solid var(--line);
+  }
+  .aclist button:last-child{border-bottom:none}
+  .aclist button:hover, .aclist button:focus-visible{background:var(--well)}
+  .aclist b{color:var(--hold);font-weight:600}
+  .aclist .from{color:var(--dim);font-family:var(--mono);font-size:10px;white-space:nowrap;flex:none}
+
+  /* ---------- modal ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:50;background:rgba(4,4,6,.78);
+    display:flex;align-items:flex-end;justify-content:center;
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  }
+  @media(min-width:480px){ .overlay{align-items:center} }
+  .modal{
+    background:var(--surface);border:1px solid var(--line-2);
+    border-radius:20px 20px 0 0;width:100%;max-width:460px;
+    max-height:88dvh;overflow-y:auto;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+  @media(min-width:480px){ .modal{border-radius:20px;padding-bottom:24px} }
+  .modal h2{font-size:21px;font-weight:700;font-stretch:112%;letter-spacing:-.028em;line-height:1.1;margin-bottom:9px}
+  .modal .muted{margin-bottom:18px}
+  .modal .btn + .btn{margin-top:9px}
+  .modal .sect:first-child{margin-top:0}
+
+  /* ---------- estado vacío ---------- */
+  .empty{text-align:center;padding:56px 16px 44px}
+  .empty .big{
+    font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:14px;
+  }
+  .empty p{font-size:15px;font-weight:600;letter-spacing:-.015em}
+  .empty .muted{margin-top:8px;font-size:12.5px;color:var(--dim)}
+
+  .pill{
+    display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.12em;
+    text-transform:uppercase;border:1px solid var(--line);border-radius:999px;
+    padding:3px 8px;color:var(--dim);white-space:nowrap;
+  }
+  .pill.hold{color:var(--hold);border-color:rgba(215,164,75,.35)}
+
+  /* ---------- opción de tarjeta ancha (modales) ---------- */
+  .opt{
+    display:flex;flex-direction:column;gap:4px;text-align:left;width:100%;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:14px 15px;
+  }
+  .opt.on{border-color:rgba(215,164,75,.45);background:rgba(215,164,75,.06)}
+  .opt b{font-size:14.5px;font-weight:600;letter-spacing:-.015em}
+  .opt.on b{color:var(--hold)}
+  .opt span{font-size:12px;color:var(--dim);line-height:1.5}
+  h1,h2{font-size:21px;font-weight:700;font-stretch:112%;letter-spacing:-.028em;line-height:1.15}
+  .l-v input{width:52px;padding:8px 4px;font-size:13px;background:var(--well)}
+  .why b{color:var(--ash);font-weight:500}
+  .note-d b{color:var(--ash);font-weight:500}
+  .modal p{font-size:13.5px;line-height:1.6;color:var(--ash)}
+  .modal p b{color:var(--bone);font-weight:600}
+  .modal .tiny{color:var(--dim);font-size:11.5px}
+  .modal textarea{margin-top:4px}
+  .modal .stack{gap:9px}
+
+
+  html,body{height:auto}
+  body{
+    background:var(--void);color:var(--bone);font-family:var(--sans);font-synthesis:none;
+    margin:0;padding:56px 24px 96px;
+  }
+  .brief{max-width:1240px;margin:0 auto 56px}
+  .brief .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);font-weight:600;font-stretch:80%}
+  .brief h1{font-size:clamp(38px,7vw,68px);line-height:.94;letter-spacing:-.03em;font-weight:700;font-stretch:118%;margin:14px 0 18px}
+  .brief h1 em{font-style:normal;color:var(--dim)}
+  .brief p{max-width:62ch;color:var(--ash);font-size:14.5px;line-height:1.6}
+  .brief p + p{margin-top:12px}
+  .brief code{font-family:var(--mono);font-size:13px;color:var(--bone)}
+  .tokens{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .token{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 8px;border:1px solid var(--line);border-radius:999px;font-family:var(--mono);font-size:11px;color:var(--ash)}
+  .token i{width:13px;height:13px;border-radius:3px;display:block}
+
+  .chapter{max-width:1240px;margin:0 auto 34px;padding-top:26px;border-top:1px solid var(--line)}
+  .chapter .k{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+  .chapter h2{font-size:30px;font-weight:700;font-stretch:112%;letter-spacing:-.03em;margin:10px 0 12px}
+  .chapter p{max-width:62ch;color:var(--ash);font-size:14px;line-height:1.6}
+
+  .deck{max-width:1240px;margin:0 auto 76px;display:grid;align-items:start;grid-template-columns:repeat(auto-fit,minmax(320px,390px));gap:64px 48px;justify-content:center}
+  figure{margin:0}
+  figcaption{margin-top:22px;max-width:390px}
+  .cap-n{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.08em}
+  .cap-t{font-size:16px;font-weight:600;letter-spacing:-.01em;margin:6px 0 7px}
+  .cap-d{font-size:13px;line-height:1.55;color:var(--ash)}
+
+  .phone{
+    width:390px;height:844px;border-radius:46px;overflow:hidden;background:var(--void);
+    border:1px solid var(--line-2);position:relative;display:flex;flex-direction:column;
+    box-shadow:0 40px 80px -40px #000;transform:translateZ(0);
+  }
+  .phone.grow{height:auto;min-height:844px}
+  .phone.grow .scr{overflow:visible}
+  .phone.grow .appbox{height:auto}
+  .status{height:48px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 30px 6px;font-family:var(--mono);font-size:12px;position:relative;z-index:60}
+  .status .sig{display:flex;gap:3px;align-items:flex-end}
+  .status .sig b{display:block;width:3px;background:var(--bone);border-radius:1px}
+  .scr{flex:1;min-height:0;overflow:hidden;position:relative;padding:0}
+  .appbox{height:100%;overflow:hidden}
+  .phone header.app{padding-top:6px}
+  .phone .dock{position:static;margin-top:18px}
+
+  @media(max-width:900px){
+    body{padding:36px 16px 72px}
+    .deck{gap:52px 0}
+    .phone{width:100%;max-width:390px}
+    .phone:not(.grow){height:auto;aspect-ratio:390/844}
+  }
+
+  .plate-dot{width:15px;height:15px;border-radius:50%;flex:none}
+  .check{width:23px;height:23px;border-radius:7px;border:1px solid var(--line-2);display:flex;
+    align-items:center;justify-content:center;color:transparent;flex:none}
+  .check.on{background:var(--bone);border-color:var(--bone);color:#0B0B0D}
+  .check svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .qty{display:flex;align-items:center;background:var(--surface-2);border-radius:9px;padding:2px;flex:none}
+  .qty button{width:30px;height:28px;display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-family:var(--mono);font-size:15px}
+  .qty > span{min-width:22px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--bone)}
+
+  .load{display:block;width:100%;text-align:left;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+  .load-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .load-l{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .load-v{font-family:var(--mono);font-size:12.5px;color:var(--ash);display:flex;align-items:center;gap:6px}
+  .load-v b{color:var(--bone);font-weight:500}
+  .load svg{margin:4px 0}
+
+  .warm{border-top:1px solid var(--line);padding:14px 0 4px}
+  .warm.work{border-top-color:rgba(127,211,168,.3)}
+  .modal .warm:first-of-type{border-top:0;padding-top:4px}
+
+  .cell.ph{color:var(--dim)}
+  .set.done .cell{color:var(--ash)}
+  .modal .sect:first-of-type{margin-top:22px}
+</style>
+</head>
+<body>
+
+<header class="brief">
+  <div class="eyebrow">Propuesta · calculadora de carga · 10 pantallas</div>
+  <h1>Cómo cargar<br><em>la barra</em></h1>
+  <p>Dos piezas encadenadas. Primero <b>Mi equipo</b>: qué discos, barras y mancuernas hay en tu gimnasio,
+  con la misma lógica de inventario que viste en las capturas. Después la <b>calculadora</b>: en cuanto un
+  ejercicio usa barra, la app dibuja cómo cargarla — en las series de trabajo y en cada escalón del
+  calentamiento.</p>
+  <p>Los discos llevan el color del código internacional porque así los reconoces en el rack, no por
+  decorar. Todo lo demás es el mismo lenguaje que ya tiene la app: mono para los datos, punto de color
+  para el veredicto, línea de un pixel para separar.</p>
+  <div class="tokens">
+    <div class="token"><i style="background:#C0473E"></i>25 kg</div>
+    <div class="token"><i style="background:#3C6FA8"></i>20 kg</div>
+    <div class="token"><i style="background:#C2963A"></i>15 kg</div>
+    <div class="token"><i style="background:#4C9970"></i>10 kg</div>
+    <div class="token"><i style="background:#CFCCC4"></i>5 kg</div>
+    <div class="token"><i style="background:#8B8F96"></i>2,5 kg</div>
+    <div class="token"><i style="background:#6C7076"></i>1,25 kg</div>
+  </div>
+</header>
+
+<div class="chapter">
+  <div class="k">01</div>
+  <h2>Mi equipo</h2>
+  <p>Se configura una vez y vive en Ajustes. Es la parte que copiamos de tus capturas: lista con casilla,
+  cantidad y conmutador kg/lb, más un <b>+</b> para lo que se salga del catálogo.</p>
+</div>
+<div class="deck">
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <div class="head-row"><div class="mark">Hierro</div><div class="goal">Hipertrofia</div></div>
+  <div class="title">Ajustes</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="sect">Mi equipo</div>
+    <div class="list">
+      <button class="line">
+        <div><div class="l-t">Discos</div><div class="l-d">7 tipos · 2 pares de cada uno</div></div>
+        <div class="l-v">1,25 – 25 kg <span class="chev">›</span></div>
+      </button>
+      <button class="line">
+        <div><div class="l-t">Barras</div><div class="l-d">Olímpica 20 kg por defecto</div></div>
+        <div class="l-v">3 <span class="chev">›</span></div>
+      </button>
+      <button class="line">
+        <div><div class="l-t">Mancuernas</div><div class="l-d">De 1 en 1 hasta 24, luego de 2 en 2</div></div>
+        <div class="l-v">1 – 40 kg <span class="chev">›</span></div>
+      </button>
+    </div>
+    <div class="hint">Con esto la app te dice exactamente qué discos poner en cada lado, tanto en las series
+      de trabajo como en el calentamiento — y redondea las sugerencias a pesos que de verdad puedes armar.</div>
+
+    <div class="sect">Objetivo</div>
+    <div class="goals">
+      <button class="goal-c on"><div class="g-t">Hipertrofia</div><div class="g-d">8–12 reps</div></button>
+      <button class="goal-c"><div class="g-t">Fuerza</div><div class="g-d">4–6 reps</div></button>
+      <button class="goal-c"><div class="g-t">Ambas</div><div class="g-d">6–10 reps</div></button>
+    </div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P01</div>
+    <div class="cap-t">Ajustes · Mi equipo</div>
+    <div class="cap-d">Una sección nueva en Ajustes. Es lo único que hay que configurar una vez: qué discos, qué barras y qué mancuernas hay en tu gimnasio. Sin esto la app no puede decirte cómo cargar nada.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Mi equipo</button>
+  <div class="head-row"><div class="title sm">Discos</div><div class="tools"><button aria-label="Agregar disco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+  <div class="meta">7 tipos · 14 pares en total</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="row" style="justify-content:space-between;margin:18px 0 4px">
+      <div class="sect" style="margin:0">Pesos disponibles</div>
+      <div class="pill-sw"><button class="on">kg</button><button>lb</button></div>
+    </div>
+    
+      <div class="line">
+        <div class="row grow" style="gap:14px;">
+          <i class="plate-dot" style="background:#C0473E"></i>
+          <div>
+            <div class="l-t">25 kg</div>
+            <div class="l-d">2 pares · 4 discos</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="qty"><button>−</button><span>2</span><button>+</button></span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="row grow" style="gap:14px;">
+          <i class="plate-dot" style="background:#3C6FA8"></i>
+          <div>
+            <div class="l-t">20 kg</div>
+            <div class="l-d">2 pares · 4 discos</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="qty"><button>−</button><span>2</span><button>+</button></span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="row grow" style="gap:14px;">
+          <i class="plate-dot" style="background:#C2963A"></i>
+          <div>
+            <div class="l-t">15 kg</div>
+            <div class="l-d">2 pares · 4 discos</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="qty"><button>−</button><span>2</span><button>+</button></span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="row grow" style="gap:14px;">
+          <i class="plate-dot" style="background:#4C9970"></i>
+          <div>
+            <div class="l-t">10 kg</div>
+            <div class="l-d">2 pares · 4 discos</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="qty"><button>−</button><span>2</span><button>+</button></span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="row grow" style="gap:14px;">
+          <i class="plate-dot" style="background:#CFCCC4"></i>
+          <div>
+            <div class="l-t">5 kg</div>
+            <div class="l-d">3 pares · 6 discos</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="qty"><button>−</button><span>3</span><button>+</button></span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="row grow" style="gap:14px;">
+          <i class="plate-dot" style="background:#8B8F96"></i>
+          <div>
+            <div class="l-t">2,5 kg</div>
+            <div class="l-d">2 pares · 4 discos</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="qty"><button>−</button><span>2</span><button>+</button></span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="row grow" style="gap:14px;">
+          <i class="plate-dot" style="background:#6C7076"></i>
+          <div>
+            <div class="l-t">1,25 kg</div>
+            <div class="l-d">1 par · 2 discos</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="qty"><button>−</button><span>1</span><button>+</button></span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="row grow" style="gap:14px;opacity:.4">
+          <i class="plate-dot" style="background:#4C4F54"></i>
+          <div>
+            <div class="l-t">0,5 kg</div>
+            <div class="l-d">No lo tienes</div>
+          </div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          
+          <span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+    <div class="hint">Los pares importan: si solo tienes un par de 20, la app no te propondrá cargar dos por lado.
+      El <b>+</b> de arriba sirve para discos raros (fraccionales de 0,25, discos viejos en libras).</div>
+    <div class="dock"><button class="btn">Listo</button></div></main>
+      </div>
+      
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P02</div>
+    <div class="cap-t">Discos</div>
+    <div class="cap-d">La pantalla que pediste. El punto de color es el código internacional (rojo 25, azul 20, amarillo 15, verde 10, blanco 5) para que reconozcas el disco de un vistazo. La cantidad es en pares, que es como se cargan.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Mi equipo</button>
+  <div class="head-row"><div class="title sm">Barras</div><div class="tools"><button aria-label="Agregar barra"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+  <div class="meta">3 de 5 · olímpica por defecto</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="sect">Tus barras</div>
+    
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">Olímpica <span class="pill hold">Por defecto</span></div>
+          <div class="l-d">Disponible</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="l-v">20 kg</span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">Olímpica corta </div>
+          <div class="l-d">Disponible</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="l-v">15 kg</span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">Barra Z </div>
+          <div class="l-d">Disponible</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="l-v">7 kg</span>
+          <span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="grow" style="opacity:.4">
+          <div class="l-t">Barra recta </div>
+          <div class="l-d">No la tienes</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="l-v">10 kg</span>
+          <span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+      <div class="line">
+        <div class="grow" style="opacity:.4">
+          <div class="l-t">Multipower </div>
+          <div class="l-d">No la tienes</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px">
+          <span class="l-v">20 kg</span>
+          <span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+        </div>
+      </div>
+    <div class="hint">La multipower cuenta aparte porque su barra guiada suele pesar distinto —
+      si no sabes cuánto, déjala fuera y anota el peso como si fuera una máquina.</div>
+    <div class="dock"><button class="btn">Listo</button></div></main>
+      </div>
+      
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P03</div>
+    <div class="cap-t">Barras</div>
+    <div class="cap-d">Cada barra pesa distinto y eso cambia toda la cuenta. La predeterminada se usa cuando el ejercicio no dice otra cosa; en la ficha de cada ejercicio se puede fijar una barra concreta.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Mi equipo</button>
+  <div class="head-row"><div class="title sm">Mancuernas</div><div class="tools"><button aria-label="Agregar mancuerna"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+  <div class="meta">18 pares · 1 – 40 kg</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="sect">Rango rápido</div>
+    <div class="list">
+      <div class="line"><div class="l-t">Desde</div><div class="l-v"><span class="cell ph" style="width:58px;padding:8px 4px;font-size:13px">1</span> kg</div></div>
+      <div class="line"><div class="l-t">Hasta</div><div class="l-v"><span class="cell ph" style="width:58px;padding:8px 4px;font-size:13px">24</span> kg</div></div>
+      <div class="line"><div class="l-t">Salto</div><div class="l-v">1 kg <span class="chev">›</span></div></div>
+    </div>
+
+    <div class="row" style="justify-content:space-between;margin:26px 0 4px">
+      <div class="sect" style="margin:0">Las que tienes</div>
+      <div class="pill-sw"><button class="on">kg</button><button>lb</button></div>
+    </div>
+    
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">1 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">2 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">3 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">4 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">5 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">6 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="opacity:.4">
+          <div class="l-t">7 kg</div>
+          <div class="l-d">No lo tienes</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">8 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="opacity:.4">
+          <div class="l-t">9 kg</div>
+          <div class="l-d">No lo tienes</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+      <div class="line">
+        <div class="grow" style="">
+          <div class="l-t">10 kg</div>
+          <div class="l-d">1 par</div>
+        </div>
+        <div class="row" style="flex:none;gap:12px"><span class="qty"><button>−</button><span>1</span><button>+</button></span><span class="check on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span></div>
+      </div>
+    <div class="hint" style="text-align:center">12 kg · 14 kg · 16 kg · …</div>
+    <div class="dock"><button class="btn">Listo</button></div></main>
+      </div>
+      
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P04</div>
+    <div class="cap-t">Mancuernas</div>
+    <div class="cap-d">Casi ningún gimnasio tiene la serie completa. El rango rápido llena la lista de un golpe y luego destildas las que falten — así la app nunca te sugiere una mancuerna que no existe.</div>
+  </figcaption>
+</figure></div>
+
+<div class="chapter">
+  <div class="k">02</div>
+  <h2>La calculadora</h2>
+  <p>Aparece sola en los ejercicios de barra. Nunca pide una decisión: es información que ya estaba
+  implícita en la sugerencia del coach, ahora dibujada.</p>
+</div>
+<div class="deck">
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app sticky">
+  <div class="sess-top">
+    <div class="grow">
+      <div class="clock">18:42</div>
+      <div class="sess-meta">Pierna · 3 de 8 series</div>
+    </div>
+    <div class="sess-actions">
+      <button class="end">Terminar</button>
+      <button class="unitbtn">kg ⇄</button>
+    </div>
+  </div>
+  <button class="rest on">
+    <div class="rest-row">
+      <span class="rest-l">Descansando</span>
+      <span class="rest-t">1:24</span>
+    </div>
+    <div class="rest-track"><div class="rest-fill" style="width:30%"></div></div>
+  </button></header>
+        <main>
+    <div style="margin-top:2px">
+      <div class="ex-open">
+        <div class="ex-title">Squat <em>(Barbell)</em></div>
+        <div class="last">Última · <b>70×9</b> · <b>70×8</b> · <b>70×8</b></div>
+        <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>72,5 kg × 8</b></div></div>
+        <div class="why">Llegaste a 9 reps en todas las series con 70 kg. Toca progresar la carga (~2,5 %).</div>
+        
+  <button class="load">
+    <div class="load-row">
+      <span class="load-l">Cargar la barra</span>
+      <span class="load-v">72,5 kg <span class="chev">›</span></span>
+    </div>
+    <svg viewBox="0 0 340 74" style="width:100%;height:74px;display:block" aria-hidden="true"><rect x="10" y="35.45" width="320" height="3.1" rx="1.55" fill="#6E727A"/><rect x="148.3" y="31.42" width="3.1" height="11.16" rx="1.5" fill="#8B8F96"/><rect x="188.6" y="31.42" width="3.1" height="11.16" rx="1.5" fill="#8B8F96"/><rect x="141.5" y="8.5" width="8.1" height="57.0" rx="1.6" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="135.3" y="19.6" width="5.0" height="34.7" rx="1.6" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="130.9" y="25.8" width="3.1" height="22.3" rx="1.6" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="126.0" y="30.2" width="3.7" height="13.6" rx="2" fill="#54585E"/><rect x="190.5" y="8.5" width="8.1" height="57.0" rx="1.6" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="199.8" y="19.6" width="5.0" height="34.7" rx="1.6" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="206.0" y="25.8" width="3.1" height="22.3" rx="1.6" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="210.3" y="30.2" width="3.7" height="13.6" rx="2" fill="#54585E"/></svg>
+    <div class="load-row" style="margin-top:8px">
+      <span class="load-l">Por lado</span>
+      <span class="load-v"><b>20</b> + <b>5</b> + <b>1,25</b> kg</span>
+    </div>
+    
+  </button>
+        
+  <div class="grid-h"><span>#</span><span>kg</span><span>reps</span><span>rir</span><span></span><span></span></div>
+        
+  <div class="set done">
+    <span class="i">1</span>
+    <span class="cell">72,5</span>
+    <span class="cell">9</span>
+    <span class="cell ph">2</span>
+    <span class="ck on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+    <span class="xbtn">✕</span>
+  </div>
+        
+  <div class="set now">
+    <span class="i">2</span>
+    <span class="cell ph">72,5</span>
+    <span class="cell ph">8</span>
+    <span class="cell ph">1–3</span>
+    <span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+    <span class="xbtn">✕</span>
+  </div>
+        
+  <div class="set">
+    <span class="i">3</span>
+    <span class="cell ph">72,5</span>
+    <span class="cell ph">8</span>
+    <span class="cell ph">1–3</span>
+    <span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+    <span class="xbtn">✕</span>
+  </div>
+        <div class="ex-actions">
+          <button>+ Serie</button><button>Calentamiento</button><button>Notas</button>
+        </div>
+      </div>
+      <button class="ex-next">
+        <span class="grow">
+          <span class="ex-title" style="display:block">Leg Curl <em>(Machine)</em></span>
+          <span class="last" style="display:block">Siguiente · <b>35×12</b></span>
+        </span>
+        <span class="chev">›</span>
+      </button>
+    </div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M9 2h6"/></svg><span>Sesión</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P05</div>
+    <div class="cap-t">Sesión · barra cargada</div>
+    <div class="cap-d">El corazón de la función. Debajo del veredicto del coach aparece la barra dibujada con los discos de hoy y el desglose por lado. Un vistazo y sabes qué agarrar, sin hacer la cuenta de cabeza.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app sticky">
+  <div class="sess-top">
+    <div class="grow">
+      <div class="clock">18:42</div>
+      <div class="sess-meta">Pierna · 3 de 8 series</div>
+    </div>
+    <div class="sess-actions">
+      <button class="end">Terminar</button>
+      <button class="unitbtn">kg ⇄</button>
+    </div>
+  </div>
+  <button class="rest">
+    <div class="rest-row">
+      <span class="rest-l">Descanso</span>
+      <span class="rest-t">2:00</span>
+    </div>
+    <div class="rest-track"><div class="rest-fill" style="width:0%"></div></div>
+  </button></header>
+        <main><div style="margin-top:2px"><div class="ex-open"><div class="ex-title">Squat <em>(Barbell)</em></div></div></div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M9 2h6"/></svg><span>Sesión</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      <div class="overlay"><div class="modal">
+    <h2>Cargar 72,5 kg</h2>
+    <p class="muted">Squat (Barbell) · serie de trabajo</p>
+    <svg viewBox="0 0 340 126" style="width:100%;height:126px;display:block" aria-hidden="true"><rect x="10" y="60.5" width="320" height="5" rx="2.5" fill="#6E727A"/><rect x="135" y="54" width="5" height="18" rx="1.5" fill="#8B8F96"/><rect x="200" y="54" width="5" height="18" rx="1.5" fill="#8B8F96"/><rect x="124.0" y="17.0" width="13.0" height="92.0" rx="2.5" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="114.0" y="35.0" width="8.0" height="56.0" rx="2.5" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="107.0" y="45.0" width="5.0" height="36.0" rx="2.5" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="99.0" y="52.0" width="6.0" height="22.0" rx="2" fill="#54585E"/><rect x="203.0" y="17.0" width="13.0" height="92.0" rx="2.5" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="218.0" y="35.0" width="8.0" height="56.0" rx="2.5" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="228.0" y="45.0" width="5.0" height="36.0" rx="2.5" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="235.0" y="52.0" width="6.0" height="22.0" rx="2" fill="#54585E"/></svg>
+    <div class="sect">Por lado</div>
+    <div class="list">
+    <div class="line">
+      <div class="row grow" style="gap:13px">
+        <i class="plate-dot" style="background:#3C6FA8"></i>
+        <div class="l-t">20 kg</div>
+      </div>
+      <div class="l-v">×1 <span style="color:var(--dim)">por lado</span></div>
+    </div>
+    <div class="line">
+      <div class="row grow" style="gap:13px">
+        <i class="plate-dot" style="background:#CFCCC4"></i>
+        <div class="l-t">5 kg</div>
+      </div>
+      <div class="l-v">×1 <span style="color:var(--dim)">por lado</span></div>
+    </div>
+    <div class="line">
+      <div class="row grow" style="gap:13px">
+        <i class="plate-dot" style="background:#6C7076"></i>
+        <div class="l-t">1,25 kg</div>
+      </div>
+      <div class="l-v">×1 <span style="color:var(--dim)">por lado</span></div>
+    </div></div>
+    <div class="hint">Barra olímpica <b>20</b> + discos <b>52,5</b> (26,25 por lado) = <b>72,5 kg</b>.</div>
+    <button class="btn" style="margin-top:18px">Listo</button>
+    <button class="btn ghost">Cambiar de barra</button>
+  </div></div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P06</div>
+    <div class="cap-t">Cómo cargar la barra</div>
+    <div class="cap-d">Al tocar la tira se abre el detalle: la barra en grande, la lista de discos por lado con su color y la cuenta completa. El botón de espejo es para las barras que ya vienen cargadas de la serie anterior.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app sticky">
+  <div class="sess-top">
+    <div class="grow">
+      <div class="clock">02:15</div>
+      <div class="sess-meta">Pierna · 0 de 8 series</div>
+    </div>
+    <div class="sess-actions">
+      <button class="end">Terminar</button>
+      <button class="unitbtn">kg ⇄</button>
+    </div>
+  </div>
+  <button class="rest">
+    <div class="rest-row">
+      <span class="rest-l">Descanso</span>
+      <span class="rest-t">2:00</span>
+    </div>
+    <div class="rest-track"><div class="rest-fill" style="width:0%"></div></div>
+  </button></header>
+        <main><div style="margin-top:2px"><div class="ex-open"><div class="ex-title">Squat <em>(Barbell)</em></div></div></div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M9 2h6"/></svg><span>Sesión</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      <div class="overlay"><div class="modal">
+    <h2>Calentamiento — Squat</h2>
+    <p class="muted">Escalera calculada desde los 72,5 kg de hoy. Descansa 30–60 s entre escalones
+      y mueve el peso con intención de velocidad.</p>
+    
+      <div class="warm">
+        <div class="load-row">
+          <span class="load-l">Serie 1</span>
+          <span class="load-v"><b>37,5 kg × 6</b></span>
+        </div>
+        <svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="148.7" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="144.5" y="19.6" width="3.1" height="22.9" rx="1.3" fill="#8B8F96" stroke="#63666B" stroke-width="1"/><rect x="140.9" y="21.6" width="2.6" height="18.7" rx="1.3" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="136.7" y="25.3" width="3.1" height="11.4" rx="2" fill="#54585E"/><rect x="187.2" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="192.4" y="19.6" width="3.1" height="22.9" rx="1.3" fill="#8B8F96" stroke="#63666B" stroke-width="1"/><rect x="196.5" y="21.6" width="2.6" height="18.7" rx="1.3" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="200.2" y="25.3" width="3.1" height="11.4" rx="2" fill="#54585E"/></svg>
+        <div class="load-row"><span class="load-l">Por lado</span><span class="load-v"><b>5</b> + <b>2,5</b> + <b>1,25</b> kg</span></div>
+      </div>
+      <div class="warm">
+        <div class="load-row">
+          <span class="load-l">Serie 2</span>
+          <span class="load-v"><b>55 kg × 3</b></span>
+        </div>
+        <svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="147.1" y="9.2" width="5.7" height="43.7" rx="1.3" fill="#C2963A" stroke="#8E6D28" stroke-width="1"/><rect x="143.0" y="19.6" width="3.1" height="22.9" rx="1.3" fill="#8B8F96" stroke="#63666B" stroke-width="1"/><rect x="138.8" y="25.3" width="3.1" height="11.4" rx="2" fill="#54585E"/><rect x="187.2" y="9.2" width="5.7" height="43.7" rx="1.3" fill="#C2963A" stroke="#8E6D28" stroke-width="1"/><rect x="193.9" y="19.6" width="3.1" height="22.9" rx="1.3" fill="#8B8F96" stroke="#63666B" stroke-width="1"/><rect x="198.1" y="25.3" width="3.1" height="11.4" rx="2" fill="#54585E"/></svg>
+        <div class="load-row"><span class="load-l">Por lado</span><span class="load-v"><b>15</b> + <b>2,5</b> kg</span></div>
+      </div>
+      <div class="warm work">
+        <div class="load-row">
+          <span class="load-l" style="color:var(--up)">Trabajo</span>
+          <span class="load-v"><b style="color:var(--up)">72,5 kg × 8</b></span>
+        </div>
+        <svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="146.1" y="7.1" width="6.8" height="47.8" rx="1.3" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="140.9" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="137.2" y="21.6" width="2.6" height="18.7" rx="1.3" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="133.1" y="25.3" width="3.1" height="11.4" rx="2" fill="#54585E"/><rect x="187.2" y="7.1" width="6.8" height="47.8" rx="1.3" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="195.0" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="#94918A" stroke-width="1"/><rect x="200.2" y="21.6" width="2.6" height="18.7" rx="1.3" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="203.8" y="25.3" width="3.1" height="11.4" rx="2" fill="#54585E"/></svg>
+        <div class="load-row"><span class="load-l">Por lado</span><span class="load-v"><b>20</b> + <b>5</b> + <b>1,25</b> kg</span></div>
+      </div>
+    <div class="hint">No registres estas series en la app — solo las de trabajo.</div>
+    <button class="btn" style="margin-top:18px">Listo</button>
+  </div></div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P07</div>
+    <div class="cap-t">Calentamiento con carga</div>
+    <div class="cap-d">Lo que pediste para el calentamiento: cada escalón trae su propia barra dibujada. Se lee de arriba abajo mientras vas sumando discos, y la serie de trabajo cierra en verde.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app sticky">
+  <div class="sess-top">
+    <div class="grow">
+      <div class="clock">04:08</div>
+      <div class="sess-meta">Pierna · 0 de 8 series</div>
+    </div>
+    <div class="sess-actions">
+      <button class="end">Terminar</button>
+      <button class="unitbtn">kg ⇄</button>
+    </div>
+  </div>
+  <button class="rest">
+    <div class="rest-row">
+      <span class="rest-l">Descanso</span>
+      <span class="rest-t">2:00</span>
+    </div>
+    <div class="rest-track"><div class="rest-fill" style="width:0%"></div></div>
+  </button></header>
+        <main>
+    <div style="margin-top:2px">
+      <div class="ex-open">
+        <div class="ex-title">Romanian Deadlift <em>(Barbell)</em></div>
+        <div class="last">Última · <b>60×10</b> · <b>60×10</b></div>
+        <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>62,5 kg × 8</b></div></div>
+        <div class="why">Llegaste a 10 reps en todas las series con 60 kg. Toca progresar la carga (~2,5 %).</div>
+        
+  <button class="load">
+    <div class="load-row">
+      <span class="load-l">Cargar la barra</span>
+      <span class="load-v">62,5 kg <span class="chev">›</span></span>
+    </div>
+    <svg viewBox="0 0 340 74" style="width:100%;height:74px;display:block" aria-hidden="true"><rect x="10" y="35.45" width="320" height="3.1" rx="1.55" fill="#6E727A"/><rect x="148.3" y="31.42" width="3.1" height="11.16" rx="1.5" fill="#8B8F96"/><rect x="188.6" y="31.42" width="3.1" height="11.16" rx="1.5" fill="#8B8F96"/><rect x="141.5" y="8.5" width="8.1" height="57.0" rx="1.6" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="137.1" y="25.8" width="3.1" height="22.3" rx="1.6" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="132.2" y="30.2" width="3.7" height="13.6" rx="2" fill="#54585E"/><rect x="190.5" y="8.5" width="8.1" height="57.0" rx="1.6" fill="#3C6FA8" stroke="#2A5079" stroke-width="1"/><rect x="199.8" y="25.8" width="3.1" height="22.3" rx="1.6" fill="#6C7076" stroke="#4C4F54" stroke-width="1"/><rect x="204.1" y="30.2" width="3.7" height="13.6" rx="2" fill="#54585E"/></svg>
+    <div class="load-row" style="margin-top:8px">
+      <span class="load-l">Por lado</span>
+      <span class="load-v"><b>20</b> + <b>1,25</b> kg</span>
+    </div>
+    <div class="why" style="padding-left:0;margin-top:9px">El salto exacto pedía 61,5 kg. Con tus discos lo más cercano por arriba es 62,5 — se ajusta solo.</div>
+  </button>
+        
+  <div class="grid-h"><span>#</span><span>kg</span><span>reps</span><span>rir</span><span></span><span></span></div>
+        
+  <div class="set now">
+    <span class="i">1</span>
+    <span class="cell ph">62,5</span>
+    <span class="cell ph">8</span>
+    <span class="cell ph">1–3</span>
+    <span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+    <span class="xbtn">✕</span>
+  </div>
+        
+  <div class="set">
+    <span class="i">2</span>
+    <span class="cell ph">62,5</span>
+    <span class="cell ph">8</span>
+    <span class="cell ph">1–3</span>
+    <span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+    <span class="xbtn">✕</span>
+  </div>
+        <div class="ex-actions">
+          <button>+ Serie</button><button>Calentamiento</button><button>Notas</button>
+        </div>
+      </div>
+    </div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M9 2h6"/></svg><span>Sesión</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P08</div>
+    <div class="cap-t">Cuando no sale exacto</div>
+    <div class="cap-d">El caso que rompe a las apps que no conocen tu gimnasio. Si el coach pide 63,5 kg y con tus discos no existe, redondea al armable más cercano y lo dice — en vez de mandarte a una cifra imposible.</div>
+  </figcaption>
+</figure></div>
+
+<div class="chapter">
+  <div class="k">03</div>
+  <h2>Dónde se enchufa</h2>
+  <p>Dos sitios más: la ficha del ejercicio gana una fila de equipo, y el resto de material —
+  mancuernas y máquinas — se comporta de forma coherente.</p>
+</div>
+<div class="deck">
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+    <button class="back">‹ Volver</button>
+    <div class="title big">Squat</div>
+    <div class="title-sub">Barbell</div>
+    <div class="knurl"></div></header>
+        <main>
+    <div class="sect">Ajustes del ejercicio</div>
+    <div class="list">
+      <div class="line">
+        <div><div class="l-t">Equipo</div><div class="l-d">Define si se calcula la carga</div></div>
+        <div class="l-v">Barra <span class="chev">›</span></div>
+      </div>
+      <div class="line">
+        <div><div class="l-t">Barra</div><div class="l-d">Olímpica · 20 kg</div></div>
+        <div class="l-v">20 kg <span class="chev">›</span></div>
+      </div>
+      <div class="line"><div class="l-t">Rango de reps</div>
+        <div class="l-v"><span class="cell ph" style="width:48px;padding:8px 4px;font-size:13px">8</span>
+        <span style="color:var(--dim)">–</span>
+        <span class="cell ph" style="width:48px;padding:8px 4px;font-size:13px">12</span></div></div>
+      <div class="line"><div class="l-t">Salto mínimo</div><div class="l-v">Auto <span class="chev">›</span></div></div>
+      <div class="line"><div class="l-t">Grupo muscular</div><div class="l-v">Pierna <span class="chev">›</span></div></div>
+      <div class="line"><div class="l-t">Descanso</div><div class="l-v">3:00 <span class="chev">›</span></div></div>
+    </div>
+    <div class="hint">Con <b>Equipo · Barra</b>, el salto mínimo pasa a ser el par de discos más pequeño que
+      tengas (2 × 1,25 = 2,5 kg): el coach deja de proponer aumentos que no se pueden armar.</div>
+
+    <div class="sect">Cómo se progresa</div>
+    <div class="seg4">
+      <button class="on">Normal</button><button>Asistido</button><button>Corporal</button><button>Tiempo</button>
+    </div>
+    <div class="hint">Tú levantas la carga. Progresas subiendo kilos cuando llenas el rango de reps.</div></main>
+      </div>
+      
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P09</div>
+    <div class="cap-t">Ficha · qué equipo usa</div>
+    <div class="cap-d">En los ajustes del ejercicio entra una fila nueva. Los importados de Hevy ya traen “(Barbell)” o “(Dumbbell)” en el nombre, así que se detecta solo — la fila está para corregirlo cuando falle.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app sticky">
+  <div class="sess-top">
+    <div class="grow">
+      <div class="clock">12:30</div>
+      <div class="sess-meta">Torso · 2 de 11 series</div>
+    </div>
+    <div class="sess-actions">
+      <button class="end">Terminar</button>
+      <button class="unitbtn">kg ⇄</button>
+    </div>
+  </div>
+  <button class="rest">
+    <div class="rest-row">
+      <span class="rest-l">Descanso</span>
+      <span class="rest-t">2:00</span>
+    </div>
+    <div class="rest-track"><div class="rest-fill" style="width:0%"></div></div>
+  </button></header>
+        <main>
+    <div style="margin-top:2px">
+      <div class="ex-open">
+        <div class="ex-title">Incline Bench Press <em>(Dumbbell)</em></div>
+        <div class="last">Última · <b>18×12</b> · <b>18×12</b></div>
+        <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>20 kg × 8</b></div></div>
+        <button class="load">
+          <div class="load-row">
+            <span class="load-l">Mancuernas</span>
+            <span class="load-v">2 × 20 kg <span class="chev">›</span></span>
+          </div>
+          <svg viewBox="0 0 340 76" style="width:100%;height:76px;display:block" aria-hidden="true">
+    <rect x="124" y="34" width="92" height="8" rx="4" fill="#6E727A"/>
+    
+      <rect x="114" y="10" width="16" height="56" rx="4" fill="#8B8F96" stroke="#63666B"/>
+      <rect x="96" y="5" width="16" height="66" rx="4" fill="#A2A6AC" stroke="#74777C"/>
+      <rect x="210" y="10" width="16" height="56" rx="4" fill="#8B8F96" stroke="#63666B"/>
+      <rect x="228" y="5" width="16" height="66" rx="4" fill="#A2A6AC" stroke="#74777C"/>
+  </svg>
+          <div class="why" style="padding-left:0;margin-top:6px">El salto exacto pedía 19 kg. Tu gimnasio salta
+            de 18 a 20, así que va 20 — y el coach lo cuenta como progreso real.</div>
+        </button>
+        
+  <div class="grid-h"><span>#</span><span>kg</span><span>reps</span><span>rir</span><span></span><span></span></div>
+        
+  <div class="set now">
+    <span class="i">1</span>
+    <span class="cell ph">20</span>
+    <span class="cell ph">8</span>
+    <span class="cell ph">1–3</span>
+    <span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+    <span class="xbtn">✕</span>
+  </div>
+        
+  <div class="set">
+    <span class="i">2</span>
+    <span class="cell ph">20</span>
+    <span class="cell ph">8</span>
+    <span class="cell ph">1–3</span>
+    <span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+    <span class="xbtn">✕</span>
+  </div>
+        <div class="ex-actions">
+          <button>+ Serie</button><button>Calentamiento</button><button>Notas</button>
+        </div>
+      </div>
+      <button class="ex-next">
+        <span class="grow">
+          <span class="ex-title" style="display:block">Shoulder Press <em>(Machine)</em></span>
+          <span class="last" style="display:block">Siguiente · <b>12,3×11</b></span>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="hint">En máquinas no aparece ninguna tira: no hay discos que poner.</div>
+    </div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M9 2h6"/></svg><span>Sesión</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">P10</div>
+    <div class="cap-t">Mancuernas y máquinas</div>
+    <div class="cap-d">La misma idea sin barra: en mancuernas se redondea al par que existe en tu gimnasio, y en máquinas la app se queda callada porque ahí no hay nada que cargar.</div>
+  </figcaption>
+</figure></div>
+</body>
+</html>
