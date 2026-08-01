@@ -512,13 +512,30 @@ const PLATE_COLORS = {
 };
 /* diámetro y grosor del dibujo, de mayor a menor */
 const PLATE_DIMS = [[25,92,15],[20,92,13],[15,84,11],[10,72,9],[5,56,8],[2.5,44,6],[0,36,5]];
-const EQUIP_LABEL = { barra:'Barra', mancuerna:'Mancuernas', maquina:'Máquina', otro:'Otro' };
+/* cómo se carga el ejercicio: de aquí salen la unidad, el salto y el dibujo */
+const EQUIP = {
+  barra:     { label:'Barra',      desc:'Una barra con discos a los dos lados.' },
+  discos:    { label:'Discos',     desc:'Máquina o aparato donde tú pones los discos.' },
+  placas:    { label:'Placas',     desc:'Máquina de pin: eliges una placa y sube de golpe en golpe.' },
+  mancuerna: { label:'Mancuernas', desc:'Del rango que tengas en Mi equipo.' },
+  nada:      { label:'Nada',       desc:'Peso corporal o sin carga que calcular.' },
+};
+const EQUIP_KEYS = Object.keys(EQUIP);
+/* dónde van los discos: cambia el salto mínimo y la cuenta entera */
+const POINTS = [
+  [1, 'En un solo lado', 'Un pitón. Todo el peso va ahí.'],
+  [2, 'En los dos lados', 'Lo normal en barras y en la mayoría de aparatos.'],
+  [4, 'En cuatro pitones', 'Prensas y trineos. El peso se reparte entre los cuatro.'],
+];
 /* el nombre casi siempre dice el implemento: Hevy lo pone en inglés y
    quien escribe a mano lo pone en español */
 const EQUIP_HINTS = [
   ['barra',     ['barbell','barra','ez bar','ez-bar','olympic','smith','multipower','landmine','trap bar','hex bar']],
   ['mancuerna', ['dumbbell','dumbell','mancuerna','mancuernas',' db ']],
-  ['maquina',   ['machine','maquina','cable','polea','lever','hammer strength','pin loaded','selectorized','pec deck','crossover','prensa','multipress']],
+  /* aparatos que cargas tú con discos */
+  ['discos',    ['prensa','leg press','hack','t-bar','t bar','plate loaded','plate-loaded','sled','trineo']],
+  /* máquinas de torre y pin */
+  ['placas',    ['machine','maquina','cable','polea','lever','hammer strength','pin loaded','selectorized','pec deck','crossover','multipress','pulley']],
 ];
 function guessEquip(name){
   const n = ' ' + acNorm(name) + ' ';
@@ -603,13 +620,32 @@ function toKg(x){ return db.settings.unit === 'lb' ? x * LB_KG : x; }
 function fmtNum(x){ return (Math.round(x*100)/100).toString().replace('.',','); }
 /* fmtW SIEMPRE recibe kg y muestra en la unidad activa */
 function fmtW(kg){ return fmtNum(fromKg(kg)); }
+/* ---------- unidad de la máquina ----------
+   Una torre de placas puede subir de 5 en 5 lb aunque la app esté en kg
+   (o al revés): ese ejercicio se escribe y se lee en la unidad de SU
+   máquina. Por dentro todo sigue guardándose en kg. */
+function exUnit(key){
+  const st = exMeta(key).stack;
+  if(exMeta(key).equip === 'placas' && st && st.unit === 'lb') return 'lb';
+  if(exMeta(key).equip === 'placas' && st && st.unit === 'kg') return 'kg';
+  return db.settings.unit;
+}
+function pinnedUnit(key){
+  const m = exMeta(key);
+  return m.equip === 'placas' && m.stack && (m.stack.unit === 'kg' || m.stack.unit === 'lb');
+}
+function uLabelEx(key){ return exUnit(key); }
+function fromKgEx(key, kg){ return exUnit(key) === 'lb' ? kg / LB_KG : kg; }
+function toKgEx(key, x){ return exUnit(key) === 'lb' ? x * LB_KG : x; }
+function fmtWEx(key, kg){ return fmtNum(fromKgEx(key, kg)); }
+function inputWEx(key, kg){ return String(Math.round(fromKgEx(key, kg) * 100) / 100); }
 /* valor para atributos value= de inputs (punto decimal, en unidad activa) */
 function inputW(kg){ return String(Math.round(fromKg(kg)*100)/100); }
 function fmtClock(sec){ return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`; }
 /* una serie en texto: "60×10" o, en ejercicios por tiempo, "45s" / "10+45s" (lastre) */
 function fmtSet(key, s){
-  if(exMeta(key).type === 'tiempo') return (s.w > 0 ? fmtW(s.w) + '+' : '') + s.r + 's';
-  return `${fmtW(s.w)}×${s.r}`;
+  if(exMeta(key).type === 'tiempo') return (s.w > 0 ? fmtWEx(key, s.w) + '+' : '') + s.r + 's';
+  return `${fmtWEx(key, s.w)}×${s.r}`;
 }
 
 /* =====================================================================
@@ -625,7 +661,14 @@ function prog(key){
 /* metadatos por ejercicio: tipo, rango de reps propio, salto de kg, notas */
 function exMeta(key){
   if(!db.exmeta[key]) db.exmeta[key] = { type:'normal', lo:null, hi:null, step:null, notes:'', rest:null, muscle:null, equip:null, bar:null };
-  return db.exmeta[key];
+  const m = db.exmeta[key];
+  /* migración de la taxonomía vieja: máquina → placas, otro → nada */
+  if(m.equip === 'maquina') m.equip = 'placas';
+  else if(m.equip === 'otro') m.equip = 'nada';
+  if(m.points === undefined) m.points = null;   /* null → 2 (los dos lados) */
+  if(m.base === undefined) m.base = null;       /* peso del carro, opcional */
+  if(!m.stack || typeof m.stack !== 'object') m.stack = { unit:null, step:null, start:null };
+  return m;
 }
 
 /* adivinar el grupo muscular por el nombre del ejercicio (es/en) */
@@ -657,8 +700,18 @@ function effRange(key){
 function effStep(key, w){
   const st = parseFloat(exMeta(key).step);
   if(!isNaN(st) && st > 0) return st;
-  /* en barra, el salto mínimo real es el par de discos más pequeño */
-  if(effEquip(key) === 'barra'){ const s = barMinStep(); if(s > 0) return s; }
+  const eq = effEquip(key);
+  /* con discos, el salto mínimo es el disco menor repetido en cada punto */
+  if(eq === 'barra' || eq === 'discos'){
+    const s = plateMinStep(effPoints(key));
+    if(s > 0) return s;
+  }
+  /* en una torre, el salto es el de la máquina, pasado a kg sin redondear
+     (el peso final se ancla a la placa exacta más adelante) */
+  if(eq === 'placas'){
+    const c = stackConf(key);
+    if(c) return c.step * stackFactor(c);
+  }
   return roundStep(w);
 }
 
@@ -694,7 +747,7 @@ function deloadSugg(key, sugg){
   if(meta.type === 'asistido' && sugg.w > 0){
     const w = sugg.w + effStep(key, sugg.w);
     return { w, reps: lo, sets, type:'hold',
-      msg:`Descarga: <b>${fmtW(w)} ${uLabel()} de ayuda × ${lo}</b> en ${sets} serie${sets===1?'':'s'}`, why };
+      msg:`Descarga: <b>${fmtWEx(key, w)} ${uLabelEx(key)} de ayuda × ${lo}</b> en ${sets} serie${sets===1?'':'s'}`, why };
   }
   if(meta.type === 'tiempo'){
     const reps = Math.max(10, Math.round(sugg.reps * 0.7 / 5) * 5);
@@ -710,7 +763,7 @@ function deloadSugg(key, sugg){
   if(w <= 0) w = sugg.w;
   w = fitWeight(key, w) || w;
   return { w, reps: lo, sets, type:'hold',
-    msg:`Descarga: <b>${fmtW(w)} ${uLabel()} × ${lo}</b> en ${sets} serie${sets===1?'':'s'}`, why };
+    msg:`Descarga: <b>${fmtWEx(key, w)} ${uLabelEx(key)} × ${lo}</b> en ${sets} serie${sets===1?'':'s'}`, why };
 }
 
 /* peso "de trabajo": el más usado en la sesión; empate → el mayor */
@@ -742,9 +795,21 @@ function roundToStep(w, st){ st = st || roundStep(w); return Math.round(w/st)*st
    ===================================================================== */
 function effEquip(key){
   const e = exMeta(key).equip;
-  return (e === 'barra' || e === 'mancuerna' || e === 'maquina' || e === 'otro') ? e : null;
+  return EQUIP[e] ? e : null;
 }
-/* un par de discos = un disco por lado */
+/* dónde van los discos: 1 pitón, 2 lados o 4 pitones */
+function effPoints(key){
+  const n = parseInt(exMeta(key).points, 10);
+  return (n === 1 || n === 2 || n === 4) ? n : 2;
+}
+/* peso propio del aparato: la barra, o el carro si lo anotaste */
+function effBase(key){
+  if(effEquip(key) === 'barra'){ const b = barFor(key); return b ? b.kg : 0; }
+  const v = parseFloat(exMeta(key).base);
+  return (!isNaN(v) && v > 0) ? v : 0;
+}
+
+/* ---------- inventario ---------- */
 function availablePlates(){
   return db.gym.plates
     .filter(p => p.on && p.kg > 0 && p.pairs > 0)
@@ -762,24 +827,62 @@ function barFor(key){
   const id = exMeta(key).bar;
   return (id && bars.find(b => b.id === id)) || bars.find(b => b.def) || bars[0];
 }
-/* el salto más pequeño que se puede armar: el par de discos menor */
-function barMinStep(){
-  const p = availablePlates();
-  return p.length ? p[p.length-1].kg * 2 : 0;
+
+/* ---------- torre de placas ----------
+   Unas suben de 5 en 5 lb y otras de 5 en 5 kg: la unidad es de la
+   máquina, no del usuario. */
+function stackConf(key){
+  const st = exMeta(key).stack || {};
+  const step = parseFloat(st.step);
+  if(isNaN(step) || step <= 0) return null;
+  const start = parseFloat(st.start);
+  return {
+    unit: st.unit === 'lb' ? 'lb' : 'kg',
+    step,
+    start: (!isNaN(start) && start > 0) ? start : step,
+  };
+}
+function stackFactor(conf){ return conf.unit === 'lb' ? LB_KG : 1; }
+/* peso en kg → la placa más cercana de esa torre */
+function stackSnap(key, kg){
+  const c = stackConf(key);
+  if(!c) return null;
+  const f = stackFactor(c);
+  let i = Math.round((kg / f - c.start) / c.step);
+  if(i < 0) i = 0;
+  const value = Math.round((c.start + i * c.step) * 1000) / 1000;
+  return { unit:c.unit, step:c.step, index:i + 1, value,
+           kg: Math.round(value * f * 1000) / 1000 };
+}
+/* los primeros escalones, para compararlos con lo que dice la máquina */
+function stackPreview(key, n){
+  const c = stackConf(key);
+  if(!c) return [];
+  return Array.from({length: n || 7}, (_, i) => Math.round((c.start + i * c.step) * 1000) / 1000);
 }
 
-/* todas las sumas por lado que se pueden armar → la combinación con menos
-   discos de cada una. Con 7 tipos × 2 pares son ~2000 casos: se cachea. */
-let _plateIdx = null;
-function plateIndex(){
+/* ---------- discos ----------
+   Con N puntos de carga cada disco hay que repetirlo N veces: un par
+   (2 discos) solo alcanza para 2 pitones. */
+function maxPerPoint(pairs, points){ return Math.floor(pairs * 2 / points); }
+function plateMinStep(points){
+  const p = availablePlates().filter(x => maxPerPoint(x.n, points) >= 1);
+  return p.length ? p[p.length-1].kg * points : 0;
+}
+
+/* sumas por punto que se pueden armar → la combinación con menos discos */
+let _plateIdx = {};
+function plateIndex(points){
   const plates = availablePlates();
-  const ck = JSON.stringify(plates);
-  if(_plateIdx && _plateIdx.ck === ck) return _plateIdx;
+  const ck = JSON.stringify(plates) + '|' + points;
+  if(_plateIdx[points] && _plateIdx[points].ck === ck) return _plateIdx[points];
   const map = new Map([[0, []]]);
   for(const p of plates){
+    const max = maxPerPoint(p.n, points);
+    if(max < 1) continue;
     for(const [sum, list] of [...map]){
       let s = sum, l = list;
-      for(let i = 1; i <= p.n; i++){
+      for(let i = 1; i <= max; i++){
         s = Math.round((s + p.kg) * 1000) / 1000;
         l = l.concat(p.kg);
         const prev = map.get(s);
@@ -787,10 +890,10 @@ function plateIndex(){
       }
     }
   }
-  _plateIdx = { ck, map, sums: [...map.keys()].sort((a,b) => a - b) };
-  return _plateIdx;
+  _plateIdx[points] = { ck, map, sums: [...map.keys()].sort((a,b) => a - b) };
+  return _plateIdx[points];
 }
-function invalidatePlates(){ _plateIdx = null; }
+function invalidatePlates(){ _plateIdx = {}; }
 
 /* el valor de `list` más cercano a w; en empate gana el mayor (sobrecarga) */
 function nearestIn(list, w){
@@ -804,40 +907,71 @@ function nearestIn(list, w){
 }
 function nearestDumbbell(w){ return nearestIn(availableDumbbells(), w); }
 
-/*  barLoad(key, pesoKg) → null si no hay barra, o
-    { bar, plates:[kg por lado], perSide, total, exact, target }          */
-function barLoad(key, targetKg){
-  const bar = barFor(key);
-  if(!bar) return null;
-  const idx = plateIndex();
+/*  loadPlan(key, pesoKg) → null si no aplica, o
+    { kind, base, points, perPoint:[kg], perPointKg, total, exact, target,
+      bar?, stack?, dumbbell? }                                            */
+function loadPlan(key, targetKg){
+  const eq = effEquip(key);
+  if(!eq || eq === 'nada') return null;
+
+  if(eq === 'mancuerna'){
+    const d = nearestDumbbell(targetKg);
+    if(d == null) return null;
+    return { kind:'mancuerna', dumbbell:d, total:d,
+             exact: Math.abs(d - targetKg) < 1e-9, target:targetKg };
+  }
+  if(eq === 'placas'){
+    const sn = stackSnap(key, targetKg);
+    if(!sn) return null;
+    return { kind:'placas', stack:sn, total:sn.kg,
+             exact: Math.abs(sn.kg - targetKg) < 1e-9, target:targetKg };
+  }
+
+  const points = effPoints(key);
+  const bar = eq === 'barra' ? barFor(key) : null;
+  if(eq === 'barra' && !bar) return null;
+  const base = eq === 'barra' ? bar.kg : effBase(key);
+  const idx = plateIndex(points);
   if(!idx.sums.length) return null;
-  const want = (targetKg - bar.kg) / 2;
-  if(want < 0) return { bar, plates:[], perSide:0, total:bar.kg, exact:false, target:targetKg };
-  const side = nearestIn(idx.sums, want);
-  const total = Math.round((bar.kg + 2 * side) * 1000) / 1000;
-  return { bar, plates: idx.map.get(side) || [], perSide: side, total,
-           exact: Math.abs(total - targetKg) < 1e-9, target: targetKg };
+  const want = (targetKg - base) / points;
+  const side = want < 0 ? 0 : nearestIn(idx.sums, want);
+  const total = Math.round((base + points * side) * 1000) / 1000;
+  return {
+    kind: eq, bar, base, points,
+    perPoint: idx.map.get(side) || [], perPointKg: side,
+    total, exact: Math.abs(total - targetKg) < 1e-9, target: targetKg,
+  };
+}
+/* la barra es el caso de dos puntos: se conserva el nombre viejo */
+function barLoad(key, targetKg){
+  const p = loadPlan(key, targetKg);
+  if(!p || p.kind !== 'barra') return null;
+  return Object.assign({}, p, { plates:p.perPoint, perSide:p.perPointKg });
 }
 
 /* redondea un peso al más cercano que se pueda armar con el equipo */
 function fitWeight(key, w){
-  const eq = effEquip(key);
-  if(eq === 'barra'){ const l = barLoad(key, w); return l ? l.total : w; }
-  if(eq === 'mancuerna'){ const d = nearestDumbbell(w); return d == null ? w : d; }
-  return w;
+  const p = loadPlan(key, w);
+  return (p && p.total > 0) ? p.total : w;
 }
 /* ajusta la sugerencia del coach a un peso real y lo explica */
+const FIT_WHY = {
+  barra:'Con tus discos', discos:'Con tus discos',
+  placas:'La torre de esta máquina sube a saltos:', mancuerna:'Con tus mancuernas',
+};
 function fitSuggestion(key, sugg){
   const meta = exMeta(key);
   if(!sugg || meta.type !== 'normal' || !(sugg.w > 0)) return sugg;
   const eq = effEquip(key);
-  if(eq !== 'barra' && eq !== 'mancuerna') return sugg;
+  if(!eq || eq === 'nada') return sugg;
   const fitted = fitWeight(key, sugg.w);
   if(!(fitted > 0) || Math.abs(fitted - sugg.w) < 1e-9) return sugg;
-  const before = `${fmtW(sugg.w)} ${uLabel()}`, after = `${fmtW(fitted)} ${uLabel()}`;
-  if(before !== after) sugg.msg = sugg.msg.replace(before, after);
-  sugg.why = `${eq === 'barra' ? 'Con tus discos' : 'Con tus mancuernas'}, ` +
-    `${fmtW(fitted)} ${uLabel()} es lo más cercano a ${fmtW(sugg.w)}. ` + sugg.why;
+  const before = `${fmtWEx(key, sugg.w)} ${uLabelEx(key)}`;
+  const after  = `${fmtWEx(key, fitted)} ${uLabelEx(key)}`;
+  /* si al redondear se ven igual, el ajuste es invisible: no hay nada que explicar */
+  if(before === after){ sugg.w = fitted; return sugg; }
+  sugg.msg = sugg.msg.replace(before, after);
+  sugg.why = `${FIT_WHY[eq]} ${after} es lo más cercano a ${before}. ` + sugg.why;
   sugg.wanted = sugg.w;
   sugg.w = fitted;
   return sugg;
@@ -873,7 +1007,7 @@ function computeSuggestion(key){
     if(meta.type === 'asistido' && w > 0){
       const nw = roundToStep(w * (2 - factor), step);
       back = { w:nw, reps:lo, type:'back',
-        msg:`Vuelta tras ~${weeks} semanas: <b>${fmtW(nw)} ${uLabel()} de ayuda × ${lo}</b>`,
+        msg:`Vuelta tras ~${weeks} semanas: <b>${fmtWEx(key, nw)} ${uLabelEx(key)} de ayuda × ${lo}</b>`,
         why:`Llevas ${gapDays} días sin este ejercicio. Retoma con algo más de asistencia; en 1–2 sesiones vuelves a tu marca.` };
     } else if(meta.type === 'tiempo'){
       const target = Math.max(lo, Math.round(maxR * factor / 5) * 5);
@@ -889,8 +1023,8 @@ function computeSuggestion(key){
       let nw = roundToStep(w * factor, step);
       if(nw <= 0) nw = w;
       back = { w:nw, reps:lo, type:'back',
-        msg:`Vuelta tras ~${weeks} semanas: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b> (~${Math.round((1-factor)*100)} % menos)`,
-        why:`Llevas ${gapDays} días sin hacer este ejercicio y la fuerza cae un poco con la pausa. Arranca más liviano — en 1–2 sesiones estás de vuelta en ${fmtW(w)} ${uLabel()}. Esto evita lesiones y agujetas brutales.` };
+        msg:`Vuelta tras ~${weeks} semanas: <b>${fmtWEx(key, nw)} ${uLabelEx(key)} × ${lo}</b> (~${Math.round((1-factor)*100)} % menos)`,
+        why:`Llevas ${gapDays} días sin hacer este ejercicio y la fuerza cae un poco con la pausa. Arranca más liviano — en 1–2 sesiones estás de vuelta en ${fmtWEx(key, w)} ${uLabelEx(key)}. Esto evita lesiones y agujetas brutales.` };
     }
     back.sets = Math.max(1, nSets - (gapDays >= 28 ? 1 : 0));
     return back;
@@ -905,24 +1039,24 @@ function computeSuggestion(key){
       sugg = (nw <= 0 || w <= 2.5)
         ? { w:0, reps:lo, type:'up',
             msg:`¡Prueba <b>sin asistencia</b>!`,
-            why:`Llegaste a ${hi} reps con solo ${fmtW(w)} ${uLabel()} de ayuda. Intenta la versión libre y registra 0 kg.` }
+            why:`Llegaste a ${hi} reps con solo ${fmtWEx(key, w)} ${uLabelEx(key)} de ayuda. Intenta la versión libre y registra 0 kg.` }
         : { w:nw, reps:lo, type:'up',
-            msg:`Baja la ayuda: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
-            why:`En asistidos, menos peso de ayuda = más difícil = progreso. Llegaste a ${hi} reps con ${fmtW(w)} ${uLabel()} de ayuda.` };
+            msg:`Baja la ayuda: <b>${fmtWEx(key, nw)} ${uLabelEx(key)} × ${lo}</b>`,
+            why:`En asistidos, menos peso de ayuda = más difícil = progreso. Llegaste a ${hi} reps con ${fmtWEx(key, w)} ${uLabelEx(key)} de ayuda.` };
     } else if(minR < lo){
       if(p.fail >= 2){
         sugg = { w:w + step, reps:lo, type:'deload',
-          msg:`Sube la ayuda a <b>${fmtW(w + step)} ${uLabel()}</b> y reconstruye`,
+          msg:`Sube la ayuda a <b>${fmtWEx(key, w + step)} ${uLabelEx(key)}</b> y reconstruye`,
           why:`Van ${p.fail} sesiones sin sostener el rango (${lo}–${hi}). Con un poco más de asistencia vuelves a progresar.` };
       } else {
         sugg = { w, reps:lo, type:'hold',
-          msg:`Misma ayuda (<b>${fmtW(w)} ${uLabel()}</b>): busca al menos ${lo} reps`,
+          msg:`Misma ayuda (<b>${fmtWEx(key, w)} ${uLabelEx(key)}</b>): busca al menos ${lo} reps`,
           why:`Consolida el rango (${lo}–${hi}) antes de bajar la asistencia.` };
       }
     } else {
       const target = Math.min(hi, maxR + 1);
       sugg = { w, reps:target, type:'reps',
-        msg:`Misma ayuda (<b>${fmtW(w)} ${uLabel()}</b>), apunta a <b>${target} reps</b>`,
+        msg:`Misma ayuda (<b>${fmtWEx(key, w)} ${uLabelEx(key)}</b>), apunta a <b>${target} reps</b>`,
         why:`Cuando llegues a ${hi} reps en todas las series, te sugeriré bajar la ayuda.` };
     }
   } else if(meta.type === 'tiempo'){
@@ -965,8 +1099,8 @@ function computeSuggestion(key){
       if(atCap){
         /* la máquina no da más → progresión por reps abiertas (y series, vía estancamiento) */
         sugg = { w, reps:maxR + 1, type:'reps',
-          msg:`Tope de la máquina: mantén <b>${fmtW(w)} ${uLabel()}</b> y apunta a <b>${maxR + 1} reps</b>`,
-          why:`Marcaste ${fmtW(cap)} ${uLabel()} como máximo disponible en este equipo. Sin más peso, el progreso sigue por reps y series — y cuando lo superes con holgura, considera una variante más difícil o agregar lastre.` };
+          msg:`Tope de la máquina: mantén <b>${fmtWEx(key, w)} ${uLabelEx(key)}</b> y apunta a <b>${maxR + 1} reps</b>`,
+          why:`Marcaste ${fmtWEx(key, cap)} ${uLabelEx(key)} como máximo disponible en este equipo. Sin más peso, el progreso sigue por reps y series — y cuando lo superes con holgura, considera una variante más difícil o agregar lastre.` };
       } else {
         const boost = (rir !== null && rir >= 3) ? 1.7 : 1;
         let nw = roundToStep(w * (1 + p.inc * boost), step);
@@ -974,8 +1108,8 @@ function computeSuggestion(key){
         const capped = hasCap && nw > cap;
         if(capped) nw = cap;                 /* último salto: justo hasta el tope */
         sugg = { w:nw, reps:lo, type:'up',
-          msg:`Sube el peso: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>${capped ? ' (tope de la máquina)' : ''}`,
-          why:`Llegaste a ${hi} reps en todas las series con ${fmtW(w)} ${uLabel()}.` +
+          msg:`Sube el peso: <b>${fmtWEx(key, nw)} ${uLabelEx(key)} × ${lo}</b>${capped ? ' (tope de la máquina)' : ''}`,
+          why:`Llegaste a ${hi} reps en todas las series con ${fmtWEx(key, w)} ${uLabelEx(key)}.` +
               (boost > 1 ? ` Además te sobraban reps (RIR ${Math.round(rir)}), así que el salto es un poco mayor.`
                          : ` Toca progresar la carga (~${(p.inc*100).toFixed(1)} %).`) +
               (capped ? ' Con este salto llegas al máximo del equipo.' : '') };
@@ -986,11 +1120,11 @@ function computeSuggestion(key){
         if(w - nw < step/2) nw = w - step;   /* retroceso real de al menos un paso */
         if(nw <= 0) nw = w;
         sugg = { w:nw, reps:lo, type:'deload',
-          msg:`Baja un poco: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
-          why:`Van ${p.fail} sesiones sin sostener el rango con ${fmtW(w)} ${uLabel()}. Retroceder ~5 % y volver a construir es lo que mejor funciona.` };
+          msg:`Baja un poco: <b>${fmtWEx(key, nw)} ${uLabelEx(key)} × ${lo}</b>`,
+          why:`Van ${p.fail} sesiones sin sostener el rango con ${fmtWEx(key, w)} ${uLabelEx(key)}. Retroceder ~5 % y volver a construir es lo que mejor funciona.` };
       } else {
         sugg = { w, reps:lo, type:'hold',
-          msg:`Consolida <b>${fmtW(w)} ${uLabel()}</b>: busca al menos ${lo} reps por serie`,
+          msg:`Consolida <b>${fmtWEx(key, w)} ${uLabelEx(key)}</b>: busca al menos ${lo} reps por serie`,
           why:`La última vez alguna serie quedó bajo el rango (${lo}–${hi}). Repite el peso dejando 1–3 reps en reserva antes de subir.` };
       }
     } else if(rir !== null && rir >= 4 && !atCap){
@@ -998,12 +1132,12 @@ function computeSuggestion(key){
       if(nw - w < step/2) nw = w + step;   /* progreso real de al menos un paso (evita errores de redondeo) */
       if(hasCap && nw > cap) nw = cap;
       sugg = { w:nw, reps:lo, type:'up',
-        msg:`Sube ya el peso: <b>${fmtW(nw)} ${uLabel()} × ${lo}</b>`,
+        msg:`Sube ya el peso: <b>${fmtWEx(key, nw)} ${uLabelEx(key)} × ${lo}</b>`,
         why:`Registraste RIR ${Math.round(rir)} (te sobraban ~${Math.round(rir)} reps): ese peso te queda liviano, no hace falta esperar al tope del rango.` };
     } else {
       const target = Math.min(hi, maxR + 1);
       sugg = { w, reps:target, type:'reps',
-        msg:`Mismo peso (<b>${fmtW(w)} ${uLabel()}</b>), apunta a <b>${target} reps</b>`,
+        msg:`Mismo peso (<b>${fmtWEx(key, w)} ${uLabelEx(key)}</b>), apunta a <b>${target} reps</b>`,
         why:`Doble progresión: primero llena el rango de reps (${lo}–${hi}), después sube el peso.` };
     }
   }
@@ -1030,7 +1164,7 @@ function computeSuggestion(key){
     if(nwC > w + 1e-9){
       const reps = Math.min(hi, Math.max(lo, maxR));
       sugg = { w: nwC, reps, sets: target, type:'up',
-        msg:`Concentra el trabajo: <b>${fmtW(nwC)} ${uLabel()} × ${reps}</b> en <b>${target} series</b> (antes ${nSets})`,
+        msg:`Concentra el trabajo: <b>${fmtWEx(key, nwC)} ${uLabelEx(key)} × ${reps}</b> en <b>${target} series</b> (antes ${nSets})`,
         why:`Hiciste ${nSets} series casi idénticas (${minAll}–${maxR} reps): te sobra reserva, y a partir de la 4ª serie del mismo ejercicio el beneficio por sesión cae en picada. Con ${target} series intensas (RIR 1–3) y algo más de peso logras lo mismo en menos tiempo.` };
     } else {
       sugg.sets = target;
@@ -1185,6 +1319,50 @@ function barbellSVG(perSide, opts){
   }
   return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:${h}px;display:block" aria-hidden="true">${out}</svg>`;
 }
+/* un pitón corto con sus discos: aparatos de un lado y prensas */
+function postSVG(perPost, opts){
+  opts = opts || {};
+  const scale = opts.scale || 1, h = opts.h || 92;
+  const W = 340, cy = h/2;
+  const dims = perPost.map(plateDims);
+  const load = dims.reduce((a, d) => a + Math.max(d.t*scale, 4) + 2*scale, 0);
+  const rod = 8*scale + load + Math.max(6*scale, 4) + 12*scale;
+  const x0 = (W - (13 + rod)) / 2;
+  let out = `<rect x="${x0}" y="${cy-34*scale}" width="13" height="${68*scale}" rx="4" fill="#2A2D31"/>`;
+  out += `<rect x="${x0+13}" y="${cy-2.5*scale}" width="${rod}" height="${5*scale}" rx="${2.5*scale}" fill="#6E727A"/>`;
+  out += `<rect x="${x0+13}" y="${cy-9*scale}" width="${5*scale}" height="${18*scale}" rx="1.5" fill="#8B8F96"/>`;
+  let x = x0 + 13 + 8*scale;
+  perPost.forEach((kg, i) => {
+    const t = Math.max(dims[i].t*scale, 4), d = dims[i].d*scale;
+    out += `<rect x="${x.toFixed(1)}" y="${(cy-d/2).toFixed(1)}" width="${t.toFixed(1)}" height="${d.toFixed(1)}" rx="${(2.5*scale).toFixed(1)}" fill="${plateColor(kg)}" stroke="rgba(0,0,0,.35)"/>`;
+    x += t + 2*scale;
+  });
+  out += `<rect x="${x.toFixed(1)}" y="${(cy-11*scale).toFixed(1)}" width="${Math.max(6*scale,4).toFixed(1)}" height="${(22*scale).toFixed(1)}" rx="2" fill="#3E4247"/>`;
+  return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:${h}px;display:block" aria-hidden="true">${out}</svg>`;
+}
+/* la torre de placas con el pin puesto */
+function stackSVG(sel, total, opts){
+  opts = opts || {};
+  const h = opts.h || 150, W = 110, slab = 9, gap = 2.5;
+  const n = Math.max(total, sel);
+  const top = (h - (n*slab + (n-1)*gap)) / 2;
+  let out = `<rect x="${W/2-4}" y="${top-10}" width="8" height="${n*(slab+gap)+14}" rx="3" fill="#2A2D31"/>`;
+  for(let i = 0; i < n; i++){
+    const y = top + i*(slab+gap), on = i < sel;
+    out += `<rect x="18" y="${y.toFixed(1)}" width="${W-36}" height="${slab}" rx="2.5"
+      fill="${on ? '#8B8F96' : '#1B1E22'}" stroke="${on ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.07)'}"/>`;
+  }
+  const py = top + (sel-1)*(slab+gap) + slab/2;
+  out += `<rect x="${W-22}" y="${(py-2.5).toFixed(1)}" width="20" height="5" rx="2.5" fill="#D7A44B"/>`;
+  out += `<circle cx="${W-4}" cy="${py.toFixed(1)}" r="4" fill="#D7A44B"/>`;
+  return `<svg viewBox="0 0 ${W} ${h}" style="width:${W}px;height:${h}px;display:block;flex:none" aria-hidden="true">${out}</svg>`;
+}
+/* «25 + 10 + 1,25 kg» */
+function pointTextHTML(perPoint){
+  return perPoint.length
+    ? perPoint.map(k => `<b>${fmtW(k)}</b>`).join(' + ') + ' ' + uLabel()
+    : '<b>sin discos</b>';
+}
 function dumbbellSVG(kg, opts){
   const h = (opts && opts.h) || 76;
   const W = 340, cx = W/2, cy = h/2;
@@ -1204,19 +1382,20 @@ function sideTextHTML(perSide){
     : '<b>solo la barra</b>';
 }
 /* lista de discos por lado, con su punto de color */
-function plateListHTML(perSide){
+function plateListHTML(perSide, points){
   const counts = [];
   for(const kg of perSide){
     const hit = counts.find(c => Math.abs(c.kg - kg) < 1e-9);
     if(hit) hit.n++; else counts.push({ kg, n:1 });
   }
+  const sufijo = points === 1 ? 'en el pitón' : (points === 4 ? 'en cada pitón' : 'por lado');
   return counts.map(c => `
     <div class="line">
       <div class="row grow" style="gap:13px">
         <i class="plate-dot" style="background:${plateColor(c.kg)}"></i>
         <div class="l-t">${fmtW(c.kg)} ${uLabel()}</div>
       </div>
-      <div class="l-v">×${c.n} <span style="color:var(--dim)">por lado</span></div>
+      <div class="l-v">×${c.n} <span style="color:var(--dim)">${sufijo}</span></div>
     </div>`).join('');
 }
 
@@ -1563,14 +1742,14 @@ function viewExercise(){
   const repsMode = corporal || porTiempo;   /* la métrica es reps/segundos, no e1RM */
   const pts = hist.map(h => ({
     date: h.date,
-    v: repsMode ? Math.max(...h.sets.map(s => s.r)) : Math.round(fromKg(bestE1RM(h.sets))*10)/10
+    v: repsMode ? Math.max(...h.sets.map(s => s.r)) : Math.round(fromKgEx(key, bestE1RM(h.sets))*10)/10
   })).filter(p => p.v > 0);
   window.__chartPts = pts;
-  window.__chartUnit = porTiempo ? 's' : (corporal ? 'reps' : uLabel());
+  window.__chartUnit = porTiempo ? 's' : (corporal ? 'reps' : uLabelEx(key));
   const best = pts.length ? Math.max(...pts.map(p => p.v)) : 0;
 
   const headLabel = porTiempo ? 'Tu mejor tiempo' : (corporal ? 'Tu récord de reps' : '1RM estimado');
-  const unitLabel = porTiempo ? 's' : (corporal ? 'reps' : uLabel());
+  const unitLabel = porTiempo ? 's' : (corporal ? 'reps' : uLabelEx(key));
 
   /* «tu carga de trabajo es el X % de esa marca» */
   let pctLine = '';
@@ -1578,7 +1757,7 @@ function viewExercise(){
     const wNow = workWeight(hist[hist.length-1].sets);
     const bestKg = Math.max(0, ...hist.map(h => bestE1RM(h.sets)));
     if(wNow > 0 && bestKg > 0){
-      pctLine = `<div class="pr-d">Tu carga de trabajo (${fmtW(wNow)} ${uLabel()}) es el
+      pctLine = `<div class="pr-d">Tu carga de trabajo (${fmtWEx(key, wNow)} ${uLabelEx(key)}) es el
         <b>${Math.round(wNow / bestKg * 100)} %</b> de esa marca.</div>`;
     }
   }
@@ -1637,6 +1816,17 @@ function viewExercise(){
     <div class="seg4">${seg}</div>
     <div class="hint">${TYPE_HINT[meta.type] || ''}</div>
 
+    <div class="sect">Cómo se carga</div>
+    <div class="stack">
+      ${EQUIP_KEYS.map(k => `
+        <button class="opt ${meta.equip === k ? 'on' : ''}" onclick="setExEquip('${key}','${k}')">
+          <b>${EQUIP[k].label}</b><span>${EQUIP[k].desc}</span>
+        </button>`).join('')}
+    </div>
+    ${ !meta.equip ? `<div class="hint">Sin elegir, el coach progresa igual pero no puede decirte cómo
+      cargar nada. Se adivina del nombre del ejercicio; toca el que corresponda si falló.</div>` : '' }
+    ${ equipConfigHTML(key, meta) }
+
     <div class="sect">Ajustes del ejercicio</div>
     <div class="list">
       <div class="line">
@@ -1650,24 +1840,6 @@ function viewExercise(){
         </div>
       </div>
       <div class="line">
-        <div><div class="l-t">Equipo</div><div class="l-d">Define si se calcula la carga</div></div>
-        <div class="l-v"><select class="inline" onchange="setExEquip('${key}',this.value)">
-          <option value="none" ${!meta.equip ? 'selected' : ''}>Sin especificar</option>
-          ${Object.entries(EQUIP_LABEL).map(([k, l]) =>
-            `<option value="${k}" ${meta.equip === k ? 'selected' : ''}>${l}</option>`).join('')}
-        </select></div>
-      </div>
-      ${ meta.equip === 'barra' ? (() => {
-        const bars = availableBars(), cur = barFor(key);
-        return `<div class="line">
-          <div><div class="l-t">Barra</div><div class="l-d">${cur ? `${esc(cur.name)} · ${fmtW(cur.kg)} ${uLabel()}` : 'Ninguna disponible'}</div></div>
-          <div class="l-v"><select class="inline" onchange="setExBarSel('${key}',this.value)">
-            <option value="auto" ${!meta.bar ? 'selected' : ''}>Predeterminada</option>
-            ${bars.map(b => `<option value="${b.id}" ${meta.bar === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
-          </select></div>
-        </div>`;
-      })() : '' }
-      <div class="line">
         <div class="l-t">Salto mínimo</div>
         <div class="l-v"><select class="inline" onchange="setExStep('${key}',this.value)">${stepOptionsHTML(meta.step)}</select></div>
       </div>
@@ -1676,9 +1848,9 @@ function viewExercise(){
         <div><div class="l-t">Peso máximo</div><div class="l-d">El tope de esa máquina o mancuerna</div></div>
         <div class="l-v">
           <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" style="width:66px"
-            value="${meta.cap != null ? inputW(meta.cap) : ''}" aria-label="Peso máximo"
+            value="${meta.cap != null ? inputWEx(key, meta.cap) : ''}" aria-label="Peso máximo"
             oninput="setExCap('${key}',this.value)">
-          <span style="color:var(--dim)">${uLabel()}</span>
+          <span style="color:var(--dim)">${uLabelEx(key)}</span>
         </div>
       </div>` : '' }
       <div class="line">
@@ -1698,10 +1870,18 @@ function viewExercise(){
       </div>
     </div>
     <div class="hint">El rango viene de tu objetivo (${g.lo}–${g.hi}); cámbialo solo para casos especiales
-      (ej. abdominales 15–25). ${ meta.equip === 'barra' && barMinStep() > 0
-        ? `Con equipo <b>Barra</b>, el salto automático es tu par de discos más pequeño (<b>${fmtW(barMinStep())} ${uLabel()}</b>) y las sugerencias se redondean a pesos que puedes armar.`
-        : 'El salto mínimo es el aumento más pequeño posible en tu gimnasio.' }
+      (ej. abdominales 15–25). ${ (() => {
+        const auto = effStep(key, 20);
+        return effEquip(key) && effEquip(key) !== 'nada'
+          ? `El salto automático sale de cómo se carga: <b>${fmtWEx(key, auto)} ${uLabelEx(key)}</b>. Cámbialo solo si tu gimnasio es raro.`
+          : 'El salto mínimo es el aumento más pequeño posible en tu gimnasio.'; })() }
       Si marcas el peso máximo, al alcanzarlo el coach progresa por reps y series en vez de pedirte kilos imposibles.</div>
+
+    <div class="sect">Otra máquina</div>
+    <button class="btn quiet sm" onclick="promptDuplicateEx('${key}', '${esc(view.exname).replace(/'/g, "\\'")}')">
+      Duplicar para otra máquina</button>
+    <div class="hint">Si tu gimnasio tiene este ejercicio en dos aparatos —uno de cable y otro de discos—
+      van separados: no pesan lo mismo ni progresan igual.</div>
 
     <div class="sect">Notas</div>
     <textarea placeholder="Ej. agarre ancho, asiento en 4, bajar lento…"
@@ -1711,13 +1891,122 @@ function viewExercise(){
     ${ recent ? `
       <div class="sect">Últimas sesiones</div>
       <div class="list" style="padding:4px 16px">${recent}</div>
-      <div class="hint">Formato: ${uLabel()}×reps. El “@2” es tu RIR — las reps que te quedaban.</div>` : '' }`;
+      <div class="hint">Formato: ${uLabelEx(key)}×reps. El “@2” es tu RIR — las reps que te quedaban.</div>` : '' }`;
+}
+
+/* la configuración propia de cada forma de cargar */
+function equipConfigHTML(key, meta){
+  const eq = effEquip(key);
+  if(eq === 'barra' || eq === 'discos'){
+    const pts = effPoints(key);
+    const minStep = plateMinStep(pts);
+    const bars = availableBars(), cur = barFor(key);
+    return `
+      <div class="sect">¿Dónde van los discos?</div>
+      <div class="stack">
+        ${POINTS.map(([n, t, d]) => `
+          <button class="opt ${pts === n ? 'on' : ''}" onclick="setExPoints('${key}',${n})">
+            <b>${t}</b><span>${d}</span>
+          </button>`).join('')}
+      </div>
+      <div class="list" style="margin-top:14px">
+        ${ eq === 'barra' ? `
+        <div class="line">
+          <div><div class="l-t">Barra</div><div class="l-d">${cur ? `${esc(cur.name)} · ${fmtW(cur.kg)} ${uLabel()}` : 'Ninguna disponible'}</div></div>
+          <div class="l-v"><select class="inline" onchange="setExBarSel('${key}',this.value)">
+            <option value="auto" ${!meta.bar ? 'selected' : ''}>Predeterminada</option>
+            ${bars.map(b => `<option value="${b.id}" ${meta.bar === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
+          </select></div>
+        </div>` : `
+        <div class="line">
+          <div><div class="l-t">El aparato vacío pesa</div><div class="l-d">Si no lo sabes, déjalo en blanco</div></div>
+          <div class="l-v">
+            <input type="number" inputmode="decimal" step="any" min="0" placeholder="—"
+              value="${meta.base != null ? inputW(meta.base) : ''}" aria-label="Peso del aparato"
+              oninput="setExBase('${key}',this.value)">
+            <span style="color:var(--dim)">${uLabel()}</span>
+          </div>
+        </div>` }
+      </div>
+      <div class="hint">${ minStep > 0
+        ? `Con ${pts === 1 ? 'un solo pitón' : (pts === 2 ? 'dos lados' : 'cuatro pitones')}, el salto más pequeño que puedes armar es <b>${fmtW(minStep)} ${uLabel()}</b>${pts > 1 ? ` — un disco de ${fmtW(minStep/pts)} en cada uno` : ''}.`
+        : 'Marca algún disco en Ajustes → Mi equipo para poder calcular la carga.' }
+        ${ eq === 'discos' ? ' Dejar el peso en blanco no rompe nada: el coach compara tus series entre sí.' : '' }</div>`;
+  }
+
+  if(eq === 'placas'){
+    const c = stackConf(key);
+    const u = (meta.stack && meta.stack.unit === 'lb') ? 'lb' : 'kg';
+    const prev = stackPreview(key, 7);
+    return `
+      <div class="sect">La torre de esta máquina</div>
+      <div class="list">
+        <div class="line">
+          <div><div class="l-t">Unidad de la máquina</div><div class="l-d">Lo que está escrito en las placas</div></div>
+          <div class="pill-sw">
+            <button class="${u === 'kg' ? 'on' : ''}" onclick="setExStack('${key}','unit','kg')">kg</button>
+            <button class="${u === 'lb' ? 'on' : ''}" onclick="setExStack('${key}','unit','lb')">lb</button>
+          </div>
+        </div>
+        <div class="line">
+          <div><div class="l-t">Sube de</div><div class="l-d">De una placa a la siguiente</div></div>
+          <div class="l-v">
+            <input type="number" inputmode="decimal" step="any" min="0" placeholder="—"
+              value="${meta.stack && meta.stack.step != null ? meta.stack.step : ''}" aria-label="Salto de la torre"
+              oninput="setExStack('${key}','step',this.value)">
+            <span style="color:var(--dim)">${u}</span>
+          </div>
+        </div>
+        <div class="line">
+          <div><div class="l-t">Empieza en</div><div class="l-d">La placa más ligera</div></div>
+          <div class="l-v">
+            <input type="number" inputmode="decimal" step="any" min="0" placeholder="—"
+              value="${meta.stack && meta.stack.start != null ? meta.stack.start : ''}" aria-label="Primera placa"
+              oninput="setExStack('${key}','start',this.value)">
+            <span style="color:var(--dim)">${u}</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint" id="stackhint">${ c
+        ? `Así queda la torre: <b>${prev.map(fmtNum).join(' · ')} …</b> ${u}. Compárala con los números de la
+           máquina — si no cuadran, corrige el salto. Este ejercicio se anota y se muestra en ${u}, aunque el
+           resto de la app esté en ${db.settings.unit === 'lb' ? 'libras' : 'kilos'}.`
+        : 'Escribe de cuánto en cuánto sube y te enseño la torre entera para que la compares con la máquina. No hace falta saberlo de memoria: se ajusta de pie frente al aparato.' }</div>`;
+  }
+  return '';
 }
 
 function setExType(key, t){ exMeta(key).type = t; save(); render(); }
+function setExPoints(key, n){ exMeta(key).points = n; save(); render(); }
+function setExBase(key, v){
+  const x = parseFloat(v);
+  exMeta(key).base = (isNaN(x) || x <= 0) ? null : Math.round(toKg(x)*1000)/1000;
+  save();
+}
+function setExStack(key, field, v){
+  const st = exMeta(key).stack;
+  if(field === 'unit') st.unit = v;
+  else {
+    const x = parseFloat(v);
+    st[field] = (isNaN(x) || x <= 0) ? null : x;
+  }
+  save();
+  if(field === 'unit') render(); else renderStackHint(key);
+}
+/* al teclear el salto no se re-renderiza todo: solo se refresca la torre */
+function renderStackHint(key){
+  const el = document.getElementById('stackhint');
+  if(!el) return;
+  const c = stackConf(key);
+  const u = uLabelEx(key);
+  el.innerHTML = c
+    ? `Así queda la torre: <b>${stackPreview(key, 7).map(fmtNum).join(' · ')} …</b> ${u}.`
+    : 'Escribe de cuánto en cuánto sube y te enseño la torre entera.';
+}
 function setExEquip(key, v){
-  exMeta(key).equip = (v === 'none') ? null : v;
-  if(v !== 'barra') exMeta(key).bar = null;
+  const m = exMeta(key);
+  m.equip = EQUIP[v] ? v : null;
+  if(v !== 'barra') m.bar = null;
   save(); render();
 }
 function setExBarSel(key, v){ exMeta(key).bar = (v === 'auto') ? null : v; save(); render(); }
@@ -1754,7 +2043,7 @@ function setExRest(key, val){
 function setExMuscle(key, val){ exMeta(key).muscle = val; save(); }
 function setExCap(key, val){
   const v = parseFloat(val);
-  exMeta(key).cap = (isNaN(v) || v <= 0) ? null : Math.round(toKg(v)*1000)/1000;
+  exMeta(key).cap = (isNaN(v) || v <= 0) ? null : Math.round(toKgEx(key, v)*1000)/1000;
   save();
 }
 
@@ -1817,7 +2106,7 @@ function saveExNotes(key){
 /* peso objetivo de hoy: lo escrito en la serie 1, o lo que sugiere el coach */
 function targetWeight(ex){
   const typed = parseFloat(ex.sets[0] && ex.sets[0].w);
-  if(!isNaN(typed) && typed > 0) return toKg(typed);
+  if(!isNaN(typed) && typed > 0) return toKgEx(ex.key, typed);
   if(ex.sugg && ex.sugg.w > 0) return ex.sugg.w;
   return NaN;
 }
@@ -1826,94 +2115,133 @@ function loadStripHTML(xi){
   const ex = db.active.exercises[xi];
   const key = ex.key;
   if(exMeta(key).type !== 'normal') return '';
-  const eq = effEquip(key);
   const w = targetWeight(ex);
   if(!(w > 0)) return '';
+  const p = loadPlan(key, w);
+  if(!p) return '';
+  const note = p.exact ? '' : (
+    p.kind === 'placas'
+      ? `La torre sube a saltos: ${fmtWEx(key, p.total)} ${uLabelEx(key)} es la placa más cercana a ${fmtWEx(key, w)}.`
+      : p.kind === 'mancuerna'
+      ? `Tu gimnasio no tiene ${fmtW(w)} ${uLabel()}: lo más cercano es ${fmtW(p.total)}.`
+      : `Con tus discos, ${fmtW(p.total)} ${uLabel()} es lo más cercano a ${fmtW(w)}.`);
+  const wrap = inner => `<button class="load" onclick="showLoad(${xi})">${inner}
+    ${note ? `<div class="why" style="padding-left:0;margin-top:9px">${note}</div>` : ''}</button>`;
 
-  if(eq === 'barra'){
-    const l = barLoad(key, w);
-    if(!l) return '';
-    const note = l.exact ? '' :
-      `Con tus discos, ${fmtW(l.total)} ${uLabel()} es lo más cercano a ${fmtW(w)}.`;
-    return `
-    <button class="load" onclick="showLoad(${xi})">
+  if(p.kind === 'placas'){
+    return wrap(`
       <div class="load-row">
-        <span class="load-l">Cargar la barra</span>
-        <span class="load-v">${fmtW(l.total)} ${uLabel()} <span class="chev">›</span></span>
+        <span class="load-l">Pon el pin en</span>
+        <span class="load-v">Placa ${p.stack.index} · <b>${fmtNum(p.stack.value)} ${p.stack.unit}</b> <span class="chev">›</span></span>
       </div>
-      ${barbellSVG(l.plates, { h:86, scale:0.72 })}
-      <div class="load-row" style="margin-top:8px">
-        <span class="load-l">Por lado</span>
-        <span class="load-v">${sideTextHTML(l.plates)}</span>
-      </div>
-      ${note ? `<div class="why" style="padding-left:0;margin-top:9px">${note}</div>` : ''}
-    </button>`;
+      <div style="display:flex;justify-content:center;padding:10px 0 2px">${stackSVG(p.stack.index, Math.max(p.stack.index + 3, 12), { h:132 })}</div>`);
   }
-  if(eq === 'mancuerna'){
-    const d = nearestDumbbell(w);
-    if(d == null) return '';
-    const note = Math.abs(d - w) < 1e-9 ? '' :
-      `Tu gimnasio no tiene ${fmtW(w)} ${uLabel()}: lo más cercano es ${fmtW(d)}.`;
-    return `
-    <button class="load" onclick="showLoad(${xi})">
+  if(p.kind === 'mancuerna'){
+    return wrap(`
       <div class="load-row">
         <span class="load-l">Mancuernas</span>
-        <span class="load-v">2 × ${fmtW(d)} ${uLabel()} <span class="chev">›</span></span>
+        <span class="load-v">2 × <b>${fmtW(p.dumbbell)} ${uLabel()}</b> <span class="chev">›</span></span>
       </div>
-      ${dumbbellSVG(d)}
-      ${note ? `<div class="why" style="padding-left:0;margin-top:6px">${note}</div>` : ''}
-    </button>`;
+      ${dumbbellSVG(p.dumbbell)}`);
   }
-  return '';
+  /* barra y discos: uno o varios puntos de carga */
+  const label = p.points === 1 ? 'Todo en un solo lado'
+              : (p.points === 2 ? 'Por lado' : `En cada uno de los ${p.points} pitones`);
+  const draw = p.points === 2
+    ? barbellSVG(p.perPoint, { h:86, scale:0.72 })
+    : postSVG(p.perPoint, { h:84, scale:0.72 });
+  return wrap(`
+    <div class="load-row">
+      <span class="load-l">${p.kind === 'barra' ? 'Cargar la barra' : 'Cargar el aparato'}</span>
+      <span class="load-v">${fmtW(p.total)} ${uLabel()} <span class="chev">›</span></span>
+    </div>
+    ${draw}
+    <div class="load-row" style="margin-top:8px">
+      <span class="load-l">${label}</span>
+      <span class="load-v">${pointTextHTML(p.perPoint)}</span>
+    </div>`);
 }
 
-/* el detalle: la barra en grande y la cuenta completa */
+/* el detalle: el dibujo en grande y la cuenta completa */
 function showLoad(xi){
   const ex = db.active.exercises[xi];
-  const key = ex.key, eq = effEquip(key);
+  const key = ex.key;
   const w = targetWeight(ex);
   if(!(w > 0)) return;
+  const p = loadPlan(key, w);
+  if(!p){
+    infoModal('Todavía no puedo calcularlo',
+      'Dime cómo se carga este ejercicio en su ficha (tócalo desde la rutina) y aquí te enseño cómo montarlo.');
+    return;
+  }
+  const title = esc(exBaseName(ex.name));
 
-  if(eq === 'mancuerna'){
-    const d = nearestDumbbell(w);
-    if(d == null) return;
+  if(p.kind === 'placas'){
     openModal(`
-      <h2>${fmtW(d)} ${uLabel()} por mano</h2>
-      <p class="muted">${esc(exBaseName(ex.name))} · serie de trabajo</p>
-      ${dumbbellSVG(d, { h:96 })}
-      <div class="hint">Dos mancuernas de ${fmtW(d)} ${uLabel()} = ${fmtW(d*2)} ${uLabel()} en total.
-        ${Math.abs(d - w) < 1e-9 ? '' : `El salto exacto pedía ${fmtW(w)} ${uLabel()}, pero tu gimnasio no lo tiene.`}</div>
+      <h2>Placa ${p.stack.index} · ${fmtNum(p.stack.value)} ${p.stack.unit}</h2>
+      <p class="muted">${title} · serie de trabajo</p>
+      <div style="display:flex;justify-content:center;margin:6px 0 4px">${stackSVG(p.stack.index, Math.max(p.stack.index + 4, 14), { h:190 })}</div>
+      <div class="hint">Cuenta ${p.stack.index} placa${p.stack.index === 1 ? '' : 's'} desde arriba.
+        La torre empieza en ${fmtNum(p.stack.value - (p.stack.index-1)*p.stack.step)} y sube de
+        ${fmtNum(p.stack.step)} en ${fmtNum(p.stack.step)} ${p.stack.unit}.
+        ${p.exact ? '' : `El objetivo era ${fmtWEx(key, p.target)} ${uLabelEx(key)}; esta es la placa más cercana.`}</div>
+      <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
+      <button class="btn ghost" onclick="closeModal(); openExerciseByKey('${key}')">Ajustar la torre</button>`);
+    return;
+  }
+  if(p.kind === 'mancuerna'){
+    openModal(`
+      <h2>${fmtW(p.dumbbell)} ${uLabel()} por mano</h2>
+      <p class="muted">${title} · serie de trabajo</p>
+      ${dumbbellSVG(p.dumbbell, { h:96 })}
+      <div class="hint">Dos mancuernas de ${fmtW(p.dumbbell)} ${uLabel()} = ${fmtW(p.dumbbell*2)} ${uLabel()} en total.
+        ${p.exact ? '' : `El salto exacto pedía ${fmtW(p.target)} ${uLabel()}, pero tu gimnasio no lo tiene.`}</div>
       <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
       <button class="btn ghost" onclick="closeModal(); go({name:'gym', kind:'dumbbells'})">Editar mancuernas</button>`);
     return;
   }
 
-  const l = barLoad(key, w);
-  if(!l) {
-    infoModal('Sin barras configuradas',
-      'Marca al menos una barra en Ajustes → Mi equipo para que pueda calcular la carga.');
-    return;
-  }
+  const label = p.points === 1 ? 'Todo en un solo lado'
+              : (p.points === 2 ? 'Por lado' : `En cada pitón`);
+  const draw = p.points === 2
+    ? barbellSVG(p.perPoint, { h:126 })
+    : postSVG(p.perPoint, { h:112 });
+  const cuenta = p.kind === 'barra'
+    ? `${esc(p.bar.name)} <b>${fmtW(p.base)}</b> + discos <b>${fmtW(p.points * p.perPointKg)}</b>`
+    : (p.base > 0 ? `Aparato <b>${fmtW(p.base)}</b> + discos <b>${fmtW(p.points * p.perPointKg)}</b>`
+                  : `Discos <b>${fmtW(p.points * p.perPointKg)}</b>`);
   openModal(`
-    <h2>Cargar ${fmtW(l.total)} ${uLabel()}</h2>
-    <p class="muted">${esc(exBaseName(ex.name))} · serie de trabajo</p>
-    ${barbellSVG(l.plates, { h:126 })}
-    <div class="sect">Por lado</div>
-    <div class="list">${plateListHTML(l.plates) ||
-      `<div class="line"><div class="l-t">Sin discos</div><div class="l-v">solo la barra</div></div>`}</div>
-    <div class="hint">${esc(l.bar.name)} <b>${fmtW(l.bar.kg)}</b> + discos <b>${fmtW(2*l.perSide)}</b>
-      (${fmtW(l.perSide)} por lado) = <b>${fmtW(l.total)} ${uLabel()}</b>.
-      ${l.exact ? '' : `El objetivo era ${fmtW(l.target)} ${uLabel()}; esto es lo más cercano que puedes armar.`}</div>
+    <h2>Cargar ${fmtW(p.total)} ${uLabel()}</h2>
+    <p class="muted">${title} · serie de trabajo</p>
+    ${draw}
+    ${ p.points !== 2 ? `<div class="load-row" style="margin-top:4px">
+      <span class="load-l">Son ${p.points} punto${p.points === 1 ? '' : 's'} de carga</span>
+      <span class="load-v">${p.points} × ${fmtW(p.perPointKg)} = <b>${fmtW(p.points * p.perPointKg)} ${uLabel()}</b></span>
+    </div>` : '' }
+    <div class="sect">${label}</div>
+    <div class="list">${plateListHTML(p.perPoint, p.points) ||
+      `<div class="line"><div class="l-t">Sin discos</div><div class="l-v">${p.kind === 'barra' ? 'solo la barra' : 'aparato vacío'}</div></div>`}</div>
+    <div class="hint">${cuenta} = <b>${fmtW(p.total)} ${uLabel()}</b>.
+      ${p.exact ? '' : `El objetivo era ${fmtW(p.target)} ${uLabel()}; esto es lo más cercano que puedes armar.`}</div>
     <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
-    <button class="btn ghost" onclick="closeModal(); pickBar('${key}')">Cambiar de barra</button>`);
+    ${ p.kind === 'barra' ? `<button class="btn ghost" onclick="closeModal(); pickBar('${key}')">Cambiar de barra</button>` : '' }`);
+}
+
+/* abrir la ficha desde la sesión, sin pasar por la rutina */
+function openExerciseByKey(key){
+  for(const r of db.routines){
+    const ex = r.exercises.find(e => e.key === key);
+    if(ex){ go({ name:'exercise', key, exname:ex.name, rid:r.id }); return; }
+  }
+  const a = db.active && db.active.exercises.find(e => e.key === key);
+  if(a) go({ name:'exercise', key, exname:a.name, rid:(db.active.routineId || '') });
 }
 
 /* elegir barra para este ejercicio, desde la sesión o desde la ficha */
 function pickBar(key){
   const bars = availableBars();
   if(!bars.length){
-    infoModal('Sin barras configuradas',
-      'Marca al menos una barra en Ajustes → Mi equipo.');
+    infoModal('Sin barras configuradas', 'Marca al menos una barra en Ajustes → Mi equipo.');
     return;
   }
   const cur = barFor(key);
@@ -1998,7 +2326,7 @@ function viewSession(){
     if(!ex.sugg){
       if(t === 'corporal') firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). El peso puedes dejarlo en blanco; si usas lastre, anótalo.`;
       else if(t === 'tiempo') firstMsg = `Primera vez. Mide los segundos que sostienes con buena técnica (ideal ${lo}–${hi} s). Toca el ▶ de cada serie para usar el cronómetro con alarma.`;
-      else if(t === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina o banda (en ${uLabel()}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
+      else if(t === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina o banda (en ${uLabelEx(ex.key)}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
       else firstMsg = `Primera vez con este ejercicio. Elige un peso con el que puedas hacer ${lo}–${hi} reps quedándote 1–3 en reserva (sin llegar al fallo). Desde la próxima, te sugiero la progresión.`;
     }
 
@@ -2011,7 +2339,7 @@ function viewSession(){
       ${ loadStripHTML(xi) }
       <div class="grid-h">
         <span>${t === 'tiempo' ? '▶' : '#'}</span>
-        <span>${(t === 'corporal' || t === 'tiempo') ? 'lastre' : (t === 'asistido' ? 'ayuda' : uLabel())}</span>
+        <span>${(t === 'corporal' || t === 'tiempo') ? 'lastre' : (t === 'asistido' ? 'ayuda' : uLabelEx(ex.key))}</span>
         <span>${t === 'tiempo' ? 'seg' : 'reps'}</span>
         <span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir</span>
         <span></span><span></span>
@@ -2035,7 +2363,8 @@ function viewSession(){
 
 function setRowHTML(xi, si, st, sugg, t){
   const tiempo = t === 'tiempo';
-  const pw = sugg ? fmtW(sugg.w) : ((t === 'corporal' || tiempo) ? '0' : uLabel());
+  const key = db.active ? db.active.exercises[xi].key : null;
+  const pw = sugg ? fmtWEx(key, sugg.w) : ((t === 'corporal' || tiempo) ? '0' : uLabelEx(key));
   const pr = sugg ? sugg.reps : (tiempo ? 'seg' : 'reps');
   const cls = sugg ? ' sugg' : '';
   const done = !!st.done;
@@ -2188,7 +2517,7 @@ function editSession(id){
     entries: h.entries.map(e => ({
       key: e.key, name: e.name,
       sets: e.sets.map(st => ({
-        w: st.w != null ? inputW(st.w) : '',
+        w: st.w != null ? inputWEx(e.key, st.w) : '',
         r: st.r != null ? String(st.r) : '',
         rir: (st.rir === undefined || st.rir === null) ? '' : String(st.rir)
       }))
@@ -2209,12 +2538,12 @@ function renderEditModal(){
       <div>
         <div class="ex-title" style="margin-bottom:2px">${exTitleHTML(e.name)}</div>
         <div class="grid-h" style="grid-template-columns:14px 1fr 1fr .8fr 20px">
-          <span>#</span><span>${uLabel()}</span><span>reps</span><span>rir</span><span></span></div>
+          <span>#</span><span>${uLabelEx(e.key)}</span><span>reps</span><span>rir</span><span></span></div>
         ${e.sets.map((st, si) => `
           <div class="set" style="grid-template-columns:14px 1fr 1fr .8fr 20px">
             <span class="i">${si+1}</span>
             <input class="cell" type="number" inputmode="decimal" step="any" min="0" value="${st.w}"
-              aria-label="Peso en ${uLabel()}" oninput="editVal(${ei},${si},'w',this.value)">
+              aria-label="Peso en ${uLabelEx(e.key)}" oninput="editVal(${ei},${si},'w',this.value)">
             <input class="cell" type="number" inputmode="numeric" step="1" min="0" value="${st.r}"
               aria-label="Reps" oninput="editVal(${ei},${si},'r',this.value)">
             <input class="cell" type="number" inputmode="numeric" step="1" min="0" max="9" value="${st.rir}" placeholder="–"
@@ -2246,7 +2575,7 @@ function saveEditedSession(){
   for(const e of ed.entries){
     const sets = e.sets.map(st => {
       let w = parseFloat(st.w);
-      if(!isNaN(w)) w = Math.round(toKg(w)*1000)/1000;   /* editado en la unidad activa → kg */
+      if(!isNaN(w)) w = Math.round(toKgEx(e.key, w)*1000)/1000;   /* en la unidad de su máquina → kg */
       const r = parseInt(st.r,10), rir = parseInt(st.rir,10);
       const out = { w, r };
       if(!isNaN(rir)) out.rir = Math.min(9, Math.max(0, rir));
@@ -2732,6 +3061,49 @@ function moveEx(rid, i, dir){
   [r.exercises[i], r.exercises[j]] = [r.exercises[j], r.exercises[i]];
   save(); render();
 }
+/* el mismo ejercicio en otra máquina no es el mismo ejercicio: 90 en la
+   de cable no es 90 en la de discos. Se separan, pero sin trabajo. */
+function promptDuplicateEx(key, name){
+  window.__dupFrom = key;
+  openModal(`
+    <h2>Duplicar para otra máquina</h2>
+    <p class="muted">Crea un ejercicio aparte partiendo de <b>${esc(exBaseName(name))}</b>. Empieza sin
+      historial: son aparatos distintos y sus pesos no se pueden comparar.</p>
+    <form onsubmit="doDuplicateEx(event)" class="stack" autocomplete="off">
+      <div class="field"><span>Nombre</span>
+        <input type="text" id="dupname" value="${esc(name)} (2)" autocomplete="off"></div>
+      <button class="btn" type="submit">Crear</button>
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+    </form>
+    <div class="hint">Se copian el rango de reps, el grupo muscular y el descanso. Lo que cambies después
+      en uno no toca al otro.</div>`);
+  setTimeout(() => document.getElementById('dupname')?.select(), 60);
+}
+function doDuplicateEx(ev){
+  ev.preventDefault();
+  const from = window.__dupFrom;
+  const name = document.getElementById('dupname').value.trim();
+  if(!from || !name) return;
+  const key = exKey(name);
+  if(key === from || db.exmeta[key]){
+    infoModal('Ese nombre ya existe', 'Ponle uno que diga de qué máquina es — por ejemplo “(Cable)” o “(Discos)”.');
+    return;
+  }
+  const src = exMeta(from);
+  db.exmeta[key] = { type:src.type, lo:src.lo, hi:src.hi, step:null, notes:'', rest:src.rest,
+                     muscle:src.muscle, equip:null, bar:null, points:null, base:null,
+                     stack:{ unit:null, step:null, start:null } };
+  /* se añade a las mismas rutinas donde está el original */
+  for(const r of db.routines){
+    const i = r.exercises.findIndex(e => e.key === from);
+    if(i >= 0 && !r.exercises.some(e => e.key === key))
+      r.exercises.splice(i + 1, 0, { id:uid(), name, key });
+  }
+  window.__dupFrom = null;
+  save(); closeModal();
+  openExerciseByKey(key);
+}
+
 function duplicateRoutine(rid){
   const r = db.routines.find(x => x.id === rid);
   const copy = { id:uid(), name: r.name + ' (copia)',
@@ -2788,7 +3160,7 @@ function vsLastInfo(xi){
     if(repsMode){ vol += r; done++; }
     else {
       const w = parseFloat(st.w);
-      if(!isNaN(w) && w >= 0){ vol += toKg(w) * r; done++; }
+      if(!isNaN(w) && w >= 0){ vol += toKgEx(ex.key, w) * r; done++; }
     }
   }
   if(!done) return null;
@@ -3001,7 +3373,7 @@ function collectEntries(s){
     const sets = ex.sets.map(st => {
       let w = parseFloat(st.w);
       if(isNaN(w) && corp && st.r !== '' && st.r !== undefined) w = 0;  /* corporal/tiempo: peso en blanco = 0 */
-      if(!isNaN(w)) w = Math.round(toKg(w)*1000)/1000;                  /* lo escrito está en la unidad activa → guardar en kg */
+      if(!isNaN(w)) w = Math.round(toKgEx(ex.key, w)*1000)/1000;        /* lo escrito está en la unidad de esa máquina → kg */
       const r = parseInt(st.r,10);
       const out = { w, r };
       const rir = parseInt(st.rir,10);
@@ -3069,7 +3441,7 @@ function finishSession(){
       const prevBest = bestAssistBefore(e.key);
       const nowBest = Math.min(...e.sets.filter(st => st.r >= lo).map(st => st.w), Infinity);
       if(prevBest !== Infinity && nowBest < prevBest - 1e-9){
-        prs.push(`${esc(e.name)}: <b style="color:var(--hold)">${nowBest === 0 ? '¡sin asistencia!' : fmtW(nowBest) + ' ' + uLabel() + ' de ayuda'}</b> <span class="tiny">(antes ${fmtW(prevBest)})</span>`);
+        prs.push(`${esc(e.name)}: <b style="color:var(--hold)">${nowBest === 0 ? '¡sin asistencia!' : fmtWEx(e.key, nowBest) + ' ' + uLabelEx(e.key) + ' de ayuda'}</b> <span class="tiny">(antes ${fmtWEx(e.key, prevBest)})</span>`);
       }
       continue;
     }
@@ -3077,8 +3449,8 @@ function finishSession(){
     const prev = bestMetricBefore(e.key);
     const now = repsMode ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
     if(prev > 0 && now > prev){
-      const fv = v => repsMode ? fmtNum(Math.round(v*10)/10) : fmtW(Math.round(v*10)/10);
-      const unit = meta.type === 'tiempo' ? 's' : (meta.type === 'corporal' ? 'reps' : uLabel());
+      const fv = v => repsMode ? fmtNum(Math.round(v*10)/10) : fmtWEx(e.key, Math.round(v*10)/10);
+      const unit = meta.type === 'tiempo' ? 's' : (meta.type === 'corporal' ? 'reps' : uLabelEx(e.key));
       prs.push(`${esc(e.name)}: <b style="color:var(--hold)">${fv(now)} ${unit}</b> <span class="tiny">(antes ${fv(prev)})</span>`);
     }
   }
@@ -3148,6 +3520,7 @@ function setUnit(u){
   if(db.active){
     const f = (u === 'lb') ? 1/LB_KG : LB_KG;
     for(const ex of db.active.exercises){
+      if(pinnedUnit(ex.key)) continue;   /* esa torre tiene su propia unidad */
       for(const st of ex.sets){
         const n = parseFloat(st.w);
         if(st.w !== '' && st.w !== undefined && !isNaN(n)){
@@ -3214,7 +3587,7 @@ function warmupPlan(xi){
   if(isNaN(W) || W <= 0) return null;         /* aún no hay peso de referencia */
   if(meta.type === 'asistido'){
     const helpW = roundToStep(W * 1.5, effStep(ex.key, W));
-    return { rows: [`1 serie × 6 con más ayuda (~${fmtW(helpW)} ${uLabel()})`], first,
+    return { rows: [`1 serie × 6 con más ayuda (~${fmtWEx(ex.key, helpW)} ${uLabelEx(ex.key)})`], first,
              note: 'En asistidos, calentar = misma técnica con bastante más asistencia.' };
   }
   if(W <= 12){
@@ -3231,26 +3604,33 @@ function warmupPlan(xi){
     wk = fitWeight(ex.key, wk) || wk;   /* que el escalón se pueda armar de verdad */
     if(wk <= 0 || wk >= W || seen.has(wk)) continue;
     seen.add(wk);
-    rows.push(`${fmtW(wk)} ${uLabel()} × ${reps}`);
+    rows.push(`${fmtWEx(ex.key, wk)} ${uLabelEx(ex.key)} × ${reps}`);
     steps.push({ w:wk, reps });
   }
   return { rows, steps, first, W, heavy,
            note: rows.length ? null : 'El peso de trabajo es tan bajo que no salen escalones útiles: 1 serie suave alcanza.' };
 }
 
-/* un escalón del calentamiento con su barra dibujada */
+/* un escalón del calentamiento con su carga dibujada */
 function warmStepHTML(key, label, value, w, work){
-  const l = barLoad(key, w);
-  const plates = l ? l.plates : [];
-  return `
-  <div class="warm${work ? ' work' : ''}">
+  const p = loadPlan(key, w);
+  const head = `
     <div class="load-row">
       <span class="load-l"${work ? ' style="color:var(--up)"' : ''}>${label}</span>
       <span class="load-v"><b${work ? ' style="color:var(--up)"' : ''}>${value}</b></span>
-    </div>
-    ${barbellSVG(plates, { h:62, scale:0.52 })}
-    <div class="load-row"><span class="load-l">Por lado</span><span class="load-v">${sideTextHTML(plates)}</span></div>
-  </div>`;
+    </div>`;
+  let body = '';
+  if(p && p.kind === 'placas'){
+    body = `<div style="display:flex;justify-content:center;padding:6px 0 0">
+      ${stackSVG(p.stack.index, Math.max(p.stack.index + 3, 12), { h:96 })}</div>`;
+  } else if(p && (p.kind === 'barra' || p.kind === 'discos')){
+    const lbl = p.points === 1 ? 'En un solo lado' : (p.points === 2 ? 'Por lado' : `En cada pitón`);
+    body = (p.points === 2 ? barbellSVG(p.perPoint, { h:62, scale:0.52 })
+                           : postSVG(p.perPoint, { h:62, scale:0.52 }))
+      + `<div class="load-row"><span class="load-l">${lbl}</span>
+         <span class="load-v">${pointTextHTML(p.perPoint)}</span></div>`;
+  }
+  return `<div class="warm${work ? ' work' : ''}">${head}${body}</div>`;
 }
 
 function showWarmup(xi){
@@ -3260,10 +3640,12 @@ function showWarmup(xi){
     infoModal('Calentamiento', 'Escribe primero el peso de hoy en la serie 1 (o entrena una vez este ejercicio) y te calculo la escalera de calentamiento.');
     return;
   }
-  const drawn = effEquip(ex.key) === 'barra' && (plan.steps || []).length && plan.W > 0;
+  const eqW = effEquip(ex.key);
+  const drawn = ['barra','discos','placas'].includes(eqW) && (plan.steps || []).length && plan.W > 0
+    && !!loadPlan(ex.key, plan.W);
   const list = drawn
-    ? plan.steps.map((st, i) => warmStepHTML(ex.key, `Serie ${i+1}`, `${fmtW(st.w)} ${uLabel()} × ${st.reps}`, st.w, false)).join('')
-      + warmStepHTML(ex.key, 'Trabajo', `${fmtW(plan.W)} ${uLabel()}`, plan.W, true)
+    ? plan.steps.map((st, i) => warmStepHTML(ex.key, `Serie ${i+1}`, `${fmtWEx(ex.key, st.w)} ${uLabelEx(ex.key)} × ${st.reps}`, st.w, false)).join('')
+      + warmStepHTML(ex.key, 'Trabajo', `${fmtWEx(ex.key, plan.W)} ${uLabelEx(ex.key)}`, plan.W, true)
     : plan.rows.map((r, i) => `
       <div class="exline">
         <span class="tiny">Serie ${i+1}</span>
@@ -3272,7 +3654,7 @@ function showWarmup(xi){
       + (plan.W && plan.rows.length ? `
       <div class="exline">
         <span class="tiny" style="color:var(--up)">Trabajo</span>
-        <span class="sets" style="font-size:13px;color:var(--up)">${fmtW(plan.W)} ${uLabel()}</span>
+        <span class="sets" style="font-size:13px;color:var(--up)">${fmtWEx(ex.key, plan.W)} ${uLabelEx(ex.key)}</span>
       </div>` : '');
   openModal(`
     <h2>Calentamiento — ${esc(exBaseName(ex.name))}</h2>
