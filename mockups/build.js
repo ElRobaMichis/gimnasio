@@ -105,6 +105,10 @@ function seed(){
   });
   migrateTypes();
   exMeta(exKey('Plancha')).type = 'tiempo';
+  /* una torre en libras y una prensa de cuatro pitones, como en un gimnasio real */
+  Object.assign(exMeta(exKey('Lat Pulldown (Cable)')).stack, { unit:'lb', step:5, start:10 });
+  exMeta(exKey('Hip Thrust (Barbell)')).equip = 'discos';
+  exMeta(exKey('Hip Thrust (Barbell)')).points = 1;
   exMeta(exKey('Pull Up (Assisted)')).type = 'asistido';
   exMeta(exKey('Incline Bench Press (Dumbbell)')).notes = 'Banco en 30°, bajar lento';
   db.progress = {};

@@ -590,8 +590,10 @@ chk(guessEquip('Squat (Barbell)') === 'barra', 'inglés de Hevy: "(Barbell)" →
 chk(guessEquip('Peso muerto rumano con barra') === 'barra', 'español: "con barra" → barra');
 chk(guessEquip('Incline Bench Press (Dumbbell)') === 'mancuerna', '"(Dumbbell)" → mancuerna');
 chk(guessEquip('Curl con mancuernas') === 'mancuerna', '"con mancuernas" → mancuerna');
-chk(guessEquip('Leg Curl (Machine)') === 'maquina', '"(Machine)" → máquina');
-chk(guessEquip('Jalón en polea alta') === 'maquina', '"polea" → máquina');
+chk(guessEquip('Leg Curl (Machine)') === 'placas', '"(Machine)" → torre de placas');
+chk(guessEquip('Jalón en polea alta') === 'placas', '"polea" → torre de placas');
+chk(guessEquip('Prensa de pierna') === 'discos', '"prensa" → discos que pones tú');
+chk(guessEquip('Hack Squat') === 'discos', '"hack" → discos que pones tú');
 chk(guessEquip('Smith Machine Squat') === 'barra', 'la multipower se carga con discos: barra gana a máquina');
 chk(guessEquip('Sentadilla búlgara') === null, 'sin implemento en el nombre → sin equipo');
 
@@ -622,7 +624,7 @@ db.gym = defaultGym('kg'); invalidatePlates();
 exMeta('squat').equip = 'barra';
 db.gym.plates = db.gym.plates.filter(p => p.kg !== 1.25);
 invalidatePlates();
-chk(barMinStep() === 5, 'sin discos de 1,25 el salto mínimo pasa a 5 kg');
+chk(plateMinStep(2) === 5, 'sin discos de 1,25 el salto mínimo pasa a 5 kg');
 l = barLoad('squat', 72.5);
 chk(l.total === 75 && !l.exact, 'lo que no se puede armar sube al más cercano (72,5 → 75)');
 
@@ -650,10 +652,10 @@ chk(s.why.includes('Con tus discos'), 'y explica por qué cambió');
 
 resetDB();
 db.gym = defaultGym('kg'); invalidatePlates();
-exMeta('polea').equip = 'maquina';
+exMeta('polea').equip = 'placas';
 sess('polea', [S(31,12), S(31,12)]);
 s = computeSuggestion('polea');
-chk(s.wanted === undefined, 'en máquinas no se toca el peso: no hay discos que armar');
+chk(s.wanted === undefined, 'torre sin configurar: no se toca el peso');
 
 suite('Equipo — mancuernas y barras alternativas');
 resetDB();
@@ -675,6 +677,85 @@ exMeta('curl z').bar = null;
 chk(barFor('curl z').kg === 20, 'sin fijar, se usa la predeterminada');
 db.gym.bars.forEach(b => { b.on = false; });
 chk(barLoad('curl z', 60) === null, 'sin barras marcadas no se calcula nada (y no revienta)');
+
+suite('Equipo — puntos de carga');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('prensa').equip = 'discos';
+exMeta('prensa').points = 4;
+chk(plateMinStep(4) === 5, 'con 4 pitones el salto mínimo es 5 kg (un 1,25 en cada uno)');
+chk(plateMinStep(2) === 2.5, 'con 2 lados, 2,5 kg');
+chk(plateMinStep(1) === 1.25, 'con 1 pitón, un disco suelto: 1,25 kg');
+chk(maxPerPoint(2, 4) === 1, 'dos pares (4 discos) solo dan uno por pitón entre cuatro');
+chk(maxPerPoint(2, 1) === 4, 'y los cuatro discos caben en un solo pitón');
+
+let pl = loadPlan('prensa', 145);
+chk(pl.points === 4 && pl.total === 145, 'prensa de 4 pitones: 145 kg exactos');
+chk(Math.abs(pl.perPointKg - 36.25) < 1e-9, '36,25 kg en cada pitón');
+chk(pl.perPoint.length === 3, 'y son tres discos por pitón (25 + 10 + 1,25)');
+
+exMeta('hipthrust').equip = 'discos';
+exMeta('hipthrust').points = 1;
+pl = loadPlan('hipthrust', 46.25);
+chk(pl.points === 1 && pl.total === 46.25, 'un solo pitón: todo el peso va ahí');
+chk(pl.perPoint.reduce((a,b) => a+b, 0) === 46.25, 'los discos suman el total, no la mitad');
+
+exMeta('hipthrust').base = 15;   /* el aparato pesa 15 kg */
+pl = loadPlan('hipthrust', 45);
+chk(pl.base === 15 && pl.total === 45 && pl.perPointKg === 30, 'el peso del aparato se descuenta de los discos');
+
+suite('Equipo — torres de placas');
+const KGxLB = 0.45359237;
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('remo cable').equip = 'placas';
+chk(loadPlan('remo cable', 50) === null, 'sin configurar la torre no se calcula nada');
+chk(exUnit('remo cable') === 'kg', 'y la unidad sigue siendo la de la app');
+
+Object.assign(exMeta('remo cable').stack, { unit:'lb', step:5, start:10 });
+chk(exUnit('remo cable') === 'lb', 'la torre en libras manda sobre la unidad global');
+chk(stackPreview('remo cable', 4).join(',') === '10,15,20,25', 'la vista previa sale de 5 en 5 desde 10');
+let sn = stackSnap('remo cable', 27.2155);   /* 60 lb */
+chk(sn.value === 60 && sn.index === 11, '60 lb es la placa 11');
+chk(Math.abs(sn.kg - 27.2155) < 0.001, 'y por dentro se guardan sus kilos exactos');
+sn = stackSnap('remo cable', 26);            /* 57,3 lb: entre 55 y 60 */
+chk(sn.value === 55, 'un peso intermedio cae en la placa más cercana');
+chk(Math.abs(effStep('remo cable', 30) - 5*KGxLB) < 1e-6, 'el salto del coach es el de la torre, en kg');
+
+/* la misma máquina pero en kilos */
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('pulldown').equip = 'placas';
+Object.assign(exMeta('pulldown').stack, { unit:'kg', step:5, start:5 });
+chk(exUnit('pulldown') === 'kg', 'una torre en kilos se queda en kilos');
+chk(stackSnap('pulldown', 47).value === 45, '47 kg cae en la placa de 45');
+chk(effStep('pulldown', 40) === 5, 'y el salto del coach es 5 kg');
+
+suite('Equipo — el coach en máquinas de placas');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('remo cable').equip = 'placas';
+Object.assign(exMeta('remo cable').stack, { unit:'lb', step:5, start:10 });
+const lb55 = Math.round(55 * KGxLB * 1000) / 1000;
+sess('remo cable', [S(lb55,12), S(lb55,12), S(lb55,12)]);
+s = computeSuggestion('remo cable');
+chk(Math.abs(s.w - 60*KGxLB) < 0.001, 'de 55 lb el coach salta a 60 lb, no a un peso imposible');
+chk(s.msg.includes('60'), 'y lo dice en libras, como la máquina');
+chk(fmtSet('remo cable', { w:lb55, r:12 }) === '55×12', 'el historial de ese ejercicio también va en libras');
+
+suite('Equipo — duplicar para otra máquina');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+Object.assign(exMeta('hip thrust'), { equip:'placas', muscle:'gluteos', lo:8, hi:12 });
+db.routines.push({ id:'r1', name:'G', exercises:[{ id:'a', name:'Hip Thrust', key:'hip thrust' }] });
+document.getElementById('dupname').value = 'Hip Thrust (Discos)';
+window.__dupFrom = 'hip thrust';
+doDuplicateEx({ preventDefault(){} });
+chk(!!db.exmeta['hip thrust (discos)'], 'se crea el ejercicio nuevo');
+chk(exMeta('hip thrust (discos)').muscle === 'gluteos' && exMeta('hip thrust (discos)').lo === 8,
+    'hereda grupo muscular y rango de reps');
+chk(exMeta('hip thrust (discos)').equip === null, 'pero no el equipo: es otra máquina');
+chk(db.routines[0].exercises.length === 2, 'y queda junto al original en la rutina');
 
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));

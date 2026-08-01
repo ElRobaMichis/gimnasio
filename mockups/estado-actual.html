@@ -633,10 +633,10 @@
           onclick="removeExercise('r1','e2')">✕</button>
         <button class="chev" aria-label="Ver ficha" onclick="openExercise('r1','e2')">›</button>
       </div>
-      <div class="last">Última · <b>29,6×9</b> · <b>29,6×9</b></div>
+      <div class="last">Última · <b>65,26×9</b> · <b>65,26×9</b></div>
       
-      <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>29,6 kg</b>), apunta a <b>10 reps</b></div></div>
-    <div class="why">Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
+      <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>65 lb</b>), apunta a <b>10 reps</b></div></div>
+    <div class="why">La torre de esta máquina sube a saltos: 65 lb es lo más cercano a 65,26 lb. Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
       <div class="steps">
     <div class="bars"><i class="hold"></i><i class="hold"></i><i class=""></i><i class=""></i><i class=""></i></div>
     <div class="steps-v"><b>9</b>/12</div>
@@ -760,14 +760,12 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>19 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
-      
-    <button class="load" onclick="showLoad(0)">
+      <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Mancuernas</span>
-        <span class="load-v">2 × 20 kg <span class="chev">›</span></span>
+        <span class="load-v">2 × <b>20 kg</b> <span class="chev">›</span></span>
       </div>
       <svg viewBox="0 0 340 76" style="width:100%;height:76px;display:block" aria-hidden="true"><rect x="124" y="34" width="92" height="8" rx="4" fill="#6E727A"/><rect x="114" y="10" width="16" height="56" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="96" y="5" width="16" height="66" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/><rect x="210" y="10" width="16" height="56" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="228" y="5" width="16" height="66" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/></svg>
-      
     </button>
       <div class="grid-h">
         <span>#</span>
@@ -840,7 +838,7 @@
       <button class="ex-next" id="exb-1" onclick="openSessionEx(1)">
         <span class="grow">
           <span class="ex-title" style="display:block">Lat Pulldown <em>(Cable)</em></span>
-          <span class="last" style="display:block">Siguiente · <b>29,6×10</b></span>
+          <span class="last" style="display:block">Siguiente · <b>65×10</b></span>
         </span>
         <span class="chev">›</span>
       </button>
@@ -922,6 +920,28 @@
     <div class="seg4"><button class="on" onclick="setExType('incline bench press (dumbbell)','normal')">Normal</button><button class="" onclick="setExType('incline bench press (dumbbell)','asistido')">Asistido</button><button class="" onclick="setExType('incline bench press (dumbbell)','corporal')">Corporal</button><button class="" onclick="setExType('incline bench press (dumbbell)','tiempo')">Tiempo</button></div>
     <div class="hint">Tú levantas la carga. Progresas subiendo kilos cuando llenas el rango de reps.</div>
 
+    <div class="sect">Cómo se carga</div>
+    <div class="stack">
+      
+        <button class="opt " onclick="setExEquip('incline bench press (dumbbell)','barra')">
+          <b>Barra</b><span>Una barra con discos a los dos lados.</span>
+        </button>
+        <button class="opt " onclick="setExEquip('incline bench press (dumbbell)','discos')">
+          <b>Discos</b><span>Máquina o aparato donde tú pones los discos.</span>
+        </button>
+        <button class="opt " onclick="setExEquip('incline bench press (dumbbell)','placas')">
+          <b>Placas</b><span>Máquina de pin: eliges una placa y sube de golpe en golpe.</span>
+        </button>
+        <button class="opt on" onclick="setExEquip('incline bench press (dumbbell)','mancuerna')">
+          <b>Mancuernas</b><span>Del rango que tengas en Mi equipo.</span>
+        </button>
+        <button class="opt " onclick="setExEquip('incline bench press (dumbbell)','nada')">
+          <b>Nada</b><span>Peso corporal o sin carga que calcular.</span>
+        </button>
+    </div>
+    
+    
+
     <div class="sect">Ajustes del ejercicio</div>
     <div class="list">
       <div class="line">
@@ -934,14 +954,6 @@
             value="" aria-label="Máximo" oninput="setExRange('incline bench press (dumbbell)','hi',this.value)">
         </div>
       </div>
-      <div class="line">
-        <div><div class="l-t">Equipo</div><div class="l-d">Define si se calcula la carga</div></div>
-        <div class="l-v"><select class="inline" onchange="setExEquip('incline bench press (dumbbell)',this.value)">
-          <option value="none" >Sin especificar</option>
-          <option value="barra" >Barra</option><option value="mancuerna" selected>Mancuernas</option><option value="maquina" >Máquina</option><option value="otro" >Otro</option>
-        </select></div>
-      </div>
-      
       <div class="line">
         <div class="l-t">Salto mínimo</div>
         <div class="l-v"><select class="inline" onchange="setExStep('incline bench press (dumbbell)',this.value)"><option value="auto" selected>Auto</option><option value="0.5" >0,5 kg</option><option value="1" >1 kg</option><option value="2" >2 kg</option><option value="2.5" >2,5 kg</option><option value="5" >5 kg</option></select></div>
@@ -979,8 +991,14 @@
       </div>
     </div>
     <div class="hint">El rango viene de tu objetivo (8–12); cámbialo solo para casos especiales
-      (ej. abdominales 15–25). El salto mínimo es el aumento más pequeño posible en tu gimnasio.
+      (ej. abdominales 15–25). El salto automático sale de cómo se carga: <b>2,5 kg</b>. Cámbialo solo si tu gimnasio es raro.
       Si marcas el peso máximo, al alcanzarlo el coach progresa por reps y series en vez de pedirte kilos imposibles.</div>
+
+    <div class="sect">Otra máquina</div>
+    <button class="btn quiet sm" onclick="promptDuplicateEx('incline bench press (dumbbell)', 'Incline Bench Press (Dumbbell)')">
+      Duplicar para otra máquina</button>
+    <div class="hint">Si tu gimnasio tiene este ejercicio en dos aparatos —uno de cable y otro de discos—
+      van separados: no pesan lo mismo ni progresan igual.</div>
 
     <div class="sect">Notas</div>
     <textarea placeholder="Ej. agarre ancho, asiento en 4, bajar lento…"
@@ -1087,7 +1105,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">29,6×9 · 29,6×9</span>
+            <span class="sets">65,26×9 · 65,26×9</span>
           </div>
           <div class="exline">
             <span>Shoulder Press <em>(Machine)</em></span>
@@ -1241,7 +1259,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">29,6×8 · 29,6×8</span>
+            <span class="sets">65,26×8 · 65,26×8</span>
           </div>
           <div class="exline">
             <span>Shoulder Press <em>(Machine)</em></span>
@@ -1275,7 +1293,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">27,5×9 · 27,5×8</span>
+            <span class="sets">60,63×9 · 60,63×8</span>
           </div>
         <div class="row" style="margin-top:14px;gap:9px">
           <button class="btn quiet sm" onclick="editSession('h0')">Editar</button>
@@ -1475,7 +1493,7 @@
       <button class="ex-next" id="exb-1" onclick="openSessionEx(1)">
         <span class="grow">
           <span class="ex-title" style="display:block">Lat Pulldown <em>(Cable)</em></span>
-          <span class="last" style="display:block">Siguiente · <b>27,5×8</b></span>
+          <span class="last" style="display:block">Siguiente · <b>60×8</b></span>
         </span>
         <span class="chev">›</span>
       </button>
@@ -1620,7 +1638,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">29,6×9 · 29,6×9</span>
+            <span class="sets">65,26×9 · 65,26×9</span>
           </div>
           <div class="exline">
             <span>Shoulder Press <em>(Machine)</em></span>
@@ -1774,7 +1792,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">29,6×8 · 29,6×8</span>
+            <span class="sets">65,26×8 · 65,26×8</span>
           </div>
           <div class="exline">
             <span>Shoulder Press <em>(Machine)</em></span>
@@ -1808,7 +1826,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">27,5×9 · 27,5×8</span>
+            <span class="sets">60,63×9 · 60,63×8</span>
           </div>
         <div class="row" style="margin-top:14px;gap:9px">
           <button class="btn quiet sm" onclick="editSession('h0')">Editar</button>
@@ -1976,14 +1994,12 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>19 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
-      
-    <button class="load" onclick="showLoad(0)">
+      <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Mancuernas</span>
-        <span class="load-v">2 × 19 kg <span class="chev">›</span></span>
+        <span class="load-v">2 × <b>19 kg</b> <span class="chev">›</span></span>
       </div>
       <svg viewBox="0 0 340 76" style="width:100%;height:76px;display:block" aria-hidden="true"><rect x="124" y="34" width="92" height="8" rx="4" fill="#6E727A"/><rect x="114" y="14" width="16" height="48" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="96" y="9" width="16" height="58" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/><rect x="210" y="14" width="16" height="48" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="228" y="9" width="16" height="58" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/></svg>
-      
     </button>
       <div class="grid-h">
         <span>#</span>
@@ -2056,7 +2072,7 @@
       <button class="ex-next" id="exb-1" onclick="openSessionEx(1)">
         <span class="grow">
           <span class="ex-title" style="display:block">Lat Pulldown <em>(Cable)</em></span>
-          <span class="last" style="display:block">Siguiente · <b>29,6×10</b></span>
+          <span class="last" style="display:block">Siguiente · <b>65×10</b></span>
         </span>
         <span class="chev">›</span>
       </button>
@@ -2141,14 +2157,12 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>19 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
-      
-    <button class="load" onclick="showLoad(0)">
+      <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Mancuernas</span>
-        <span class="load-v">2 × 19 kg <span class="chev">›</span></span>
+        <span class="load-v">2 × <b>19 kg</b> <span class="chev">›</span></span>
       </div>
       <svg viewBox="0 0 340 76" style="width:100%;height:76px;display:block" aria-hidden="true"><rect x="124" y="34" width="92" height="8" rx="4" fill="#6E727A"/><rect x="114" y="14" width="16" height="48" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="96" y="9" width="16" height="58" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/><rect x="210" y="14" width="16" height="48" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="228" y="9" width="16" height="58" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/></svg>
-      
     </button>
       <div class="grid-h">
         <span>#</span>
@@ -2221,7 +2235,7 @@
       <button class="ex-next" id="exb-1" onclick="openSessionEx(1)">
         <span class="grow">
           <span class="ex-title" style="display:block">Lat Pulldown <em>(Cable)</em></span>
-          <span class="last" style="display:block">Siguiente · <b>29,6×10</b></span>
+          <span class="last" style="display:block">Siguiente · <b>65×10</b></span>
         </span>
         <span class="chev">›</span>
       </button>
@@ -2355,7 +2369,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">29,6×9 · 29,6×9</span>
+            <span class="sets">65,26×9 · 65,26×9</span>
           </div>
           <div class="exline">
             <span>Shoulder Press <em>(Machine)</em></span>
@@ -2509,7 +2523,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">29,6×8 · 29,6×8</span>
+            <span class="sets">65,26×8 · 65,26×8</span>
           </div>
           <div class="exline">
             <span>Shoulder Press <em>(Machine)</em></span>
@@ -2543,7 +2557,7 @@
           </div>
           <div class="exline">
             <span>Lat Pulldown <em>(Cable)</em></span>
-            <span class="sets">27,5×9 · 27,5×8</span>
+            <span class="sets">60,63×9 · 60,63×8</span>
           </div>
         <div class="row" style="margin-top:14px;gap:9px">
           <button class="btn quiet sm" onclick="editSession('h0')">Editar</button>
@@ -2607,12 +2621,12 @@
       <div>
         <div class="ex-title" style="margin-bottom:2px">Lat Pulldown <em>(Cable)</em></div>
         <div class="grid-h" style="grid-template-columns:14px 1fr 1fr .8fr 20px">
-          <span>#</span><span>kg</span><span>reps</span><span>rir</span><span></span></div>
+          <span>#</span><span>lb</span><span>reps</span><span>rir</span><span></span></div>
         
           <div class="set" style="grid-template-columns:14px 1fr 1fr .8fr 20px">
             <span class="i">1</span>
-            <input class="cell" type="number" inputmode="decimal" step="any" min="0" value="29.6"
-              aria-label="Peso en kg" oninput="editVal(1,0,'w',this.value)">
+            <input class="cell" type="number" inputmode="decimal" step="any" min="0" value="65.26"
+              aria-label="Peso en lb" oninput="editVal(1,0,'w',this.value)">
             <input class="cell" type="number" inputmode="numeric" step="1" min="0" value="9"
               aria-label="Reps" oninput="editVal(1,0,'r',this.value)">
             <input class="cell" type="number" inputmode="numeric" step="1" min="0" max="9" value="" placeholder="–"
@@ -2621,8 +2635,8 @@
           </div>
           <div class="set" style="grid-template-columns:14px 1fr 1fr .8fr 20px">
             <span class="i">2</span>
-            <input class="cell" type="number" inputmode="decimal" step="any" min="0" value="29.6"
-              aria-label="Peso en kg" oninput="editVal(1,1,'w',this.value)">
+            <input class="cell" type="number" inputmode="decimal" step="any" min="0" value="65.26"
+              aria-label="Peso en lb" oninput="editVal(1,1,'w',this.value)">
             <input class="cell" type="number" inputmode="numeric" step="1" min="0" value="9"
               aria-label="Reps" oninput="editVal(1,1,'r',this.value)">
             <input class="cell" type="number" inputmode="numeric" step="1" min="0" max="9" value="" placeholder="–"
@@ -2755,14 +2769,12 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>19 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
-      
-    <button class="load" onclick="showLoad(0)">
+      <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Mancuernas</span>
-        <span class="load-v">2 × 19 kg <span class="chev">›</span></span>
+        <span class="load-v">2 × <b>19 kg</b> <span class="chev">›</span></span>
       </div>
       <svg viewBox="0 0 340 76" style="width:100%;height:76px;display:block" aria-hidden="true"><rect x="124" y="34" width="92" height="8" rx="4" fill="#6E727A"/><rect x="114" y="14" width="16" height="48" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="96" y="9" width="16" height="58" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/><rect x="210" y="14" width="16" height="48" rx="4" fill="#8B8F96" stroke="rgba(0,0,0,.35)"/><rect x="228" y="9" width="16" height="58" rx="4" fill="#A2A6AC" stroke="rgba(0,0,0,.35)"/></svg>
-      
     </button>
       <div class="grid-h">
         <span>#</span>
@@ -2835,7 +2847,7 @@
       <button class="ex-next" id="exb-1" onclick="openSessionEx(1)">
         <span class="grow">
           <span class="ex-title" style="display:block">Lat Pulldown <em>(Cable)</em></span>
-          <span class="last" style="display:block">Siguiente · <b>29,6×10</b></span>
+          <span class="last" style="display:block">Siguiente · <b>65×10</b></span>
         </span>
         <span class="chev">›</span>
       </button>
@@ -3712,18 +3724,16 @@
       
       <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>72,5 kg</b>), apunta a <b>10 reps</b></div></div>
     <div class="why">Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
-      
-    <button class="load" onclick="showLoad(0)">
-      <div class="load-row">
-        <span class="load-l">Cargar la barra</span>
-        <span class="load-v">72,5 kg <span class="chev">›</span></span>
-      </div>
-      <svg viewBox="0 0 340 86" style="width:100%;height:86px;display:block" aria-hidden="true"><rect x="10" y="41.2" width="320" height="3.5999999999999996" rx="1.7999999999999998" fill="#6E727A"/><rect x="144.8" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="191.6" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="135.4" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="130.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="124.2" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/><rect x="193.8" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="206.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="211.4" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/></svg>
-      <div class="load-row" style="margin-top:8px">
-        <span class="load-l">Por lado</span>
-        <span class="load-v"><b>25</b> + <b>1,25</b> kg</span>
-      </div>
-      
+      <button class="load" onclick="showLoad(0)">
+    <div class="load-row">
+      <span class="load-l">Cargar la barra</span>
+      <span class="load-v">72,5 kg <span class="chev">›</span></span>
+    </div>
+    <svg viewBox="0 0 340 86" style="width:100%;height:86px;display:block" aria-hidden="true"><rect x="10" y="41.2" width="320" height="3.5999999999999996" rx="1.7999999999999998" fill="#6E727A"/><rect x="144.8" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="191.6" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="135.4" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="130.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="124.2" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/><rect x="193.8" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="206.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="211.4" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/></svg>
+    <div class="load-row" style="margin-top:8px">
+      <span class="load-l">Por lado</span>
+      <span class="load-v"><b>25</b> + <b>1,25</b> kg</span>
+    </div>
     </button>
       <div class="grid-h">
         <span>#</span>
@@ -3858,18 +3868,16 @@
       
       <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>72,5 kg</b>), apunta a <b>10 reps</b></div></div>
     <div class="why">Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
-      
-    <button class="load" onclick="showLoad(0)">
-      <div class="load-row">
-        <span class="load-l">Cargar la barra</span>
-        <span class="load-v">72,5 kg <span class="chev">›</span></span>
-      </div>
-      <svg viewBox="0 0 340 86" style="width:100%;height:86px;display:block" aria-hidden="true"><rect x="10" y="41.2" width="320" height="3.5999999999999996" rx="1.7999999999999998" fill="#6E727A"/><rect x="144.8" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="191.6" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="135.4" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="130.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="124.2" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/><rect x="193.8" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="206.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="211.4" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/></svg>
-      <div class="load-row" style="margin-top:8px">
-        <span class="load-l">Por lado</span>
-        <span class="load-v"><b>25</b> + <b>1,25</b> kg</span>
-      </div>
-      
+      <button class="load" onclick="showLoad(0)">
+    <div class="load-row">
+      <span class="load-l">Cargar la barra</span>
+      <span class="load-v">72,5 kg <span class="chev">›</span></span>
+    </div>
+    <svg viewBox="0 0 340 86" style="width:100%;height:86px;display:block" aria-hidden="true"><rect x="10" y="41.2" width="320" height="3.5999999999999996" rx="1.7999999999999998" fill="#6E727A"/><rect x="144.8" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="191.6" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="135.4" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="130.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="124.2" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/><rect x="193.8" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="206.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="211.4" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/></svg>
+    <div class="load-row" style="margin-top:8px">
+      <span class="load-l">Por lado</span>
+      <span class="load-v"><b>25</b> + <b>1,25</b> kg</span>
+    </div>
     </button>
       <div class="grid-h">
         <span>#</span>
@@ -3968,6 +3976,7 @@
     <h2>Cargar 72,5 kg</h2>
     <p class="muted">Squat · serie de trabajo</p>
     <svg viewBox="0 0 340 126" style="width:100%;height:126px;display:block" aria-hidden="true"><rect x="10" y="60.5" width="320" height="5" rx="2.5" fill="#6E727A"/><rect x="135" y="54" width="5" height="18" rx="1.5" fill="#8B8F96"/><rect x="200" y="54" width="5" height="18" rx="1.5" fill="#8B8F96"/><rect x="122.0" y="17.0" width="15.0" height="92.0" rx="2.5" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="115.0" y="45.0" width="5.0" height="36.0" rx="2.5" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="107.0" y="52.0" width="6.0" height="22.0" rx="2" fill="#3E4247"/><rect x="203.0" y="17.0" width="15.0" height="92.0" rx="2.5" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="220.0" y="45.0" width="5.0" height="36.0" rx="2.5" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="227.0" y="52.0" width="6.0" height="22.0" rx="2" fill="#3E4247"/></svg>
+    
     <div class="sect">Por lado</div>
     <div class="list">
     <div class="line">
@@ -3984,8 +3993,7 @@
       </div>
       <div class="l-v">×1 <span style="color:var(--dim)">por lado</span></div>
     </div></div>
-    <div class="hint">Olímpica <b>20</b> + discos <b>52,5</b>
-      (26,25 por lado) = <b>72,5 kg</b>.
+    <div class="hint">Olímpica <b>20</b> + discos <b>52,5</b> = <b>72,5 kg</b>.
       </div>
     <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
     <button class="btn ghost" onclick="closeModal(); pickBar('squat (barbell)')">Cambiar de barra</button></div></div>
@@ -4029,18 +4037,16 @@
       
       <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>72,5 kg</b>), apunta a <b>10 reps</b></div></div>
     <div class="why">Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
-      
-    <button class="load" onclick="showLoad(0)">
-      <div class="load-row">
-        <span class="load-l">Cargar la barra</span>
-        <span class="load-v">72,5 kg <span class="chev">›</span></span>
-      </div>
-      <svg viewBox="0 0 340 86" style="width:100%;height:86px;display:block" aria-hidden="true"><rect x="10" y="41.2" width="320" height="3.5999999999999996" rx="1.7999999999999998" fill="#6E727A"/><rect x="144.8" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="191.6" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="135.4" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="130.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="124.2" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/><rect x="193.8" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="206.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="211.4" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/></svg>
-      <div class="load-row" style="margin-top:8px">
-        <span class="load-l">Por lado</span>
-        <span class="load-v"><b>25</b> + <b>1,25</b> kg</span>
-      </div>
-      
+      <button class="load" onclick="showLoad(0)">
+    <div class="load-row">
+      <span class="load-l">Cargar la barra</span>
+      <span class="load-v">72,5 kg <span class="chev">›</span></span>
+    </div>
+    <svg viewBox="0 0 340 86" style="width:100%;height:86px;display:block" aria-hidden="true"><rect x="10" y="41.2" width="320" height="3.5999999999999996" rx="1.7999999999999998" fill="#6E727A"/><rect x="144.8" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="191.6" y="36.52" width="3.5999999999999996" height="12.959999999999999" rx="1.5" fill="#8B8F96"/><rect x="135.4" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="130.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="124.2" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/><rect x="193.8" y="9.9" width="10.8" height="66.2" rx="1.8" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="206.0" y="30.0" width="4.0" height="25.9" rx="1.8" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="211.4" y="35.1" width="4.3" height="15.8" rx="2" fill="#3E4247"/></svg>
+    <div class="load-row" style="margin-top:8px">
+      <span class="load-l">Por lado</span>
+      <span class="load-v"><b>25</b> + <b>1,25</b> kg</span>
+    </div>
     </button>
       <div class="grid-h">
         <span>#</span>
@@ -4138,31 +4144,22 @@
        <div class="modal" role="dialog" aria-modal="true">
     <h2>Calentamiento — Squat</h2>
     
-    <div style="margin-bottom:14px">
-  <div class="warm">
+    <div style="margin-bottom:14px"><div class="warm">
     <div class="load-row">
       <span class="load-l">Serie 1</span>
       <span class="load-v"><b>37,5 kg × 6</b></span>
-    </div>
-    <svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="148.7" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="143.6" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="138.6" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="134.4" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/><rect x="187.2" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="192.4" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="197.4" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="202.4" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/></svg>
-    <div class="load-row"><span class="load-l">Por lado</span><span class="load-v"><b>5</b> + <b>2,5</b> + <b>1,25</b> kg</span></div>
-  </div>
-  <div class="warm">
+    </div><svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="148.7" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="143.6" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="138.6" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="134.4" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/><rect x="187.2" y="16.4" width="4.2" height="29.1" rx="1.3" fill="#CFCCC4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="192.4" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="197.4" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="202.4" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/></svg><div class="load-row"><span class="load-l">Por lado</span>
+         <span class="load-v"><b>5</b> + <b>2,5</b> + <b>1,25</b> kg</span></div></div><div class="warm">
     <div class="load-row">
       <span class="load-l">Serie 2</span>
       <span class="load-v"><b>55 kg × 3</b></span>
-    </div>
-    <svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="147.1" y="9.2" width="5.7" height="43.7" rx="1.3" fill="#C2963A" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="142.1" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="137.9" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/><rect x="187.2" y="9.2" width="5.7" height="43.7" rx="1.3" fill="#C2963A" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="193.9" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="199.0" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/></svg>
-    <div class="load-row"><span class="load-l">Por lado</span><span class="load-v"><b>15</b> + <b>2,5</b> kg</span></div>
-  </div>
-  <div class="warm work">
+    </div><svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="147.1" y="9.2" width="5.7" height="43.7" rx="1.3" fill="#C2963A" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="142.1" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="137.9" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/><rect x="187.2" y="9.2" width="5.7" height="43.7" rx="1.3" fill="#C2963A" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="193.9" y="19.6" width="4.0" height="22.9" rx="1.3" fill="#A7ACB4" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="199.0" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/></svg><div class="load-row"><span class="load-l">Por lado</span>
+         <span class="load-v"><b>15</b> + <b>2,5</b> kg</span></div></div><div class="warm work">
     <div class="load-row">
       <span class="load-l" style="color:var(--up)">Trabajo</span>
       <span class="load-v"><b style="color:var(--up)">72,5 kg</b></span>
-    </div>
-    <svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="145.0" y="7.1" width="7.8" height="47.8" rx="1.3" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="140.0" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="135.8" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/><rect x="187.2" y="7.1" width="7.8" height="47.8" rx="1.3" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="196.0" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="201.0" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/></svg>
-    <div class="load-row"><span class="load-l">Por lado</span><span class="load-v"><b>25</b> + <b>1,25</b> kg</span></div>
-  </div></div>
+    </div><svg viewBox="0 0 340 62" style="width:100%;height:62px;display:block" aria-hidden="true"><rect x="10" y="29.7" width="320" height="2.6" rx="1.3" fill="#6E727A"/><rect x="151.8" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="185.6" y="26.32" width="2.6" height="9.36" rx="1.5" fill="#8B8F96"/><rect x="145.0" y="7.1" width="7.8" height="47.8" rx="1.3" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="140.0" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="135.8" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/><rect x="187.2" y="7.1" width="7.8" height="47.8" rx="1.3" fill="#C0473E" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="196.0" y="21.6" width="4.0" height="18.7" rx="1.3" fill="#868B93" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="201.0" y="25.3" width="4.0" height="11.4" rx="2" fill="#3E4247"/></svg><div class="load-row"><span class="load-l">Por lado</span>
+         <span class="load-v"><b>25</b> + <b>1,25</b> kg</span></div></div></div>
     
     <p class="tiny" style="line-height:1.6;margin-bottom:14px">
       Descansa solo 30–60 s entre series de calentamiento y mueve el peso con <b>intención de velocidad</b>
@@ -4216,6 +4213,53 @@
     <div class="seg4"><button class="on" onclick="setExType('squat (barbell)','normal')">Normal</button><button class="" onclick="setExType('squat (barbell)','asistido')">Asistido</button><button class="" onclick="setExType('squat (barbell)','corporal')">Corporal</button><button class="" onclick="setExType('squat (barbell)','tiempo')">Tiempo</button></div>
     <div class="hint">Tú levantas la carga. Progresas subiendo kilos cuando llenas el rango de reps.</div>
 
+    <div class="sect">Cómo se carga</div>
+    <div class="stack">
+      
+        <button class="opt on" onclick="setExEquip('squat (barbell)','barra')">
+          <b>Barra</b><span>Una barra con discos a los dos lados.</span>
+        </button>
+        <button class="opt " onclick="setExEquip('squat (barbell)','discos')">
+          <b>Discos</b><span>Máquina o aparato donde tú pones los discos.</span>
+        </button>
+        <button class="opt " onclick="setExEquip('squat (barbell)','placas')">
+          <b>Placas</b><span>Máquina de pin: eliges una placa y sube de golpe en golpe.</span>
+        </button>
+        <button class="opt " onclick="setExEquip('squat (barbell)','mancuerna')">
+          <b>Mancuernas</b><span>Del rango que tengas en Mi equipo.</span>
+        </button>
+        <button class="opt " onclick="setExEquip('squat (barbell)','nada')">
+          <b>Nada</b><span>Peso corporal o sin carga que calcular.</span>
+        </button>
+    </div>
+    
+    
+      <div class="sect">¿Dónde van los discos?</div>
+      <div class="stack">
+        
+          <button class="opt " onclick="setExPoints('squat (barbell)',1)">
+            <b>En un solo lado</b><span>Un pitón. Todo el peso va ahí.</span>
+          </button>
+          <button class="opt on" onclick="setExPoints('squat (barbell)',2)">
+            <b>En los dos lados</b><span>Lo normal en barras y en la mayoría de aparatos.</span>
+          </button>
+          <button class="opt " onclick="setExPoints('squat (barbell)',4)">
+            <b>En cuatro pitones</b><span>Prensas y trineos. El peso se reparte entre los cuatro.</span>
+          </button>
+      </div>
+      <div class="list" style="margin-top:14px">
+        
+        <div class="line">
+          <div><div class="l-t">Barra</div><div class="l-d">Olímpica · 20 kg</div></div>
+          <div class="l-v"><select class="inline" onchange="setExBarSel('squat (barbell)',this.value)">
+            <option value="auto" selected>Predeterminada</option>
+            <option value="oly" >Olímpica</option><option value="short" >Olímpica corta</option><option value="ez" >Barra Z</option>
+          </select></div>
+        </div>
+      </div>
+      <div class="hint">Con dos lados, el salto más pequeño que puedes armar es <b>2,5 kg</b> — un disco de 1,25 en cada uno.
+        </div>
+
     <div class="sect">Ajustes del ejercicio</div>
     <div class="list">
       <div class="line">
@@ -4228,20 +4272,6 @@
             value="" aria-label="Máximo" oninput="setExRange('squat (barbell)','hi',this.value)">
         </div>
       </div>
-      <div class="line">
-        <div><div class="l-t">Equipo</div><div class="l-d">Define si se calcula la carga</div></div>
-        <div class="l-v"><select class="inline" onchange="setExEquip('squat (barbell)',this.value)">
-          <option value="none" >Sin especificar</option>
-          <option value="barra" selected>Barra</option><option value="mancuerna" >Mancuernas</option><option value="maquina" >Máquina</option><option value="otro" >Otro</option>
-        </select></div>
-      </div>
-      <div class="line">
-          <div><div class="l-t">Barra</div><div class="l-d">Olímpica · 20 kg</div></div>
-          <div class="l-v"><select class="inline" onchange="setExBarSel('squat (barbell)',this.value)">
-            <option value="auto" selected>Predeterminada</option>
-            <option value="oly" >Olímpica</option><option value="short" >Olímpica corta</option><option value="ez" >Barra Z</option>
-          </select></div>
-        </div>
       <div class="line">
         <div class="l-t">Salto mínimo</div>
         <div class="l-v"><select class="inline" onchange="setExStep('squat (barbell)',this.value)"><option value="auto" selected>Auto</option><option value="0.5" >0,5 kg</option><option value="1" >1 kg</option><option value="2" >2 kg</option><option value="2.5" >2,5 kg</option><option value="5" >5 kg</option></select></div>
@@ -4279,8 +4309,14 @@
       </div>
     </div>
     <div class="hint">El rango viene de tu objetivo (8–12); cámbialo solo para casos especiales
-      (ej. abdominales 15–25). Con equipo <b>Barra</b>, el salto automático es tu par de discos más pequeño (<b>2,5 kg</b>) y las sugerencias se redondean a pesos que puedes armar.
+      (ej. abdominales 15–25). El salto automático sale de cómo se carga: <b>2,5 kg</b>. Cámbialo solo si tu gimnasio es raro.
       Si marcas el peso máximo, al alcanzarlo el coach progresa por reps y series en vez de pedirte kilos imposibles.</div>
+
+    <div class="sect">Otra máquina</div>
+    <button class="btn quiet sm" onclick="promptDuplicateEx('squat (barbell)', 'Squat (Barbell)')">
+      Duplicar para otra máquina</button>
+    <div class="hint">Si tu gimnasio tiene este ejercicio en dos aparatos —uno de cable y otro de discos—
+      van separados: no pesan lo mismo ni progresan igual.</div>
 
     <div class="sect">Notas</div>
     <textarea placeholder="Ej. agarre ancho, asiento en 4, bajar lento…"

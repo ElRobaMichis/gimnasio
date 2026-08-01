@@ -8,78 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { phone, tabs, svgIcon, doc } = require('./shell');
 
-/* ---------- discos: diámetro, grosor y color de código internacional ---------- */
-const PLATE = {
-  25:   { d:92, t:15, c:'#C0473E', s:'#8E332C' },
-  20:   { d:92, t:13, c:'#3C6FA8', s:'#2A5079' },
-  15:   { d:84, t:11, c:'#C2963A', s:'#8E6D28' },
-  10:   { d:72, t:9,  c:'#4C9970', s:'#356B4F' },
-  5:    { d:56, t:8,  c:'#CFCCC4', s:'#94918A' },
-  2.5:  { d:44, t:6,  c:'#8B8F96', s:'#63666B' },
-  1.25: { d:36, t:5,  c:'#6C7076', s:'#4C4F54' },
-};
-const num = n => String(n).replace('.', ',');
-
-/* barra vista de frente con los discos de un lado espejados en el otro */
-function barbell(perSide, { h = 116, scale = 1, empty = '' } = {}){
-  const W = 340, cx = W/2, cy = h/2;
-  const collar = 30 * scale;
-  let out = '';
-
-  /* eje */
-  out += `<rect x="10" y="${cy - 2.5*scale}" width="${W-20}" height="${5*scale}" rx="${2.5*scale}" fill="#6E727A"/>`;
-  /* topes internos */
-  for(const dir of [-1, 1])
-    out += `<rect x="${cx + dir*collar - (dir<0 ? 5*scale : 0)}" y="${cy - 9*scale}" width="${5*scale}" height="${18*scale}" rx="1.5" fill="#8B8F96"/>`;
-
-  for(const dir of [-1, 1]){
-    let x = cx + dir*(collar + 3*scale);
-    for(const kg of perSide){
-      const p = PLATE[kg];
-      if(!p) continue;
-      const t = p.t*scale, d = p.d*scale;
-      const px = dir > 0 ? x : x - t;
-      out += `<rect x="${px.toFixed(1)}" y="${(cy - d/2).toFixed(1)}" width="${t.toFixed(1)}" height="${d.toFixed(1)}" rx="${(2.5*scale).toFixed(1)}" fill="${p.c}" stroke="${p.s}" stroke-width="1"/>`;
-      x += dir*(t + 2*scale);
-    }
-    /* seguro */
-    const cx2 = dir > 0 ? x : x - 6*scale;
-    out += `<rect x="${cx2.toFixed(1)}" y="${(cy - 11*scale).toFixed(1)}" width="${(6*scale).toFixed(1)}" height="${(22*scale).toFixed(1)}" rx="2" fill="#54585E"/>`;
-  }
-  if(!perSide.length && empty)
-    out += `<text x="${cx}" y="${cy - 16*scale}" text-anchor="middle" fill="#5F6268" font-family="IBM Plex Mono, monospace" font-size="${11*scale}">${empty}</text>`;
-
-  return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:${h}px;display:block" aria-hidden="true">${out}</svg>`;
-}
-
-function dumbbell(kg, { h = 76 } = {}){
-  const W = 340, cx = W/2, cy = h/2;
-  const d = kg >= 20 ? 56 : kg >= 12 ? 48 : 40;
-  const t = 16;
-  return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:${h}px;display:block" aria-hidden="true">
-    <rect x="${cx-46}" y="${cy-4}" width="92" height="8" rx="4" fill="#6E727A"/>
-    ${[-1,1].map(dir => `
-      <rect x="${dir>0 ? cx+40 : cx-40-t}" y="${cy-d/2}" width="${t}" height="${d}" rx="4" fill="#8B8F96" stroke="#63666B"/>
-      <rect x="${dir>0 ? cx+40+t+2 : cx-42-t*2}" y="${cy-d/2-5}" width="${t}" height="${d+10}" rx="4" fill="#A2A6AC" stroke="#74777C"/>`).join('')}
-  </svg>`;
-}
-
-/* lista «por lado» con el punto del color de cada disco */
-function plateList(perSide){
-  const counts = new Map();
-  for(const kg of perSide) counts.set(kg, (counts.get(kg) || 0) + 1);
-  return [...counts].map(([kg, n]) => `
-    <div class="line">
-      <div class="row grow" style="gap:13px">
-        <i class="plate-dot" style="background:${PLATE[kg].c}"></i>
-        <div class="l-t">${num(kg)} kg</div>
-      </div>
-      <div class="l-v">×${n} <span style="color:var(--dim)">por lado</span></div>
-    </div>`).join('');
-}
-const sideText = perSide => perSide.length
-  ? perSide.map(k => `<b>${num(k)}</b>`).join(' + ') + ' kg'
-  : '<b>solo la barra</b>';
+const { PLATE, num, barbell, dumbbell, plateList, sideText } = require('./shell');
 
 /* tira de carga que se añade a la tarjeta del ejercicio */
 function loadStrip(perSide, total, { note = '' } = {}){
