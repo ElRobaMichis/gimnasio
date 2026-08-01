@@ -663,10 +663,51 @@ db.gym = defaultGym('kg'); invalidatePlates();
 chk(nearestDumbbell(19) === 19, 'con la serie completa, 19 existe');
 db.gym.dumbbells = db.gym.dumbbells.filter(d => d.kg !== 19);
 chk(nearestDumbbell(19) === 20, 'sin el par de 19, lo más cercano por arriba es 20');
-exMeta('press mancuerna').equip = 'mancuerna';
-sess('press mancuerna', [S(18,12), S(18,12)]);
-s = computeSuggestion('press mancuerna');
-chk(s.w === 20 && s.wanted === 19, 'la sugerencia salta al par que sí tienes (19 → 20)');
+
+suite('Mancuernas — lo que anotas es el total de las dos');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+
+let pl;
+/* el caso del standing calf raise: 12 kg = dos mancuernas de 6 */
+exMeta('calf raise').equip = 'mancuerna';
+Object.assign(exMeta('calf raise'), { lo:15, hi:20 });
+sess('calf raise', [S(12,20), S(12,20)]);
+s = computeSuggestion('calf raise');
+chk(s.w === 14, 'de 12 kg (dos de 6) el siguiente escalón es 14 (dos de 7), no 13');
+chk(effStep('calf raise', 12) === 2, 'el salto es el hueco del rack × 2 manos');
+pl = loadPlan('calf raise', 14);
+chk(pl.dumbbell === 7 && pl.points === 2, 'y son dos mancuernas de 7');
+
+/* el caso del incline bench: 20 kg = dos de 10, no dos de 20 */
+exMeta('incline db').equip = 'mancuerna';
+pl = loadPlan('incline db', 20);
+chk(pl.total === 20 && pl.dumbbell === 10, '20 kg anotados = 2 × 10, no 2 × 20');
+chk(pl.exact, 'y sale exacto porque el par de 10 existe');
+
+/* totales imposibles se redondean al par que sí existe */
+pl = loadPlan('incline db', 13);
+chk(pl.total === 14 || pl.total === 12, '13 kg no se puede con dos mancuernas iguales: cae en 12 o 14');
+chk(pl.total % 2 === 0, 'los totales con dos manos siempre son pares');
+
+/* a una sola mano el total es la mancuerna */
+exMeta('remo una mano').equip = 'mancuerna';
+exMeta('remo una mano').points = 1;
+pl = loadPlan('remo una mano', 22);
+chk(pl.points === 1 && pl.total === 22 && pl.dumbbell === 22, 'a una mano, el total es esa mancuerna');
+chk(effStep('remo una mano', 22) === 1, 'y el salto es el hueco del rack, sin multiplicar');
+
+/* sin el par de 7, el coach no lo propone */
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+db.gym.dumbbells = db.gym.dumbbells.filter(d => d.kg !== 7);
+exMeta('calf raise').equip = 'mancuerna';
+Object.assign(exMeta('calf raise'), { lo:15, hi:20 });
+sess('calf raise', [S(12,20), S(12,20)]);
+s = computeSuggestion('calf raise');
+chk(s.w === 16, 'sin el par de 7 salta al de 8: 12 → 16');
+chk(s.why.includes('mancuernas'), 'y explica que fue por el rack');
+
 
 resetDB();
 db.gym = defaultGym('kg'); invalidatePlates();
@@ -689,7 +730,7 @@ chk(plateMinStep(1) === 1.25, 'con 1 pitón, un disco suelto: 1,25 kg');
 chk(maxPerPoint(2, 4) === 1, 'dos pares (4 discos) solo dan uno por pitón entre cuatro');
 chk(maxPerPoint(2, 1) === 4, 'y los cuatro discos caben en un solo pitón');
 
-let pl = loadPlan('prensa', 145);
+pl = loadPlan('prensa', 145);
 chk(pl.points === 4 && pl.total === 145, 'prensa de 4 pitones: 145 kg exactos');
 chk(Math.abs(pl.perPointKg - 36.25) < 1e-9, '36,25 kg en cada pitón');
 chk(pl.perPoint.length === 3, 'y son tres discos por pitón (25 + 10 + 1,25)');

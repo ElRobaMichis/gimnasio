@@ -521,6 +521,11 @@ const EQUIP = {
   nada:      { label:'Nada',       desc:'Peso corporal o sin carga que calcular.' },
 };
 const EQUIP_KEYS = Object.keys(EQUIP);
+/* cuántas mancuernas agarras: el peso que anotas es el total de todas */
+const DB_POINTS = [
+  [2, 'Una en cada mano', 'Lo normal. Anotas el total de las dos.'],
+  [1, 'Una sola', 'Remo a una mano, goblet squat, curl de concentración…'],
+];
 /* dónde van los discos: cambia el salto mínimo y la cuenta entera */
 const POINTS = [
   [1, 'En un solo lado', 'Un pitón. Todo el peso va ahí.'],
@@ -706,6 +711,11 @@ function effStep(key, w){
     const s = plateMinStep(effPoints(key));
     if(s > 0) return s;
   }
+  /* con mancuernas, subir un escalón del rack son dos mancuernas más */
+  if(eq === 'mancuerna'){
+    const s = dumbbellMinStep(effPoints(key));
+    if(s > 0) return s;
+  }
   /* en una torre, el salto es el de la máquina, pasado a kg sin redondear
      (el peso final se ancla a la placa exacta más adelante) */
   if(eq === 'placas'){
@@ -800,6 +810,8 @@ function effEquip(key){
 /* dónde van los discos: 1 pitón, 2 lados o 4 pitones */
 function effPoints(key){
   const n = parseInt(exMeta(key).points, 10);
+  /* con mancuernas solo hay dos casos: una en cada mano, o una sola */
+  if(effEquip(key) === 'mancuerna') return n === 1 ? 1 : 2;
   return (n === 1 || n === 2 || n === 4) ? n : 2;
 }
 /* peso propio del aparato: la barra, o el carro si lo anotaste */
@@ -906,6 +918,20 @@ function nearestIn(list, w){
   return best;
 }
 function nearestDumbbell(w){ return nearestIn(availableDumbbells(), w); }
+/* los totales que puedes armar: cada mancuerna × las que agarras */
+function dumbbellTotals(points){
+  return availableDumbbells().map(d => Math.round(d * points * 1000) / 1000);
+}
+/* el salto más pequeño: el hueco menor del rack, multiplicado por las manos */
+function dumbbellMinStep(points){
+  const d = availableDumbbells();
+  let gap = 0;
+  for(let i = 1; i < d.length; i++){
+    const g = d[i] - d[i-1];
+    if(g > 0 && (!gap || g < gap)) gap = g;
+  }
+  return gap * points;
+}
 
 /*  loadPlan(key, pesoKg) → null si no aplica, o
     { kind, base, points, perPoint:[kg], perPointKg, total, exact, target,
@@ -915,10 +941,12 @@ function loadPlan(key, targetKg){
   if(!eq || eq === 'nada') return null;
 
   if(eq === 'mancuerna'){
-    const d = nearestDumbbell(targetKg);
-    if(d == null) return null;
-    return { kind:'mancuerna', dumbbell:d, total:d,
-             exact: Math.abs(d - targetKg) < 1e-9, target:targetKg };
+    /* lo que anotas es el TOTAL: dos mancuernas de 10 son 20 kg */
+    const n = effPoints(key);
+    const total = nearestIn(dumbbellTotals(n), targetKg);
+    if(total == null) return null;
+    return { kind:'mancuerna', points:n, dumbbell: Math.round(total / n * 1000) / 1000, total,
+             exact: Math.abs(total - targetKg) < 1e-9, target:targetKg };
   }
   if(eq === 'placas'){
     const sn = stackSnap(key, targetKg);
@@ -1953,6 +1981,24 @@ function equipConfigHTML(key, meta){
         ${ eq === 'discos' ? ' Dejar el peso en blanco no rompe nada: el coach compara tus series entre sí.' : '' }</div>`;
   }
 
+  if(eq === 'mancuerna'){
+    const n = effPoints(key);
+    const step = dumbbellMinStep(n);
+    return `
+      <div class="sect">¿Cuántas agarras?</div>
+      <div class="stack">
+        ${DB_POINTS.map(([v, t, d]) => `
+          <button class="opt ${n === v ? 'on' : ''}" onclick="setExPoints('${key}',${v})">
+            <b>${t}</b><span>${d}</span>
+          </button>`).join('')}
+      </div>
+      <div class="hint">${ n === 2
+        ? `Anota siempre el <b>total de las dos</b>: 10 en cada mano son <b>20 ${uLabel()}</b>. Así el número
+           que ves es el peso que de verdad moviste, y se puede comparar con las barras y las máquinas.`
+        : 'Anota el peso de esa mancuerna.' }
+        ${ step > 0 ? ` El escalón más pequeño de tu rack es <b>${fmtW(step)} ${uLabel()}</b>${n === 2 ? ' — subir una talla en cada mano' : ''}.` : '' }</div>`;
+  }
+
   if(eq === 'placas'){
     const c = stackConf(key);
     const u = (meta.stack && meta.stack.unit === 'lb') ? 'lb' : 'kg';
@@ -2158,10 +2204,14 @@ function loadStripHTML(xi){
   if(p.kind === 'mancuerna'){
     return wrap(`
       <div class="load-row">
-        <span class="load-l">Mancuernas</span>
-        <span class="load-v">2 × <b>${fmtW(p.dumbbell)} ${uLabel()}</b> <span class="chev">›</span></span>
+        <span class="load-l">${p.points === 1 ? 'Agarra' : 'Una en cada mano'}</span>
+        <span class="load-v">${p.points} × <b>${fmtW(p.dumbbell)} ${uLabel()}</b> <span class="chev">›</span></span>
       </div>
-      ${dumbbellSVG(p.dumbbell)}`);
+      ${dumbbellSVG(p.dumbbell)}
+      <div class="load-row" style="margin-top:6px">
+        <span class="load-l">El total que anotas</span>
+        <span class="load-v"><b>${fmtW(p.total)} ${uLabel()}</b></span>
+      </div>`);
   }
   /* barra y discos: uno o varios puntos de carga */
   const label = p.points === 1 ? 'Todo en un solo lado'
@@ -2210,11 +2260,13 @@ function showLoad(xi){
   }
   if(p.kind === 'mancuerna'){
     openModal(`
-      <h2>${fmtW(p.dumbbell)} ${uLabel()} por mano</h2>
+      <h2>${p.points} × ${fmtW(p.dumbbell)} ${uLabel()}</h2>
       <p class="muted">${title} · serie de trabajo</p>
       ${dumbbellSVG(p.dumbbell, { h:96 })}
-      <div class="hint">Dos mancuernas de ${fmtW(p.dumbbell)} ${uLabel()} = ${fmtW(p.dumbbell*2)} ${uLabel()} en total.
-        ${p.exact ? '' : `El salto exacto pedía ${fmtW(p.target)} ${uLabel()}, pero tu gimnasio no lo tiene.`}</div>
+      <div class="hint">${ p.points === 2
+        ? `Una mancuerna de <b>${fmtW(p.dumbbell)}</b> en cada mano. En la app anotas el <b>total de las dos</b>: ${fmtW(p.total)} ${uLabel()}.`
+        : `Una sola mancuerna de <b>${fmtW(p.dumbbell)} ${uLabel()}</b>.` }
+        ${p.exact ? '' : ` El salto exacto pedía ${fmtW(p.target)} ${uLabel()}, pero con las mancuernas de tu gimnasio no se puede armar.`}</div>
       <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
       <button class="btn ghost" onclick="closeModal(); go({name:'gym', kind:'dumbbells'})">Editar mancuernas</button>`);
     return;
@@ -2346,6 +2398,7 @@ function viewSession(){
       if(t === 'corporal') firstMsg = `Primera vez. Haz las reps que puedas con buena técnica (ideal ${lo}–${hi} por serie). El peso puedes dejarlo en blanco; si usas lastre, anótalo.`;
       else if(t === 'tiempo') firstMsg = `Primera vez. Mide los segundos que sostienes con buena técnica (ideal ${lo}–${hi} s). Toca el ▶ de cada serie para usar el cronómetro con alarma.`;
       else if(t === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina o banda (en ${uLabelEx(ex.key)}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
+      else if(effEquip(ex.key) === 'mancuerna') firstMsg = `Primera vez. Anota el <b>total de las dos mancuernas</b>: si agarras 10 en cada mano, escribe ${fmtWEx(ex.key, 20)}. Busca un peso con el que hagas ${lo}–${hi} reps quedándote 1–3 en reserva.`;
       else firstMsg = `Primera vez con este ejercicio. Elige un peso con el que puedas hacer ${lo}–${hi} reps quedándote 1–3 en reserva (sin llegar al fallo). Desde la próxima, te sugiero la progresión.`;
     }
 
