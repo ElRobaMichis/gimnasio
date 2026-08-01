@@ -2168,6 +2168,32 @@ function saveExNotes(key){
   closeModal(); render();
 }
 
+/* la cabecera de la columna del peso: en mancuernas a dos manos avisa
+   ahí mismo, que es justo donde se teclea */
+function weightColLabel(key, t){
+  if(t === 'corporal' || t === 'tiempo') return 'lastre';
+  if(t === 'asistido') return 'ayuda';
+  if(effEquip(key) === 'mancuerna' && effPoints(key) === 2) return uLabelEx(key) + ' total';
+  return uLabelEx(key);
+}
+
+/* aviso de una sola vez, como el de Hevy: en mancuernas se anota el total */
+function dbNoticeHTML(key){
+  if(db.settings.dbNoticeSeen) return '';
+  if(effEquip(key) !== 'mancuerna' || effPoints(key) !== 2) return '';
+  return `<div class="note" style="margin:13px 0 0">
+    <div class="note-t">Anota el total de las dos mancuernas</div>
+    <div class="note-d">Si agarras 10 en cada mano, escribe <b>20</b>. Así el número es el peso que de
+      verdad moviste, se puede comparar con las barras y las máquinas, y la app sabe qué par bajar del
+      rack. Es la misma convención que usa Hevy.</div>
+    <button class="note-a" onclick="dismissDbNotice()">Entendido — no mostrar más</button>
+  </div>`;
+}
+function dismissDbNotice(){
+  db.settings.dbNoticeSeen = new Date().toISOString();
+  save(); render();
+}
+
 /* peso objetivo de hoy: lo escrito en la serie 1, o lo que sugiere el coach */
 function targetWeight(ex){
   const typed = parseFloat(ex.sets[0] && ex.sets[0].w);
@@ -2408,10 +2434,11 @@ function viewSession(){
       ${lastLineHTML(ex.key)}
       ${ meta.notes ? `<div class="exnote">${esc(meta.notes)}</div>` : '' }
       ${ ex.sugg ? verdictHTML(ex.sugg, true) : `<div class="why" style="padding-left:0;margin-top:10px">${firstMsg}</div>` }
+      ${ dbNoticeHTML(ex.key) }
       ${ loadStripHTML(xi) }
       <div class="grid-h">
         <span>${t === 'tiempo' ? '▶' : '#'}</span>
-        <span>${(t === 'corporal' || t === 'tiempo') ? 'lastre' : (t === 'asistido' ? 'ayuda' : uLabelEx(ex.key))}</span>
+        <span>${weightColLabel(ex.key, t)}</span>
         <span>${t === 'tiempo' ? 'seg' : 'reps'}</span>
         <span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir</span>
         <span></span><span></span>

@@ -820,6 +820,23 @@ go({ name:'routine', id:'r2' });
 chk(saltos[saltos.length-1] === 0, 'cada rutina lleva su propia memoria');
 window.scrollTo = () => {};
 
+suite('Mancuernas — el aviso');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('press db').equip = 'mancuerna';
+chk(weightColLabel('press db', 'normal') === 'kg total', 'la columna del peso avisa: «kg total»');
+exMeta('press db').points = 1;
+chk(weightColLabel('press db', 'normal') === 'kg', 'a una mano no hace falta: es una sola');
+exMeta('press db').points = 2;
+exMeta('barra').equip = 'barra';
+chk(weightColLabel('barra', 'normal') === 'kg', 'en barra la columna no cambia');
+chk(weightColLabel('press db', 'tiempo') === 'lastre', 'los ejercicios por tiempo siguen pidiendo lastre');
+
+chk(dbNoticeHTML('press db').includes('total de las dos'), 'la primera vez sale el aviso completo');
+chk(dbNoticeHTML('barra') === '', 'y solo en mancuernas');
+dismissDbNotice();
+chk(dbNoticeHTML('press db') === '', 'una vez lo descartas, no vuelve');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
