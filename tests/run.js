@@ -757,6 +757,28 @@ chk(exMeta('hip thrust (discos)').muscle === 'gluteos' && exMeta('hip thrust (di
 chk(exMeta('hip thrust (discos)').equip === null, 'pero no el equipo: es otra máquina');
 chk(db.routines[0].exercises.length === 2, 'y queda junto al original en la rutina');
 
+suite('Navegación — volver donde te quedaste');
+resetDB();
+db.routines.push({ id:'r1', name:'T', exercises:[] });
+db.routines.push({ id:'r2', name:'P', exercises:[] });
+const saltos = [];
+window.scrollTo = (x, y) => { saltos.push(y); window.scrollY = y; };
+window.scrollY = 0;
+go({ name:'home' });
+window.scrollY = 640;                       /* bajas hasta el sexto ejercicio */
+go({ name:'routine', id:'r1' });
+chk(saltos[saltos.length-1] === 0, 'una pantalla nueva empieza arriba');
+window.scrollY = 300;
+go({ name:'exercise', key:'x', exname:'X', rid:'r1' });
+chk(saltos[saltos.length-1] === 0, 'la ficha del ejercicio también');
+go({ name:'routine', id:'r1' });
+chk(saltos[saltos.length-1] === 300, 'al volver, la rutina retoma donde ibas');
+go({ name:'home' });
+chk(saltos[saltos.length-1] === 640, 'y el inicio recuerda la suya');
+go({ name:'routine', id:'r2' });
+chk(saltos[saltos.length-1] === 0, 'cada rutina lleva su propia memoria');
+window.scrollTo = () => {};
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
