@@ -580,6 +580,102 @@ finishSession();
 chk(els['modalhost'].innerHTML.includes('sin asistencia'), 'llegar a 0 kg de ayuda se celebra especial');
 db.active = null;
 
+/* =====================================================================
+   EQUIPO DEL GIMNASIO Y CALCULADORA DE CARGA
+   ===================================================================== */
+suite('Equipo — detección por el nombre');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+chk(guessEquip('Squat (Barbell)') === 'barra', 'inglés de Hevy: "(Barbell)" → barra');
+chk(guessEquip('Peso muerto rumano con barra') === 'barra', 'español: "con barra" → barra');
+chk(guessEquip('Incline Bench Press (Dumbbell)') === 'mancuerna', '"(Dumbbell)" → mancuerna');
+chk(guessEquip('Curl con mancuernas') === 'mancuerna', '"con mancuernas" → mancuerna');
+chk(guessEquip('Leg Curl (Machine)') === 'maquina', '"(Machine)" → máquina');
+chk(guessEquip('Jalón en polea alta') === 'maquina', '"polea" → máquina');
+chk(guessEquip('Smith Machine Squat') === 'barra', 'la multipower se carga con discos: barra gana a máquina');
+chk(guessEquip('Sentadilla búlgara') === null, 'sin implemento en el nombre → sin equipo');
+
+suite('Equipo — cargar la barra');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('squat').equip = 'barra';
+let l = barLoad('squat', 72.5);
+chk(l.bar.kg === 20 && l.total === 72.5 && l.exact, 'barra olímpica: 72,5 se arma exacto');
+chk(Math.abs(l.perSide - 26.25) < 1e-9, '26,25 kg por lado');
+chk(l.plates.length === 2 && l.plates.includes(25) && l.plates.includes(1.25),
+    'elige la combinación con menos discos (25+1,25, no 20+5+1,25)');
+l = barLoad('squat', 20);
+chk(l.total === 20 && !l.plates.length, 'solo la barra cuando el peso es el de la barra');
+
+/* un solo par de 25 → no puede poner dos por lado */
+db.gym.plates = db.gym.plates.filter(p => p.kg === 25 || p.kg === 20);
+db.gym.plates.find(p => p.kg === 25).pairs = 1;
+db.gym.plates.find(p => p.kg === 20).pairs = 1;
+invalidatePlates();
+l = barLoad('squat', 110);   /* pediría 45 por lado = 25+20 */
+chk(l.total === 110 && l.plates.length === 2, 'con un par de cada uno: 25+20 por lado');
+l = barLoad('squat', 120);   /* haría falta 25+25 y solo hay un par */
+chk(l.total === 110, 'no propone dos discos de 25 por lado si solo tienes un par');
+
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('squat').equip = 'barra';
+db.gym.plates = db.gym.plates.filter(p => p.kg !== 1.25);
+invalidatePlates();
+chk(barMinStep() === 5, 'sin discos de 1,25 el salto mínimo pasa a 5 kg');
+l = barLoad('squat', 72.5);
+chk(l.total === 75 && !l.exact, 'lo que no se puede armar sube al más cercano (72,5 → 75)');
+
+suite('Equipo — el coach solo propone pesos que existen');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+db.gym.plates = db.gym.plates.filter(p => [20,15,10,5].includes(p.kg));
+invalidatePlates();
+exMeta('sentadilla').equip = 'barra';
+sess('sentadilla', [S(60,12), S(60,12), S(60,12)]);
+s = computeSuggestion('sentadilla');
+chk(effStep('sentadilla', 60) === 10, 'sin discos chicos, el salto automático es el par menor (10 kg)');
+chk(s.w === 70, 'el salto respeta lo que se puede armar: 60 → 70');
+
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+db.gym.plates = db.gym.plates.filter(p => [20,15,10,5,2.5].includes(p.kg));
+invalidatePlates();
+Object.assign(exMeta('sentadilla'), { equip:'barra', step:2.5 });
+sess('sentadilla', [S(60,12), S(60,12), S(60,12)]);
+s = computeSuggestion('sentadilla');
+chk(s.wanted === 62.5 && s.w === 65, 'el salto pedía 62,5 (no armable) → 65');
+chk(s.msg.includes('65') && !s.msg.includes('62,5'), 'el mensaje muestra el peso corregido');
+chk(s.why.includes('Con tus discos'), 'y explica por qué cambió');
+
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('polea').equip = 'maquina';
+sess('polea', [S(31,12), S(31,12)]);
+s = computeSuggestion('polea');
+chk(s.wanted === undefined, 'en máquinas no se toca el peso: no hay discos que armar');
+
+suite('Equipo — mancuernas y barras alternativas');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+chk(nearestDumbbell(19) === 19, 'con la serie completa, 19 existe');
+db.gym.dumbbells = db.gym.dumbbells.filter(d => d.kg !== 19);
+chk(nearestDumbbell(19) === 20, 'sin el par de 19, lo más cercano por arriba es 20');
+exMeta('press mancuerna').equip = 'mancuerna';
+sess('press mancuerna', [S(18,12), S(18,12)]);
+s = computeSuggestion('press mancuerna');
+chk(s.w === 20 && s.wanted === 19, 'la sugerencia salta al par que sí tienes (19 → 20)');
+
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+exMeta('curl z').equip = 'barra';
+exMeta('curl z').bar = 'ez';
+chk(barFor('curl z').kg === 7, 'la barra fijada en el ejercicio gana a la predeterminada');
+exMeta('curl z').bar = null;
+chk(barFor('curl z').kg === 20, 'sin fijar, se usa la predeterminada');
+db.gym.bars.forEach(b => { b.on = false; });
+chk(barLoad('curl z', 60) === null, 'sin barras marcadas no se calcula nada (y no revienta)');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
