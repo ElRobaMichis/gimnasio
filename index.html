@@ -1414,21 +1414,30 @@ function postSVG(perPost, opts){
   out += `<rect x="${x.toFixed(1)}" y="${(cy-11*scale).toFixed(1)}" width="${Math.max(6*scale,4).toFixed(1)}" height="${(22*scale).toFixed(1)}" rx="2" fill="#3E4247"/>`;
   return `<svg viewBox="0 0 ${W} ${h}" style="width:100%;height:${h}px;display:block" aria-hidden="true">${out}</svg>`;
 }
-/* la torre de placas con el pin puesto */
+/* la torre de placas con el pin puesto.
+   Las placas se estrechan para que la torre entera quepa en el alto que
+   se pida: si se saliera, se recortaría y el pin parecería estar en otra
+   placa — que es justo lo que hay que evitar. */
 function stackSVG(sel, total, opts){
   opts = opts || {};
-  const h = opts.h || 150, W = 110, slab = 9, gap = 2.5;
-  const n = Math.max(total, sel);
-  const top = (h - (n*slab + (n-1)*gap)) / 2;
-  let out = `<rect x="${W/2-4}" y="${top-10}" width="8" height="${n*(slab+gap)+14}" rx="3" fill="#2A2D31"/>`;
+  const h = opts.h || 150, W = 110;
+  const n = Math.max(total, sel, 1);
+  const gapR = 0.28;
+  const slab = Math.min(9, (h - 12) / (n + gapR * (n - 1)));
+  const gap = slab * gapR;
+  const alto = n*slab + (n-1)*gap;
+  const top = (h - alto) / 2;
+  const pin = Math.max(3, slab * 0.55);
+
+  let out = `<rect x="${W/2-4}" y="${(top-6).toFixed(1)}" width="8" height="${(alto+12).toFixed(1)}" rx="3" fill="#2A2D31"/>`;
   for(let i = 0; i < n; i++){
     const y = top + i*(slab+gap), on = i < sel;
-    out += `<rect x="18" y="${y.toFixed(1)}" width="${W-36}" height="${slab}" rx="2.5"
+    out += `<rect x="18" y="${y.toFixed(1)}" width="${W-36}" height="${slab.toFixed(1)}" rx="2.5"
       fill="${on ? '#8B8F96' : '#1B1E22'}" stroke="${on ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.07)'}"/>`;
   }
   const py = top + (sel-1)*(slab+gap) + slab/2;
-  out += `<rect x="${W-22}" y="${(py-2.5).toFixed(1)}" width="20" height="5" rx="2.5" fill="#D7A44B"/>`;
-  out += `<circle cx="${W-4}" cy="${py.toFixed(1)}" r="4" fill="#D7A44B"/>`;
+  out += `<rect x="${W-22}" y="${(py-pin/2).toFixed(1)}" width="20" height="${pin.toFixed(1)}" rx="${(pin/2).toFixed(1)}" fill="#D7A44B"/>`;
+  out += `<circle cx="${W-4}" cy="${py.toFixed(1)}" r="${Math.max(3, pin*0.8).toFixed(1)}" fill="#D7A44B"/>`;
   return `<svg viewBox="0 0 ${W} ${h}" style="width:${W}px;height:${h}px;display:block;flex:none" aria-hidden="true">${out}</svg>`;
 }
 /* «25 + 10 + 1,25 kg» */
@@ -2598,7 +2607,7 @@ function loadStripHTML(xi){
         <span class="load-l">Pon el pin en</span>
         <span class="load-v">Placa ${p.stack.index} · <b>${fmtNum(p.stack.value)} ${p.stack.unit}</b> <span class="chev">›</span></span>
       </div>
-      <div style="display:flex;justify-content:center;padding:10px 0 2px">${stackSVG(p.stack.index, Math.max(p.stack.index + 3, 12), { h:132 })}</div>`);
+      <div style="display:flex;justify-content:center;padding:10px 0 2px">${stackSVG(p.stack.index, Math.max(p.stack.index + 4, 12), { h:140 })}</div>`);
   }
   if(p.kind === 'mancuerna'){
     return wrap(`
@@ -4099,8 +4108,10 @@ function warmStepHTML(key, label, value, w, work){
     </div>`;
   let body = '';
   if(p && p.kind === 'placas'){
-    body = `<div style="display:flex;justify-content:center;padding:6px 0 0">
-      ${stackSVG(p.stack.index, Math.max(p.stack.index + 3, 12), { h:96 })}</div>`;
+    body = `<div style="display:flex;justify-content:center;padding:6px 0 2px">
+        ${stackSVG(p.stack.index, Math.max(p.stack.index + 4, 12), { h:104 })}</div>
+      <div class="load-row"><span class="load-l">Pon el pin en</span>
+        <span class="load-v">Placa <b>${p.stack.index}</b></span></div>`;
   } else if(p && (p.kind === 'barra' || p.kind === 'discos')){
     const lbl = p.points === 1 ? 'En un solo lado' : (p.points === 2 ? 'Por lado' : `En cada pitón`);
     body = (p.points === 2 ? barbellSVG(p.perPoint, { h:62, scale:0.52 })
