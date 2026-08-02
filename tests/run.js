@@ -837,6 +837,98 @@ chk(dbNoticeHTML('barra') === '', 'y solo en mancuernas');
 dismissDbNotice();
 chk(dbNoticeHTML('press db') === '', 'una vez lo descartas, no vuelve');
 
+suite('Splits — migración y rotación');
+/* las rutinas viejas, sin split, se agrupan solas al cargar */
+db = normalize({ routines:[
+  { id:'a', name:'Torso', exercises:[] },
+  { id:'b', name:'Pierna', exercises:[] },
+  { id:'c', name:'Full Body', exercises:[] } ], history:[] });
+chk(db.splits.length === 1 && db.splits[0].active, 'se crea un split y queda en curso');
+chk(db.splits[0].name === 'Torso / Pierna / Full Body', 'toma el nombre de tus rutinas');
+chk(db.routines.every(r => r.split === db.splits[0].id), 'y todas quedan dentro');
+
+/* la rotación: el siguiente al último entrenado, dando la vuelta */
+chk(nextDay().routine.name === 'Torso', 'sin historial, toca el primer día');
+db.history.push({ id:'h1', routineId:'b', routineName:'Pierna',
+  date:new Date(Date.now() - 2*864e5).toISOString(), duration:60, entries:[] });
+let n = nextDay();
+chk(n.routine.name === 'Full Body' && n.idx === 2, 'tras Pierna toca Full Body');
+chk(n.last.name === 'Pierna' && n.total === 3, 'y dice qué hiciste antes');
+db.history.push({ id:'h2', routineId:'c', routineName:'Full Body',
+  date:new Date(Date.now() - 864e5).toISOString(), duration:60, entries:[] });
+chk(nextDay().routine.name === 'Torso', 'al llegar al final, la rotación da la vuelta');
+chk(daysAgoText(new Date(Date.now() - 864e5).toISOString()) === 'ayer', 'el texto del último día');
+
+/* saltarse un día no rompe nada: cuenta desde el último entrenado */
+db.history.push({ id:'h3', routineId:'a', routineName:'Torso', date:new Date().toISOString(), duration:60, entries:[] });
+chk(nextDay().routine.name === 'Pierna', 'se cuenta desde lo que entrenaste, no del calendario');
+
+suite('Splits — guardar, retomar y mover días');
+const spA = db.splits[0].id;
+document.getElementById('newsplit').value = 'PPL';
+createSplit({ preventDefault(){} });
+chk(db.splits.length === 2, 'se crea el split nuevo');
+chk(activeSplit().name === 'PPL', 'y queda en curso');
+chk(db.splits.find(x => x.id === spA).active === false, 'el anterior pasa a guardados sin perder nada');
+chk(splitRoutines(spA).length === 3, 'sus días siguen ahí');
+chk(nextDay() === null, 'un split sin días todavía no propone nada');
+
+/* crear un día lo mete en el split en curso */
+document.getElementById('newroutine').value = 'Push';
+createRoutine({ preventDefault(){} });
+chk(splitRoutines(activeSplit().id).length === 1, 'el día nuevo entra en el split en curso');
+chk(nextDay().routine.name === 'Push', 'y pasa a ser el que toca');
+
+/* mover un día de un split a otro */
+const push = db.routines.find(r => r.name === 'Push');
+const torso = db.routines.find(r => r.name === 'Torso');
+window.__moveTo = activeSplit().id; window.__moveCopy = false;
+doMoveRoutine(torso.id);
+chk(torso.split === activeSplit().id, 'mover cambia el día de split');
+chk(splitRoutines(spA).length === 2, 'y desaparece del anterior');
+
+/* copiar lo deja en los dos */
+window.__moveTo = spA; window.__moveCopy = true;
+doMoveRoutine(push.id);
+chk(splitRoutines(spA).length === 3, 'copiar añade una copia al destino');
+chk(push.split === activeSplit().id, 'y el original se queda donde estaba');
+
+/* retomar el guardado */
+activateSplit(spA);
+chk(activeSplit().id === spA, 'ponerlo en curso lo devuelve al inicio');
+chk(db.splits.filter(x => x.active).length === 1, 'solo uno puede estar en curso');
+
+/* reordenar los días */
+const orden = () => splitRoutines(activeSplit().id).map(r => r.name).join(',');
+const antes = orden();
+moveRoutine(splitRoutines(activeSplit().id)[1].id, -1);
+chk(orden() !== antes, 'los días se pueden reordenar');
+chk(splitRoutines(activeSplit().id).length === 3, 'sin perder ninguno');
+
+/* borrar un split se lleva sus días pero no el historial */
+const nSes = db.history.length;
+const otro = db.splits.find(x => !x.active).id;
+window.__confirmFn = null;
+deleteSplit(otro);
+window.__confirmFn();
+chk(!db.splits.some(x => x.id === otro), 'el split desaparece');
+chk(db.routines.every(r => r.split !== otro), 'y sus días también');
+chk(db.history.length === nSes, 'pero el historial queda intacto');
+
+suite('Splits — cada día con lo suyo');
+/* dos días con el mismo nombre en splits distintos no se roban sesiones */
+resetDB();
+db.splits = [{ id:'s1', name:'A', active:true, created:new Date().toISOString() },
+             { id:'s2', name:'B', active:false, created:new Date().toISOString() }];
+db.routines = [{ id:'ra', name:'Push', split:'s1', exercises:[] },
+               { id:'rb', name:'Push', split:'s2', exercises:[] }];
+db.history = [{ id:'hx', routineId:'ra', routineName:'Push', date:new Date().toISOString(), duration:60, entries:[] }];
+chk(splitSessions('s1').length === 1, 'la sesión cuenta en el split del día que la generó');
+chk(splitSessions('s2').length === 0, 'y no en el que solo comparte el nombre');
+/* historial sin routineId (importado) sí cae por nombre */
+db.history.push({ id:'hy', routineId:null, routineName:'Push', date:new Date().toISOString(), duration:60, entries:[] });
+chk(splitSessions('s1').length === 2, 'el historial importado se atribuye por nombre');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

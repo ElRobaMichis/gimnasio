@@ -427,6 +427,15 @@
   .modal textarea{margin-top:4px}
   .modal .stack{gap:9px}
 
+  /* ---------- splits: qué toca hoy y los días ---------- */
+  .today{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-top:18px}
+  .today-n{
+    font-size:27px;font-weight:700;font-stretch:112%;letter-spacing:-.03em;
+    line-height:1;margin:10px 0 7px;display:block;width:100%;text-align:left;
+  }
+  .dayn{font-family:var(--mono);font-size:11px;color:var(--dim);width:16px;flex:none;text-align:left}
+  .rowitem.next .row-name{color:var(--up)}
+
   /* ---------- equipo del gimnasio y calculadora de carga ---------- */
   .plate-dot{width:15px;height:15px;border-radius:50%;flex:none}
   .check{
@@ -537,6 +546,16 @@
         <main>
     
     
+    <div class="today">
+      <div class="row" style="justify-content:space-between">
+        <span class="load-l">Hoy toca</span>
+        <span class="pill">Día 2 de 3</span>
+      </div>
+      <button class="today-n" onclick="go({name:'routine', id:'r2'})">Pierna</button>
+      <div class="row-sub">3 ejercicios · ayer hiciste Torso</div>
+      <button class="btn" style="margin-top:15px" onclick="startSession('r2')">Empezar</button>
+    </div>
+    
     <div class="sect">Esta semana</div>
     <div class="strip">
       <div><div class="n">4</div><div class="l">Sesiones</div></div>
@@ -544,31 +563,37 @@
       <div><div class="n">11,8<i>t</i></div><div class="l">Volumen</div></div>
     </div>
     
-    <div class="sect">Tus rutinas</div>
+    <div class="row" style="justify-content:space-between;margin:26px 0 6px">
+      <div class="sect" style="margin:0">Torso / Pierna / Full Body · 3 días</div>
+      <button class="note-a" style="margin:0" onclick="go({name:'splits'})">Cambiar ›</button>
+    </div>
     
     <button class="rowitem" onclick="go({name:'routine', id:'r1'})">
+      <span class="dayn">1</span>
       <span class="grow">
         <span class="row-name" style="display:block">Torso</span>
-        <span class="row-sub" style="display:block">5 ejercicios · vie, 31 jul</span>
+        <span class="row-sub" style="display:block">5 ejercicios · sáb, 1 ago</span>
       </span>
       <span class="chev">›</span>
     </button>
-    <button class="rowitem" onclick="go({name:'routine', id:'r2'})">
+    <button class="rowitem next" onclick="go({name:'routine', id:'r2'})">
+      <span class="dayn">2</span>
       <span class="grow">
-        <span class="row-name" style="display:block">Pierna</span>
-        <span class="row-sub" style="display:block">3 ejercicios · mié, 29 jul</span>
+        <span class="row-name" style="display:block">Pierna <i class="dot up" style="display:inline-block;margin-left:7px;transform:none"></i></span>
+        <span class="row-sub" style="display:block">3 ejercicios · jue, 30 jul</span>
       </span>
       <span class="chev">›</span>
     </button>
     <button class="rowitem" onclick="go({name:'routine', id:'r3'})">
+      <span class="dayn">3</span>
       <span class="grow">
         <span class="row-name" style="display:block">Full Body</span>
-        <span class="row-sub" style="display:block">2 ejercicios · dom, 26 jul</span>
+        <span class="row-sub" style="display:block">2 ejercicios · lun, 27 jul</span>
       </span>
       <span class="chev">›</span>
     </button>
-    <div style="margin-top:20px"><button class="btn ghost" onclick="promptNewRoutine()">Nueva rutina</button></div>
-    <div class="hint">Toca una rutina para revisar las sugerencias del coach antes de empezar.</div></main>
+    <div style="margin-top:20px"><button class="btn ghost" onclick="promptNewRoutine()">Agregar día</button></div>
+    <div class="hint">El punto verde marca el día que sigue en la rotación. Si te saltas uno no pasa nada: se cuenta desde el último que entrenaste, no desde el calendario.</div></main>
       </div>
       <nav class="tabs">
     <div class="inner">
@@ -598,6 +623,7 @@
       <div class="title sm">Torso</div>
       <div class="tools">
         <button aria-label="Reordenar ejercicios" onclick="toggleSort()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg></button>
+        
         <button aria-label="Duplicar rutina" onclick="duplicateRoutine('r1')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button>
         <button aria-label="Eliminar rutina" onclick="deleteRoutine('r1')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button>
       </div>
@@ -760,6 +786,13 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>20 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
+      <div class="note" style="margin:13px 0 0">
+    <div class="note-t">Anota el total de las dos mancuernas</div>
+    <div class="note-d">Si agarras 10 en cada mano, escribe <b>20</b>. Así el número es el peso que de
+      verdad moviste, se puede comparar con las barras y las máquinas, y la app sabe qué par bajar del
+      rack. Es la misma convención que usa Hevy.</div>
+    <button class="note-a" onclick="dismissDbNotice()">Entendido — no mostrar más</button>
+  </div>
       <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Una en cada mano</span>
@@ -773,7 +806,7 @@
     </button>
       <div class="grid-h">
         <span>#</span>
-        <span>kg</span>
+        <span>kg total</span>
         <span>reps</span>
         <span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir</span>
         <span></span><span></span>
@@ -913,9 +946,9 @@
     <circle cx="292.0" cy="20.9" r="3.6" fill="#F3F1EC"/>
   </svg></div>
         <div class="axis">
-          <span>9 jul</span>
+          <span>10 jul</span>
           <span id="charttip">3 sesiones</span>
-          <span>31 jul</span>
+          <span>1 ago</span>
         </div>
     </div>
     
@@ -1026,15 +1059,15 @@
       <div class="sect">Últimas sesiones</div>
       <div class="list" style="padding:4px 16px">
     <div class="exline">
-      <span class="tiny">vie, 31 jul</span>
+      <span class="tiny">sáb, 1 ago</span>
       <span class="sets">18×12@2 · 18×12@2 · 18×12@1</span>
     </div>
     <div class="exline">
-      <span class="tiny">jue, 16 jul</span>
+      <span class="tiny">vie, 17 jul</span>
       <span class="sets">16×11@2 · 16×10@1</span>
     </div>
     <div class="exline">
-      <span class="tiny">jue, 9 jul</span>
+      <span class="tiny">vie, 10 jul</span>
       <span class="sets">14×10@2 · 14×10@2</span>
     </div></div>
       <div class="hint">Formato: kg×reps. El “@2” es tu RIR — las reps que te quedaban.</div></main>
@@ -1109,7 +1142,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">vie, 31 jul · 31 min 0 s · 11 series</div>
+            <div class="log-m">sáb, 1 ago · 31 min 0 s · 11 series</div>
           </div>
           <div class="log-v">1690 <i>kg</i></div>
         </div>
@@ -1147,7 +1180,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">mié, 29 jul · 56 min 0 s · 8 series</div>
+            <div class="log-m">jue, 30 jul · 56 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4753 <i>kg</i></div>
         </div>
@@ -1177,7 +1210,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Full Body</div>
-            <div class="log-m">dom, 26 jul · 52 min 0 s · 4 series</div>
+            <div class="log-m">lun, 27 jul · 52 min 0 s · 4 series</div>
           </div>
           <div class="log-v">705 <i>kg</i></div>
         </div>
@@ -1203,7 +1236,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">lun, 27 jul · 55 min 0 s · 8 series</div>
+            <div class="log-m">mar, 28 jul · 55 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4610 <i>kg</i></div>
         </div>
@@ -1233,7 +1266,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">jue, 23 jul · 56 min 0 s · 8 series</div>
+            <div class="log-m">vie, 24 jul · 56 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4575 <i>kg</i></div>
         </div>
@@ -1263,7 +1296,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">jue, 16 jul · 31 min 0 s · 8 series</div>
+            <div class="log-m">vie, 17 jul · 31 min 0 s · 8 series</div>
           </div>
           <div class="log-v">1307 <i>kg</i></div>
         </div>
@@ -1297,7 +1330,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">jue, 9 jul · 33 min 0 s · 4 series</div>
+            <div class="log-m">vie, 10 jul · 33 min 0 s · 4 series</div>
           </div>
           <div class="log-v">748 <i>kg</i></div>
         </div>
@@ -1535,6 +1568,7 @@
       <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Descarga: <b>30 s</b> en 1 serie</div></div>
     <div class="why">Sesión de descarga: ~10 % menos carga y la mitad de las series. Recuperas sin perder el hábito, y la próxima sesión normal retoma tu progresión exactamente donde iba.</div>
       
+      
       <div class="grid-h">
         <span>▶</span>
         <span>lastre</span>
@@ -1642,7 +1676,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">vie, 31 jul · 31 min 0 s · 11 series</div>
+            <div class="log-m">sáb, 1 ago · 31 min 0 s · 11 series</div>
           </div>
           <div class="log-v">1690 <i>kg</i></div>
         </div>
@@ -1680,7 +1714,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">mié, 29 jul · 56 min 0 s · 8 series</div>
+            <div class="log-m">jue, 30 jul · 56 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4753 <i>kg</i></div>
         </div>
@@ -1710,7 +1744,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Full Body</div>
-            <div class="log-m">dom, 26 jul · 52 min 0 s · 4 series</div>
+            <div class="log-m">lun, 27 jul · 52 min 0 s · 4 series</div>
           </div>
           <div class="log-v">705 <i>kg</i></div>
         </div>
@@ -1736,7 +1770,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">lun, 27 jul · 55 min 0 s · 8 series</div>
+            <div class="log-m">mar, 28 jul · 55 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4610 <i>kg</i></div>
         </div>
@@ -1766,7 +1800,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">jue, 23 jul · 56 min 0 s · 8 series</div>
+            <div class="log-m">vie, 24 jul · 56 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4575 <i>kg</i></div>
         </div>
@@ -1796,7 +1830,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">jue, 16 jul · 31 min 0 s · 8 series</div>
+            <div class="log-m">vie, 17 jul · 31 min 0 s · 8 series</div>
           </div>
           <div class="log-v">1307 <i>kg</i></div>
         </div>
@@ -1830,7 +1864,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">jue, 9 jul · 33 min 0 s · 4 series</div>
+            <div class="log-m">vie, 10 jul · 33 min 0 s · 4 series</div>
           </div>
           <div class="log-v">748 <i>kg</i></div>
         </div>
@@ -1948,11 +1982,12 @@
     <div class="knurl"></div></header>
         <main>
       <div class="empty">
-        <div class="big">Sin rutinas</div>
-        <p>Empieza por crear la primera.</p>
-        <p class="muted">Por ejemplo “Torso”, “Pierna” o “Full body”. Después le agregas los ejercicios.</p>
+        <div class="big">Sin días</div>
+        <p>Empieza por crear el primero.</p>
+        <p class="muted">Por ejemplo “Torso”, “Pierna” o “Full body”. El orden en que los crees es el orden
+          en que la app te los irá pidiendo.</p>
       </div>
-      <button class="btn" onclick="promptNewRoutine()">Nueva rutina</button></main>
+      <button class="btn" onclick="promptNewRoutine()">Crear el primer día</button></main>
       </div>
       <nav class="tabs">
     <div class="inner">
@@ -2011,6 +2046,13 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>20 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
+      <div class="note" style="margin:13px 0 0">
+    <div class="note-t">Anota el total de las dos mancuernas</div>
+    <div class="note-d">Si agarras 10 en cada mano, escribe <b>20</b>. Así el número es el peso que de
+      verdad moviste, se puede comparar con las barras y las máquinas, y la app sabe qué par bajar del
+      rack. Es la misma convención que usa Hevy.</div>
+    <button class="note-a" onclick="dismissDbNotice()">Entendido — no mostrar más</button>
+  </div>
       <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Una en cada mano</span>
@@ -2024,7 +2066,7 @@
     </button>
       <div class="grid-h">
         <span>#</span>
-        <span>kg</span>
+        <span>kg total</span>
         <span>reps</span>
         <span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir</span>
         <span></span><span></span>
@@ -2178,6 +2220,13 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>20 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
+      <div class="note" style="margin:13px 0 0">
+    <div class="note-t">Anota el total de las dos mancuernas</div>
+    <div class="note-d">Si agarras 10 en cada mano, escribe <b>20</b>. Así el número es el peso que de
+      verdad moviste, se puede comparar con las barras y las máquinas, y la app sabe qué par bajar del
+      rack. Es la misma convención que usa Hevy.</div>
+    <button class="note-a" onclick="dismissDbNotice()">Entendido — no mostrar más</button>
+  </div>
       <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Una en cada mano</span>
@@ -2191,7 +2240,7 @@
     </button>
       <div class="grid-h">
         <span>#</span>
-        <span>kg</span>
+        <span>kg total</span>
         <span>reps</span>
         <span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir</span>
         <span></span><span></span>
@@ -2381,7 +2430,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">vie, 31 jul · 31 min 0 s · 11 series</div>
+            <div class="log-m">sáb, 1 ago · 31 min 0 s · 11 series</div>
           </div>
           <div class="log-v">1690 <i>kg</i></div>
         </div>
@@ -2419,7 +2468,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">mié, 29 jul · 56 min 0 s · 8 series</div>
+            <div class="log-m">jue, 30 jul · 56 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4753 <i>kg</i></div>
         </div>
@@ -2449,7 +2498,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Full Body</div>
-            <div class="log-m">dom, 26 jul · 52 min 0 s · 4 series</div>
+            <div class="log-m">lun, 27 jul · 52 min 0 s · 4 series</div>
           </div>
           <div class="log-v">705 <i>kg</i></div>
         </div>
@@ -2475,7 +2524,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">lun, 27 jul · 55 min 0 s · 8 series</div>
+            <div class="log-m">mar, 28 jul · 55 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4610 <i>kg</i></div>
         </div>
@@ -2505,7 +2554,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Pierna</div>
-            <div class="log-m">jue, 23 jul · 56 min 0 s · 8 series</div>
+            <div class="log-m">vie, 24 jul · 56 min 0 s · 8 series</div>
           </div>
           <div class="log-v">4575 <i>kg</i></div>
         </div>
@@ -2535,7 +2584,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">jue, 16 jul · 31 min 0 s · 8 series</div>
+            <div class="log-m">vie, 17 jul · 31 min 0 s · 8 series</div>
           </div>
           <div class="log-v">1307 <i>kg</i></div>
         </div>
@@ -2569,7 +2618,7 @@
         <div class="log">
           <div class="grow">
             <div class="log-n">Torso</div>
-            <div class="log-m">jue, 9 jul · 33 min 0 s · 4 series</div>
+            <div class="log-m">vie, 10 jul · 33 min 0 s · 4 series</div>
           </div>
           <div class="log-v">748 <i>kg</i></div>
         </div>
@@ -2601,7 +2650,7 @@
       <div class="overlay" onclick="if(event.target===this)closeModal()">
        <div class="modal" role="dialog" aria-modal="true">
     <h2>Editar sesión</h2>
-    <p class="muted">Torso · vie, 31 jul. Corrige valores, agrega la serie
+    <p class="muted">Torso · sáb, 1 ago. Corrige valores, agrega la serie
       que olvidaste o quita la que sobra. Al guardar, las sugerencias del coach se recalculan
       con los datos corregidos.</p>
     <div class="stack">
@@ -2794,6 +2843,13 @@
       <div class="exnote">Banco en 30°, bajar lento</div>
       <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>20 kg × 8</b></div></div>
     <div class="why">Llegaste a 12 reps en todas las series con 18 kg. Toca progresar la carga (~2.9 %).</div>
+      <div class="note" style="margin:13px 0 0">
+    <div class="note-t">Anota el total de las dos mancuernas</div>
+    <div class="note-d">Si agarras 10 en cada mano, escribe <b>20</b>. Así el número es el peso que de
+      verdad moviste, se puede comparar con las barras y las máquinas, y la app sabe qué par bajar del
+      rack. Es la misma convención que usa Hevy.</div>
+    <button class="note-a" onclick="dismissDbNotice()">Entendido — no mostrar más</button>
+  </div>
       <button class="load" onclick="showLoad(0)">
       <div class="load-row">
         <span class="load-l">Una en cada mano</span>
@@ -2807,7 +2863,7 @@
     </button>
       <div class="grid-h">
         <span>#</span>
-        <span>kg</span>
+        <span>kg total</span>
         <span>reps</span>
         <span class="linkish" role="button" tabindex="0" onclick="rirInfo()">rir</span>
         <span></span><span></span>
@@ -3753,6 +3809,7 @@
       
       <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>72,5 kg</b>), apunta a <b>10 reps</b></div></div>
     <div class="why">Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
+      
       <button class="load" onclick="showLoad(0)">
     <div class="load-row">
       <span class="load-l">Cargar la barra</span>
@@ -3897,6 +3954,7 @@
       
       <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>72,5 kg</b>), apunta a <b>10 reps</b></div></div>
     <div class="why">Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
+      
       <button class="load" onclick="showLoad(0)">
     <div class="load-row">
       <span class="load-l">Cargar la barra</span>
@@ -4066,6 +4124,7 @@
       
       <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>72,5 kg</b>), apunta a <b>10 reps</b></div></div>
     <div class="why">Doble progresión: primero llena el rango de reps (8–12), después sube el peso.</div>
+      
       <button class="load" onclick="showLoad(0)">
     <div class="load-row">
       <span class="load-l">Cargar la barra</span>
@@ -4231,9 +4290,9 @@
     <circle cx="292.0" cy="20.9" r="3.6" fill="#F3F1EC"/>
   </svg></div>
         <div class="axis">
-          <span>23 jul</span>
+          <span>24 jul</span>
           <span id="charttip">3 sesiones</span>
-          <span>29 jul</span>
+          <span>30 jul</span>
         </div>
     </div>
     
@@ -4356,15 +4415,15 @@
       <div class="sect">Últimas sesiones</div>
       <div class="list" style="padding:4px 16px">
     <div class="exline">
-      <span class="tiny">mié, 29 jul</span>
+      <span class="tiny">jue, 30 jul</span>
       <span class="sets">72,5×9@2 · 72,5×8@1 · 72,5×8@1</span>
     </div>
     <div class="exline">
-      <span class="tiny">lun, 27 jul</span>
+      <span class="tiny">mar, 28 jul</span>
       <span class="sets">70×9@2 · 70×9@1 · 70×8@1</span>
     </div>
     <div class="exline">
-      <span class="tiny">jue, 23 jul</span>
+      <span class="tiny">vie, 24 jul</span>
       <span class="sets">70×9@2 · 70×8@1 · 70×8@1</span>
     </div></div>
       <div class="hint">Formato: kg×reps. El “@2” es tu RIR — las reps que te quedaban.</div></main>
