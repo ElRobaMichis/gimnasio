@@ -929,6 +929,39 @@ chk(splitSessions('s2').length === 0, 'y no en el que solo comparte el nombre');
 db.history.push({ id:'hy', routineId:null, routineName:'Push', date:new Date().toISOString(), duration:60, entries:[] });
 chk(splitSessions('s1').length === 2, 'el historial importado se atribuye por nombre');
 
+suite('Torre de placas — el dibujo no miente');
+resetDB();
+exMeta('cable').equip = 'placas';
+Object.assign(exMeta('cable').stack, { unit:'lb', step:5, start:2.5 });
+chk(stackPreview('cable', 4).join(',') === '2.5,7.5,12.5,17.5', 'torre que empieza en 2,5 y sube de 5 en 5');
+chk(stackSnap('cable', 17.5 * 0.45359237).index === 4, '17,5 lb es la placa 4');
+
+/* el dibujo tiene que caber entero: si se recorta, el pin parece estar
+   en otra placa — que es el fallo que se arregló */
+function cabe(sel, total, h){
+  const svg = stackSVG(sel, total, { h });
+  const ys = [...svg.matchAll(/y="(-?[\d.]+)"[^>]*height="([\d.]+)"/g)];
+  return ys.every(m => +m[1] >= -0.5 && +m[1] + +m[2] <= h + 0.5);
+}
+chk(cabe(4, 12, 104), 'cabe en el alto del calentamiento');
+chk(cabe(4, 12, 140), 'cabe en el alto de la sesión');
+chk(cabe(11, 15, 190), 'cabe en el alto del detalle');
+chk(cabe(20, 24, 96), 'y aguanta torres largas en poco espacio');
+chk(cabe(1, 12, 104), 'también con el pin en la primera placa');
+
+/* el pin se dibuja dentro de la placa que toca */
+function pinEnPlaca(sel, total, h){
+  const svg = stackSVG(sel, total, { h });
+  const rects = [...svg.matchAll(/<rect x="18" y="([\d.]+)" width="\d+" height="([\d.]+)"/g)]
+    .map(m => [+m[1], +m[1] + +m[2]]);
+  const cy = +/circle cx="\d+" cy="([\d.]+)"/.exec(svg)[1];
+  const i = rects.findIndex(([a, b]) => cy >= a && cy <= b);
+  return i + 1;
+}
+chk(pinEnPlaca(4, 12, 104) === 4, 'el pin cae en la placa 4, no en otra');
+chk(pinEnPlaca(1, 12, 104) === 1, 'y en la 1 cuando toca la primera');
+chk(pinEnPlaca(12, 12, 104) === 12, 'y en la última cuando toca el final');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
