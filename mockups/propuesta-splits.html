@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hierro — propuesta: splits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --void:#08080A;
+    --surface:#0E0F11;
+    --surface-2:#141619;
+    --well:#1B1E22;
+    --line:rgba(255,255,255,.07);
+    --line-2:rgba(255,255,255,.13);
+    --bone:#F3F1EC;
+    --ash:#9A9DA4;
+    --dim:#5F6268;
+    --up:#7FD3A8;
+    --hold:#D7A44B;
+    --danger:#E4685A;
+    --sans:'Archivo',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  .scr{
+    background:var(--void);color:var(--bone);
+    font-family:var(--sans);font-synthesis:none;
+    font-size:15px;line-height:1.5;
+    overscroll-behavior-y:contain;
+  }
+  .appbox{
+    max-width:none;margin:0;min-height:100%;
+    display:flex;flex-direction:column;
+    padding-bottom:calc(78px + env(safe-area-inset-bottom));
+  }
+  .appbox main{flex:1;padding:0 20px 32px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .num{font-variant-numeric:tabular-nums}
+  .grow{flex:1;min-width:0}
+  .row{display:flex;align-items:center;gap:10px}
+  .stack{display:flex;flex-direction:column;gap:10px}
+
+  /* ---------- moleteado (textura de barra) ---------- */
+  .knurl{
+    height:7px;flex:none;
+    background-image:
+      repeating-linear-gradient(45deg,var(--line-2) 0 1px,transparent 1px 5px),
+      repeating-linear-gradient(-45deg,var(--line-2) 0 1px,transparent 1px 5px);
+    opacity:.85;
+  }
+
+  /* ---------- cabecera ---------- */
+  header.app{
+    padding:calc(14px + env(safe-area-inset-top, 0px)) 20px 0;
+    flex:none;
+  }
+  header.app.sticky{position:sticky;top:0;z-index:30;background:var(--void)}
+  .head-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .mark{
+    font-size:10px;letter-spacing:.3em;font-weight:700;font-stretch:75%;
+    text-transform:uppercase;color:var(--dim);
+  }
+  .goal{
+    font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ash);border:1px solid var(--line);border-radius:999px;padding:5px 10px;white-space:nowrap;
+  }
+  .title{font-size:32px;font-weight:700;font-stretch:115%;letter-spacing:-.035em;line-height:1;margin:10px 0 12px}
+  .title.sm{font-size:25px;margin:0}
+  .title.big{font-size:27px;margin:12px 0 2px}
+  .title-sub{font-size:22px;font-weight:500;font-stretch:110%;letter-spacing:-.03em;color:var(--dim);line-height:1.1;margin-bottom:12px}
+  .back{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);display:flex;align-items:center;gap:7px;padding:2px 0 6px;
+  }
+  .meta{font-family:var(--mono);font-size:11px;color:var(--dim);margin:9px 0 12px}
+  .tools{display:flex;gap:16px;color:var(--dim);flex:none}
+  .tools button{display:flex;align-items:center;color:inherit}
+  .tools svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---------- tipografía utilitaria ---------- */
+  .sect{
+    font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+    font-weight:600;font-stretch:80%;margin:26px 0 11px;
+  }
+  .sect:first-child{margin-top:18px}
+  .hint{font-size:11.5px;line-height:1.55;color:var(--dim);margin-top:9px}
+  .hint b{color:var(--ash);font-weight:500}
+  .muted{color:var(--ash);font-size:13.5px;line-height:1.55}
+  .tiny{font-size:11.5px;color:var(--dim);line-height:1.5}
+  .linkish{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+
+  /* ---------- botones ---------- */
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+  .clickable:focus-visible, summary:focus-visible{
+    outline:2px solid var(--hold);outline-offset:2px;border-radius:8px;
+  }
+  .btn{
+    display:block;width:100%;text-align:center;border-radius:13px;padding:17px;
+    font-size:14.5px;font-weight:600;letter-spacing:-.01em;
+    background:var(--bone);color:#0B0B0D;border:1px solid var(--bone);
+    transition:transform .06s ease;
+  }
+  .btn:active{transform:scale(.985)}
+  .btn.ghost{background:transparent;border-color:var(--line-2);color:var(--bone);font-weight:500}
+  .btn.quiet{background:var(--surface);border-color:var(--line);color:var(--bone);font-weight:500}
+  .btn.danger{background:transparent;border-color:rgba(228,104,90,.32);color:var(--danger);font-weight:500}
+  .btn.sm{padding:12px;font-size:13.5px;border-radius:11px}
+  .deload{
+    display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;width:100%;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  }
+  .deload svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .dock{
+    position:sticky;bottom:calc(62px + env(safe-area-inset-bottom));z-index:20;
+    margin:18px -20px 0;padding:16px 20px 10px;
+    background:linear-gradient(transparent,var(--void) 26%);
+  }
+  .chev{color:var(--dim);font-size:15px;flex:none;line-height:1}
+  .xbtn{
+    color:var(--dim);font-size:13px;flex:none;line-height:1;padding:4px 2px;
+  }
+  .xbtn:hover{color:var(--danger)}
+
+  /* ---------- inputs ---------- */
+  input[type=text], input[type=number], select, textarea{
+    background:var(--well);border:1px solid transparent;border-radius:10px;
+    color:var(--bone);padding:12px;font:inherit;width:100%;
+  }
+  input[type=number]{font-family:var(--mono);text-align:center;font-variant-numeric:tabular-nums}
+  input::placeholder, textarea::placeholder{color:var(--dim)}
+  input.sugg::placeholder{color:#7a6635}
+  textarea{resize:vertical;min-height:70px;font-size:14px;line-height:1.55}
+  select{
+    -webkit-appearance:none;appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+    background-position:calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+    background-size:5px 5px, 5px 5px;background-repeat:no-repeat;padding-right:30px;
+  }
+  select.inline{
+    background-color:transparent;border-color:transparent;width:auto;flex:none;
+    font-family:var(--mono);font-size:13px;color:var(--ash);padding:6px 26px 6px 8px;text-align:right;
+  }
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field > span{font-size:10px;font-weight:600;font-stretch:80%;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .field > span.plain{text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px;line-height:1.5}
+
+  /* ---------- resumen de la semana ---------- */
+  .strip{display:flex;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .strip div{flex:1;padding:16px 4px 14px;text-align:center;border-right:1px solid var(--line)}
+  .strip div:last-child{border-right:0}
+  .strip .n{font-family:var(--mono);font-size:20px;font-weight:500;letter-spacing:-.02em}
+  .strip .n i{font-style:normal;font-size:12px;color:var(--dim)}
+  .strip .l{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:7px}
+
+  /* ---------- filas simples ---------- */
+  .rowitem{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:17px 0;border-bottom:1px solid var(--line);width:100%;
+  }
+  .row-name{font-size:16px;font-weight:600;letter-spacing:-.015em}
+  .row-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px}
+
+  /* ---------- tarjeta de ejercicio ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:15px 16px;margin-bottom:10px;width:100%}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .ex-title{font-size:15px;font-weight:600;letter-spacing:-.015em;line-height:1.25}
+  .ex-title em{font-style:normal;color:var(--dim);font-weight:400}
+  .last{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:6px}
+  .last b{color:var(--ash);font-weight:400}
+  .exnote{font-size:11.5px;color:var(--dim);margin-top:7px;line-height:1.5}
+
+  .verdict{display:flex;align-items:baseline;gap:9px;margin-top:11px}
+  .dot{width:5px;height:5px;border-radius:50%;flex:none;transform:translateY(-2px)}
+  .dot.up{background:var(--up)}
+  .dot.hold{background:var(--hold)}
+  .v-text{font-size:13px;letter-spacing:-.005em;line-height:1.45}
+  .v-text b{font-family:var(--mono);font-weight:500}
+  .v-text.up b{color:var(--up)}
+  .v-text.hold b{color:var(--hold)}
+  .why{font-size:11.5px;line-height:1.5;color:var(--dim);margin-top:6px;padding-left:14px}
+
+  .steps{display:flex;align-items:center;gap:12px;margin-top:13px}
+  .bars{display:flex;gap:5px;flex:1}
+  .bars i{flex:1;height:3px;border-radius:2px;background:var(--well)}
+  .bars i.up{background:var(--up)}
+  .bars i.hold{background:var(--hold)}
+  .steps-v{font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
+  .steps-v b{color:var(--ash);font-weight:400}
+
+  /* ---------- avisos del coach ---------- */
+  .note{border-left:1px solid var(--hold);padding:2px 0 2px 14px;margin:18px 0}
+  .note.up{border-left-color:var(--up)}
+  .note.bad{border-left-color:var(--danger)}
+  .note-t{font-size:12.5px;color:var(--hold);line-height:1.45}
+  .note.up .note-t{color:var(--up)}
+  .note.bad .note-t{color:var(--danger)}
+  .note-d{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .note-a{
+    margin-top:9px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim);text-decoration:underline;text-underline-offset:3px;
+  }
+
+  /* ---------- pestañas inferiores ---------- */
+  nav.tabs{
+    position:fixed;bottom:0;left:0;right:0;z-index:40;
+    background:rgba(8,8,10,.94);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav.tabs .inner{max-width:none;margin:0 auto;display:flex;padding:12px 0 10px}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--dim)}
+  .tab.on{color:var(--bone)}
+  .tab span{font-size:9px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-stretch:80%}
+  .tab svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---------- sesión en curso ---------- */
+  .sess-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .clock{font-family:var(--mono);font-size:36px;font-weight:400;letter-spacing:-.05em;line-height:1}
+  .sess-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-top:9px}
+  .sess-actions{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex:none}
+  .end{
+    border:1px solid rgba(228,104,90,.32);color:var(--danger);border-radius:999px;padding:9px 16px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  }
+  .unitbtn{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    border:1px solid var(--line);border-radius:999px;padding:6px 12px;
+  }
+  .rest{margin:16px 0 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px 15px;width:100%}
+  .rest-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .rest-l{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  .rest-t{font-family:var(--mono);font-size:17px;color:var(--bone)}
+  .rest-track{height:2px;background:var(--well);border-radius:2px;margin-top:13px;overflow:hidden}
+  .rest-fill{height:100%;width:0%;background:var(--bone);border-radius:2px;transition:width .9s linear}
+  .rest.on .rest-t{color:var(--hold)}
+  .rest.on .rest-fill{background:var(--hold)}
+  .rest.done{border-color:rgba(127,211,168,.35)}
+  .rest.done .rest-t,.rest.done .rest-l{color:var(--up)}
+  .rest.done .rest-fill{background:var(--up)}
+
+  .ex-open{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-bottom:10px}
+  .ex-done,.ex-next{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:10px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+  }
+  .ex-done .ex-title{font-size:14px;color:var(--ash);font-weight:500}
+  .ex-next .ex-title{font-size:14px;font-weight:500}
+  .mini-check{width:20px;height:20px;border-radius:6px;background:var(--up);display:flex;align-items:center;justify-content:center;flex:none}
+  .mini-check svg{width:12px;height:12px;stroke:#0B0B0D;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+  .grid-h,.set{display:grid;grid-template-columns:14px 1fr 1fr .8fr 42px 20px;gap:6px;align-items:center}
+  .grid-h{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);margin:16px 0 9px;
+  }
+  .grid-h span:nth-child(2),.grid-h span:nth-child(3),.grid-h span:nth-child(4){text-align:center}
+  .set{margin-bottom:8px}
+  .set .i{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center}
+  .set .i.play{color:var(--hold);font-size:13px;padding:0;text-align:center}
+  .cell{
+    background:var(--well);border-radius:10px;padding:12px 2px;text-align:center;
+    font-family:var(--mono);font-size:15px;border:1px solid transparent;color:var(--bone);
+  }
+  .cell::placeholder{color:var(--dim)}
+  .set.now .cell{border-color:var(--line-2);background:var(--surface-2)}
+  .set.done .cell{background:transparent;border-color:transparent;color:var(--ash)}
+  .ck{
+    height:42px;width:100%;border-radius:10px;border:1px solid var(--line-2);
+    display:flex;align-items:center;justify-content:center;color:var(--dim);
+  }
+  .ck svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .ck.on{background:var(--up);border-color:var(--up);color:#0B0B0D}
+  .ex-actions{
+    display:flex;gap:18px;border-top:1px solid var(--line);margin-top:14px;padding-top:14px;
+    font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    flex-wrap:wrap;
+  }
+  .ex-actions button{color:inherit}
+  .vschip{font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:center;margin-top:10px}
+  .addex{
+    width:100%;border:1px dashed var(--line-2);border-radius:14px;padding:15px;text-align:center;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  }
+
+  /* ---------- objetivo / opciones tipo tarjeta ---------- */
+  .goals{display:flex;gap:8px}
+  .goal-c{flex:1;border:1px solid var(--line);border-radius:13px;padding:13px 12px;background:transparent}
+  .goal-c.on{border-color:rgba(215,164,75,.45);background:rgba(215,164,75,.06)}
+  .goal-c .g-t{font-size:14px;font-weight:600;letter-spacing:-.015em}
+  .goal-c.on .g-t{color:var(--hold)}
+  .goal-c .g-d{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px}
+
+  /* ---------- filas de ajuste ---------- */
+  .line{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 0;border-bottom:1px solid var(--line);width:100%}
+  .line:last-child{border-bottom:0}
+  .l-t{font-size:14.5px;font-weight:500;letter-spacing:-.01em}
+  .l-d{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .l-v{font-family:var(--mono);font-size:13px;color:var(--ash);display:flex;align-items:center;gap:8px;flex:none}
+  .l-v svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .l-v.dim{color:var(--dim)}
+  .list{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0 16px}
+  .list .line{padding:15px 0}
+  .pill-sw{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;flex:none}
+  .pill-sw button{font-family:var(--mono);font-size:12px;padding:8px 16px;border-radius:8px;color:var(--dim)}
+  .pill-sw button.on{background:var(--well);color:var(--bone);box-shadow:inset 0 0 0 1px var(--line-2)}
+  .tog{width:44px;height:26px;border-radius:999px;background:var(--well);position:relative;flex:none}
+  .tog i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--dim);transition:left .16s ease}
+  .tog.on{background:var(--hold)}
+  .tog.on i{left:21px;background:#0B0B0D}
+  .seg4{display:flex;background:var(--surface-2);border-radius:12px;padding:4px;gap:2px}
+  .seg4 button{flex:1;text-align:center;font-size:12.5px;padding:11px 2px;border-radius:9px;color:var(--dim)}
+  .seg4 button.on{background:var(--well);color:var(--bone);font-weight:600;box-shadow:inset 0 0 0 1px var(--line-2)}
+
+  /* ---------- ficha de ejercicio ---------- */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 16px 14px}
+  .pr{display:flex;align-items:flex-end;gap:9px}
+  .pr .n{font-family:var(--mono);font-size:46px;font-weight:400;letter-spacing:-.05em;line-height:.9}
+  .pr .u{font-family:var(--mono);font-size:13px;color:var(--dim);padding-bottom:5px}
+  .pr-d{font-size:12px;color:var(--ash);margin-top:11px;line-height:1.5}
+  .pr-d b{font-family:var(--mono);font-weight:400;color:var(--bone)}
+  .chart{margin-top:18px}
+  .chart canvas{display:block;width:100%;touch-action:pan-y}
+  .axis{
+    display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:14px;
+  }
+
+  /* ---------- volumen semanal ---------- */
+  .vol{display:flex;align-items:center;gap:12px;padding:10px 0}
+  .vol-n{width:66px;font-size:13px;color:var(--ash);flex:none}
+  .vol-track{flex:1;height:3px;background:var(--well);border-radius:2px;overflow:hidden}
+  .vol-fill{height:100%;background:var(--dim);border-radius:2px}
+  .vol-fill.ok{background:var(--up)}
+  .vol-fill.hi{background:var(--hold)}
+  .vol-v{width:62px;text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--dim);flex:none}
+  .vol-v b{color:var(--bone);font-weight:500}
+
+  /* ---------- historial ---------- */
+  details.hist{border-bottom:1px solid var(--line)}
+  details.hist summary{list-style:none;cursor:pointer}
+  details.hist summary::-webkit-details-marker{display:none}
+  .log{padding:16px 0;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .log-n{font-size:15px;font-weight:500;letter-spacing:-.01em}
+  .log-m{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px}
+  .log-v{font-family:var(--mono);font-size:13px;color:var(--ash);white-space:nowrap;flex:none}
+  .log-v i{font-style:normal;color:var(--dim);font-size:10px}
+  details.hist .body{padding:0 0 16px;font-size:13.5px}
+  .exline{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .exline:last-of-type{border-bottom:none}
+  .exline .sets{color:var(--dim);font-family:var(--mono);font-size:11px;text-align:right;flex:none}
+  .exline em{font-style:normal;color:var(--dim)}
+
+  /* ---------- autocompletado ---------- */
+  .acwrap{position:relative;flex:1;min-width:0}
+  .aclist{
+    position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:45;
+    background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;
+    overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.6);
+  }
+  .aclist button{
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    width:100%;text-align:left;padding:12px 14px;font-size:14px;
+    border-bottom:1px solid var(--line);
+  }
+  .aclist button:last-child{border-bottom:none}
+  .aclist button:hover, .aclist button:focus-visible{background:var(--well)}
+  .aclist b{color:var(--hold);font-weight:600}
+  .aclist .from{color:var(--dim);font-family:var(--mono);font-size:10px;white-space:nowrap;flex:none}
+
+  /* ---------- modal ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:50;background:rgba(4,4,6,.78);
+    display:flex;align-items:flex-end;justify-content:center;
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  }
+  @media(min-width:480px){ .overlay{align-items:center} }
+  .modal{
+    background:var(--surface);border:1px solid var(--line-2);
+    border-radius:20px 20px 0 0;width:100%;max-width:460px;
+    max-height:88dvh;overflow-y:auto;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+  @media(min-width:480px){ .modal{border-radius:20px;padding-bottom:24px} }
+  .modal h2{font-size:21px;font-weight:700;font-stretch:112%;letter-spacing:-.028em;line-height:1.1;margin-bottom:9px}
+  .modal .muted{margin-bottom:18px}
+  .modal .btn + .btn{margin-top:9px}
+  .modal .sect:first-child{margin-top:0}
+
+  /* ---------- estado vacío ---------- */
+  .empty{text-align:center;padding:56px 16px 44px}
+  .empty .big{
+    font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:14px;
+  }
+  .empty p{font-size:15px;font-weight:600;letter-spacing:-.015em}
+  .empty .muted{margin-top:8px;font-size:12.5px;color:var(--dim)}
+
+  .pill{
+    display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.12em;
+    text-transform:uppercase;border:1px solid var(--line);border-radius:999px;
+    padding:3px 8px;color:var(--dim);white-space:nowrap;
+  }
+  .pill.hold{color:var(--hold);border-color:rgba(215,164,75,.35)}
+
+  /* ---------- opción de tarjeta ancha (modales) ---------- */
+  .opt{
+    display:flex;flex-direction:column;gap:4px;text-align:left;width:100%;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:14px 15px;
+  }
+  .opt.on{border-color:rgba(215,164,75,.45);background:rgba(215,164,75,.06)}
+  .opt b{font-size:14.5px;font-weight:600;letter-spacing:-.015em}
+  .opt.on b{color:var(--hold)}
+  .opt span{font-size:12px;color:var(--dim);line-height:1.5}
+  h1,h2{font-size:21px;font-weight:700;font-stretch:112%;letter-spacing:-.028em;line-height:1.15}
+  .l-v input{width:52px;padding:8px 4px;font-size:13px;background:var(--well)}
+  .why b{color:var(--ash);font-weight:500}
+  .note-d b{color:var(--ash);font-weight:500}
+  .modal p{font-size:13.5px;line-height:1.6;color:var(--ash)}
+  .modal p b{color:var(--bone);font-weight:600}
+  .modal .tiny{color:var(--dim);font-size:11.5px}
+  .modal textarea{margin-top:4px}
+  .modal .stack{gap:9px}
+
+  /* ---------- splits: qué toca hoy y los días ---------- */
+  .today{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-top:18px}
+  .today-n{
+    font-size:27px;font-weight:700;font-stretch:112%;letter-spacing:-.03em;
+    line-height:1;margin:10px 0 7px;display:block;width:100%;text-align:left;
+  }
+  .dayn{font-family:var(--mono);font-size:11px;color:var(--dim);width:16px;flex:none;text-align:left}
+  .rowitem.next .row-name{color:var(--up)}
+
+  /* ---------- equipo del gimnasio y calculadora de carga ---------- */
+  .plate-dot{width:15px;height:15px;border-radius:50%;flex:none}
+  .check{
+    width:23px;height:23px;border-radius:7px;border:1px solid var(--line-2);
+    display:flex;align-items:center;justify-content:center;color:transparent;flex:none;
+  }
+  .check.on{background:var(--bone);border-color:var(--bone);color:#0B0B0D}
+  .check svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .qty{display:flex;align-items:center;background:var(--surface-2);border-radius:9px;padding:2px;flex:none}
+  .qty button{
+    width:30px;height:28px;display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-family:var(--mono);font-size:15px;
+  }
+  .qty > span{min-width:22px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--bone)}
+
+  .load{display:block;width:100%;text-align:left;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+  .load-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .load-l{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .load-v{font-family:var(--mono);font-size:12.5px;color:var(--ash);display:flex;align-items:center;gap:6px}
+  .load-v b{color:var(--bone);font-weight:500}
+  .load svg{margin:4px 0}
+
+  .warm{border-top:1px solid var(--line);padding:14px 0 4px}
+  .warm.work{border-top-color:rgba(127,211,168,.3)}
+  .modal .warm:first-of-type{border-top:0;padding-top:4px}
+
+
+  html,body{height:auto}
+  body{
+    background:var(--void);color:var(--bone);font-family:var(--sans);font-synthesis:none;
+    margin:0;padding:56px 24px 96px;
+  }
+  .brief{max-width:1240px;margin:0 auto 56px}
+  .brief .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);font-weight:600;font-stretch:80%}
+  .brief h1{font-size:clamp(38px,7vw,68px);line-height:.94;letter-spacing:-.03em;font-weight:700;font-stretch:118%;margin:14px 0 18px}
+  .brief h1 em{font-style:normal;color:var(--dim)}
+  .brief p{max-width:62ch;color:var(--ash);font-size:14.5px;line-height:1.6}
+  .brief p + p{margin-top:12px}
+  .brief code{font-family:var(--mono);font-size:13px;color:var(--bone)}
+  .tokens{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .token{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 8px;border:1px solid var(--line);border-radius:999px;font-family:var(--mono);font-size:11px;color:var(--ash)}
+  .token i{width:13px;height:13px;border-radius:3px;display:block}
+
+  .chapter{max-width:1240px;margin:0 auto 34px;padding-top:26px;border-top:1px solid var(--line)}
+  .chapter .k{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+  .chapter h2{font-size:30px;font-weight:700;font-stretch:112%;letter-spacing:-.03em;margin:10px 0 12px}
+  .chapter p{max-width:62ch;color:var(--ash);font-size:14px;line-height:1.6}
+
+  .deck{max-width:1240px;margin:0 auto 76px;display:grid;align-items:start;grid-template-columns:repeat(auto-fit,minmax(320px,390px));gap:64px 48px;justify-content:center}
+  figure{margin:0}
+  figcaption{margin-top:22px;max-width:390px}
+  .cap-n{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.08em}
+  .cap-t{font-size:16px;font-weight:600;letter-spacing:-.01em;margin:6px 0 7px}
+  .cap-d{font-size:13px;line-height:1.55;color:var(--ash)}
+
+  .phone{
+    width:390px;height:844px;border-radius:46px;overflow:hidden;background:var(--void);
+    border:1px solid var(--line-2);position:relative;display:flex;flex-direction:column;
+    box-shadow:0 40px 80px -40px #000;transform:translateZ(0);
+  }
+  .phone.grow{height:auto;min-height:844px}
+  .phone.grow .scr{overflow:visible}
+  .phone.grow .appbox{height:auto}
+  .status{height:48px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 30px 6px;font-family:var(--mono);font-size:12px;position:relative;z-index:60}
+  .status .sig{display:flex;gap:3px;align-items:flex-end}
+  .status .sig b{display:block;width:3px;background:var(--bone);border-radius:1px}
+  .scr{flex:1;min-height:0;overflow:hidden;position:relative;padding:0}
+  .appbox{height:100%;overflow:hidden}
+  .phone header.app{padding-top:6px}
+  .phone .dock{position:static;margin-top:18px}
+
+  @media(max-width:900px){
+    body{padding:36px 16px 72px}
+    .deck{gap:52px 0}
+    .phone{width:100%;max-width:390px}
+    .phone:not(.grow){height:auto;aspect-ratio:390/844}
+  }
+
+  .today{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-top:18px}
+  .today-n{font-size:27px;font-weight:700;font-stretch:112%;letter-spacing:-.03em;line-height:1;margin:10px 0 7px}
+  .dayn{font-family:var(--mono);font-size:11px;color:var(--dim);width:16px;flex:none}
+  .rowitem.next .row-name{color:var(--up)}
+  .load-l{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .stack .opt + .opt{margin-top:0}
+  .modal .sect:first-of-type{margin-top:22px}
+</style>
+</head>
+<body>
+
+<header class="brief">
+  <div class="eyebrow">Propuesta · splits · 6 pantallas</div>
+  <h1>Agrupar los días<br><em>y cambiar de plan</em></h1>
+  <p>Tus rutinas dejan de ser una lista suelta y pasan a ser <b>los días de un split</b>. Eso permite lo que
+  pediste —guardar Torso/Pierna, montar un PPL y volver cuando quieras— pero además desbloquea algo que
+  hoy la app no puede hacer: si conoce el orden de tus días, <b>sabe cuál toca</b>.</p>
+  <p>La regla que sostiene todo: <b>el progreso vive en el ejercicio, no en la rutina</b>. Cambiar de split
+  no cuesta nada porque el press de banca llega a Push con las mismas marcas que tenía en Torso.</p>
+</header>
+
+<div class="chapter">
+  <div class="k">01</div>
+  <h2>El día a día</h2>
+  <p>Lo que ves al abrir la app. Si solo tienes un split, la pantalla es casi la de hoy: una línea con su
+  nombre y ya. La diferencia está arriba.</p>
+</div>
+<div class="deck">
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <div class="head-row"><div class="mark">Hierro</div><div class="goal">Hipertrofia</div></div>
+  <div class="title">Rutinas</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="today">
+      <div class="row" style="justify-content:space-between">
+        <span class="load-l">Hoy toca</span>
+        <span class="pill">Día 2 de 6</span>
+      </div>
+      <div class="today-n">Pull</div>
+      <div class="row-sub">6 ejercicios · el domingo hiciste Push</div>
+      <button class="btn" style="margin-top:15px">Empezar</button>
+    </div>
+
+    <div class="sect">Esta semana</div>
+    <div class="strip">
+      <div><div class="n">3</div><div class="l">Sesiones</div></div>
+      <div><div class="n">42</div><div class="l">Series</div></div>
+      <div><div class="n">7,4<i>t</i></div><div class="l">Volumen</div></div>
+    </div>
+
+    <div class="row" style="justify-content:space-between;margin:26px 0 6px">
+      <div class="sect" style="margin:0">PPL · 6 días</div>
+      <button class="note-a" style="margin:0">Cambiar ›</button>
+    </div>
+    
+  <button class="rowitem">
+    <span class="dayn">1</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Push</span>
+      <span class="row-sub" style="display:block">6 ejercicios · dom 27 jul</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    
+  <button class="rowitem next">
+    <span class="dayn">2</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Pull <i class="dot up" style="display:inline-block;margin-left:7px;transform:none"></i></span>
+      <span class="row-sub" style="display:block">6 ejercicios · jue 24 jul</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    
+  <button class="rowitem">
+    <span class="dayn">3</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Legs</span>
+      <span class="row-sub" style="display:block">5 ejercicios · mié 23 jul</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    
+  <button class="rowitem">
+    <span class="dayn">4</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Push</span>
+      <span class="row-sub" style="display:block">6 ejercicios · lun 21 jul</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    
+  <button class="rowitem">
+    <span class="dayn">5</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Pull</span>
+      <span class="row-sub" style="display:block">6 ejercicios · sáb 19 jul</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    
+  <button class="rowitem">
+    <span class="dayn">6</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Legs</span>
+      <span class="row-sub" style="display:block">5 ejercicios · vie 18 jul</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    <div style="margin-top:20px"><button class="btn ghost">Agregar día</button></div>
+    <div class="hint">El punto verde marca el día que sigue en la rotación. Si te saltas uno no pasa nada:
+      se cuenta desde el último que entrenaste, no desde el calendario.</div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">S01</div>
+    <div class="cap-t">Rutinas · qué toca hoy</div>
+    <div class="cap-d">Lo que gana la pantalla al agrupar en splits: si la app sabe el orden de tus días, sabe cuál sigue. Deja de ser una lista para pasar a decirte qué hacer. El resto queda igual, ordenado por día.</div>
+  </figcaption>
+</figure></div>
+
+<div class="chapter">
+  <div class="k">02</div>
+  <h2>Guardar y retomar</h2>
+  <p>Un split guardado no es un archivo muerto: conserva sus días, sus estadísticas y vuelve a estar en
+  curso con un botón.</p>
+</div>
+<div class="deck">
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Rutinas</button>
+  <div class="head-row"><div class="title sm">Splits</div><div class="tools"><button aria-label="Nuevo split"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+  <div class="meta">1 en curso · 2 guardados</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="sect">En curso</div>
+    <div class="card" style="border-color:rgba(127,211,168,.3)">
+      <div class="card-top">
+        <div>
+          <div class="ex-title" style="font-size:17px">PPL <i class="dot up" style="display:inline-block;margin-left:6px;transform:none"></i></div>
+          <div class="last">6 días · desde el 12 de agosto · 18 sesiones</div>
+        </div>
+        <div class="chev">›</div>
+      </div>
+      <div class="steps" style="margin-top:12px">
+        <div class="bars"><i class="up"></i><i class="up"></i><i class="up"></i><i class="up"></i><i></i><i></i></div>
+        <div class="steps-v"><b>4</b>/6 días esta vuelta</div>
+      </div>
+    </div>
+
+    <div class="sect">Guardados</div>
+    <button class="rowitem">
+      <span class="grow">
+        <span class="row-name" style="display:block">Torso / Pierna / Full Body</span>
+        <span class="row-sub" style="display:block">3 días · 47 sesiones · hasta el 10 ago</span>
+      </span>
+      <span class="chev">›</span>
+    </button>
+    <button class="rowitem">
+      <span class="grow">
+        <span class="row-name" style="display:block">Upper / Lower</span>
+        <span class="row-sub" style="display:block">4 días · 22 sesiones · hasta el 3 may</span>
+      </span>
+      <span class="chev">›</span>
+    </button>
+
+    <div class="note">
+      <div class="note-t">Cambiar de split no borra tu progreso</div>
+      <div class="note-d">Tus marcas viven en cada ejercicio, no en la rutina. Si el press de banca estaba
+        en Torso y ahora está en Push, llega con su historial, su récord y la sugerencia del coach
+        exactamente donde la dejaste.</div>
+    </div>
+    <div style="margin-top:4px"><button class="btn ghost">Nuevo split</button></div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">S02</div>
+    <div class="cap-t">Cambiar de split</div>
+    <div class="cap-d">Aquí vive lo que pediste: los splits guardados no se borran, se apartan. Cambiar de PPL a Upper/Lower y volver dentro de tres meses es un toque, y cada uno conserva sus días tal como los dejaste.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Splits</button>
+  <div class="head-row"><div class="title sm">Torso / Pierna</div><div class="tools"><button aria-label="Reordenar días"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg></button>
+     <button aria-label="Duplicar split"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button>
+     <button aria-label="Borrar split"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div></div>
+  <div class="meta">Guardado · 47 sesiones · hasta el 10 ago</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="sect">Sus días</div>
+    
+  <button class="rowitem">
+    <span class="dayn">1</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Torso</span>
+      <span class="row-sub" style="display:block">9 ejercicios</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    
+  <button class="rowitem">
+    <span class="dayn">2</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Pierna</span>
+      <span class="row-sub" style="display:block">6 ejercicios</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+    
+  <button class="rowitem">
+    <span class="dayn">3</span>
+    <span class="grow">
+      <span class="row-name" style="display:block">Full Body</span>
+      <span class="row-sub" style="display:block">6 ejercicios</span>
+    </span>
+    <span class="chev">›</span>
+  </button>
+
+    <div class="sect">Cuánto lo usaste</div>
+    <div class="list">
+      <div class="line"><div class="l-t">Sesiones</div><div class="l-v">47</div></div>
+      <div class="line"><div class="l-t">Del</div><div class="l-v">14 feb al 10 ago</div></div>
+      <div class="line"><div class="l-t">Volumen movido</div><div class="l-v">96,4 t</div></div>
+    </div>
+
+    <div class="dock">
+      <button class="btn">Ponerlo en curso</button>
+      <div class="hint" style="text-align:center;margin-top:12px">PPL pasa a guardados. Nada se borra.</div>
+    </div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">S03</div>
+    <div class="cap-t">Un split guardado</div>
+    <div class="cap-d">Al abrir uno guardado ves sus días tal como quedaron y cuánto lo entrenaste. Ponerlo en curso es un botón: no se copia ni se duplica nada, simplemente vuelve a ser el que manda en el inicio.</div>
+  </figcaption>
+</figure></div>
+
+<div class="chapter">
+  <div class="k">03</div>
+  <h2>Empezar uno nuevo</h2>
+  <p>Solo el nombre. Los días los pones tú, en el orden que quieras.</p>
+</div>
+<div class="deck">
+<figure>
+  <div class="phone">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Splits</button>
+  <div class="head-row"><div class="title sm">Splits</div></div>
+  <div class="meta">1 en curso · 2 guardados</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="sect">En curso</div>
+    <div class="card"><div class="card-top">
+      <div><div class="ex-title" style="font-size:17px">PPL</div>
+      <div class="last">3 días · 18 sesiones</div></div><div class="chev">›</div>
+    </div></div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      <div class="overlay"><div class="modal">
+    <h2>Nuevo split</h2>
+    <p class="muted">Un split es el orden de tus días. Ponle nombre y luego le vas creando los días
+      que quieras — sin plantillas ni ataduras.</p>
+    <div class="stack">
+      <input type="text" value="Upper / Lower">
+      <button class="btn">Crear y ponerlo en curso</button>
+      <button class="btn ghost">Cancelar</button>
+    </div>
+    <div class="hint">El que tengas ahora pasa a guardados. Puedes volver a él cuando quieras, y tu
+      progreso no se toca: vive en cada ejercicio, no en la rutina.</div>
+  </div></div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">S04</div>
+    <div class="cap-t">Nuevo split</div>
+    <div class="cap-d">Sin plantillas: solo el nombre. Los días los creas tú, en el orden que quieras, y ese orden es el que la app usará para decirte qué toca. Nada viene decidido de fábrica.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone grow">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Rutinas</button>
+  <div class="head-row"><div class="title sm">Push</div><div class="tools"><button aria-label="Reordenar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg></button>
+     <button aria-label="Duplicar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button>
+     <button aria-label="Borrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div></div>
+  <div class="meta">6 ejercicios · 8–12 reps · 1–3 RIR</div>
+  <div class="knurl"></div></header>
+        <main>
+    <div class="note up" style="margin-top:2px">
+      <div class="note-t">Split nuevo, progreso de siempre</div>
+      <div class="note-d">Estos ejercicios ya los entrenabas en Torso. Traen su historial completo, así que
+        el coach sigue exactamente donde iba.</div>
+    </div>
+    <div class="card">
+      <div class="card-top"><div class="ex-title">Incline Bench Press <em>(Dumbbell)</em></div><div class="chev">›</div></div>
+      <div class="last">Última · <b>18×12</b> · <b>18×12</b> · <b>18×12</b></div>
+      <div class="verdict"><i class="dot up"></i><div class="v-text up">Sube el peso: <b>20 kg × 8</b></div></div>
+      <div class="steps">
+        <div class="bars"><i class="up"></i><i class="up"></i><i class="up"></i><i class="up"></i><i class="up"></i></div>
+        <div class="steps-v"><b>12</b>/12 · rango lleno</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-top"><div class="ex-title">Shoulder Press <em>(Machine)</em></div><div class="chev">›</div></div>
+      <div class="last">Última · <b>12,3×8</b> · <b>12,3×10</b></div>
+      <div class="verdict"><i class="dot hold"></i><div class="v-text hold">Mismo peso (<b>12,3 kg</b>), apunta a <b>11 reps</b></div></div>
+      <div class="steps">
+        <div class="bars"><i class="hold"></i><i class="hold"></i><i class="hold"></i><i></i><i></i></div>
+        <div class="steps-v"><b>10</b>/12</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-top"><div class="ex-title">Lateral Raise <em>(Dumbbell)</em></div><div class="chev">›</div></div>
+      <div class="last">Sin registros todavía</div>
+      <div class="exnote">Nuevo en este split — la primera sesión marca el punto de partida.</div>
+    </div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">S05</div>
+    <div class="cap-t">El progreso viaja contigo</div>
+    <div class="cap-d">La pantalla que responde al miedo de cambiar de split. Primer día del PPL recién creado: el press de banca venía de Torso y llega con sus 18×12, su récord y la sugerencia del coach intactos.</div>
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="phone">
+    <div class="status"><span>12:04</span><span class="sig"><b style="height:4px"></b><b style="height:6px"></b><b style="height:8px"></b><b style="height:10px"></b></span></div>
+    <div class="scr">
+      <div class="appbox">
+        <header class="app">
+  <button class="back">‹ Rutinas</button>
+  <div class="head-row"><div class="title sm">Full Body</div></div>
+  <div class="meta">6 ejercicios · 8–12 reps · 1–3 RIR</div>
+  <div class="knurl"></div></header>
+        <main><div style="margin-top:2px">
+    <div class="card"><div class="card-top"><div class="ex-title">Squat <em>(Barbell)</em></div><div class="chev">›</div></div></div>
+    <div class="card"><div class="card-top"><div class="ex-title">Bench Press <em>(Barbell)</em></div><div class="chev">›</div></div></div>
+  </div></main>
+      </div>
+      <nav class="tabs"><div class="inner">
+    <button class="tab on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 6v12M16 6v12M20 9v6M8 12h8"/></svg><span>Rutinas</span></button>
+    
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Historial</span></button>
+    <button class="tab "><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg><span>Ajustes</span></button>
+  </div></nav>
+      <div class="overlay"><div class="modal">
+    <h2>¿A qué split?</h2>
+    <p class="muted">Ahora mismo <b>Full Body</b> vive en Torso / Pierna. Su historial no se toca:
+      las sesiones ya guardadas siguen contando igual.</p>
+    <div class="stack">
+      <button class="opt on"><b>PPL</b><span>En curso · 6 días</span></button>
+      <button class="opt"><b>Torso / Pierna</b><span>Guardado · donde está ahora</span></button>
+      <button class="opt"><b>Upper / Lower</b><span>Guardado · 4 días</span></button>
+    </div>
+    <div class="sect">Cómo</div>
+    <div class="stack">
+      <button class="opt on"><b>Mover</b><span>Deja de estar en Torso / Pierna.</span></button>
+      <button class="opt"><b>Copiar</b><span>Queda en los dos, cada uno editable por separado.</span></button>
+    </div>
+    <button class="btn" style="margin-top:18px">Mover a PPL</button>
+    <button class="btn ghost">Cancelar</button>
+  </div></div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="cap-n">S06</div>
+    <div class="cap-t">Mover un día a otro split</div>
+    <div class="cap-d">Los días no están casados con su split. Si «Full Body» te sirve también en el nuevo, se mueve o se copia sin tocar su historial. Copiar deja el original donde estaba.</div>
+  </figcaption>
+</figure></div>
+</body>
+</html>

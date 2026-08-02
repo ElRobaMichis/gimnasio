@@ -436,6 +436,15 @@
   .modal textarea{margin-top:4px}
   .modal .stack{gap:9px}
 
+  /* ---------- splits: qué toca hoy y los días ---------- */
+  .today{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-top:18px}
+  .today-n{
+    font-size:27px;font-weight:700;font-stretch:112%;letter-spacing:-.03em;
+    line-height:1;margin:10px 0 7px;display:block;width:100%;text-align:left;
+  }
+  .dayn{font-family:var(--mono);font-size:11px;color:var(--dim);width:16px;flex:none;text-align:left}
+  .rowitem.next .row-name{color:var(--up)}
+
   /* ---------- equipo del gimnasio y calculadora de carga ---------- */
   .plate-dot{width:15px;height:15px;border-radius:50%;flex:none}
   .check{
@@ -589,6 +598,22 @@ function normalize(d){
   d.progress = (d.progress && typeof d.progress === 'object') ? d.progress : {};
   d.exmeta   = (d.exmeta   && typeof d.exmeta   === 'object') ? d.exmeta   : {};
   d.active   = d.active || null;
+  /* splits: las rutinas son los días de un plan ordenado */
+  d.splits = Array.isArray(d.splits) ? d.splits : [];
+  const huerfanas = d.routines.filter(r => !r.split || !d.splits.some(sp => sp.id === r.split));
+  if(huerfanas.length || (!d.splits.length && d.routines.length)){
+    let sp = d.splits.find(x => x.active) || d.splits[0];
+    if(!sp){
+      const nombres = d.routines.map(r => r.name);
+      sp = { id:'sp' + Math.random().toString(36).slice(2,8),
+             name: (nombres.length && nombres.length <= 3) ? nombres.join(' / ') : 'Mi entrenamiento',
+             active:true, created:new Date().toISOString() };
+      d.splits.push(sp);
+    }
+    for(const r of huerfanas) r.split = sp.id;
+  }
+  if(d.splits.length && !d.splits.some(sp => sp.active)) d.splits[0].active = true;
+
   d.gym = (d.gym && typeof d.gym === 'object') ? d.gym : {};
   const def = defaultGym(d.settings.unit);
   for(const k of ['plates','bars','dumbbells'])
@@ -1254,6 +1279,7 @@ function viewKey(v){
   if(v.name === 'routine')  return 'routine:' + v.id + (v.sort ? ':orden' : '');
   if(v.name === 'exercise') return 'exercise:' + v.key;
   if(v.name === 'gym')      return 'gym:' + (v.kind || 'plates');
+  if(v.name === 'split')    return 'split:' + v.id;
   return v.name;
 }
 function scrollNow(){ return window.scrollY || window.pageYOffset || 0; }
@@ -1281,6 +1307,7 @@ const ICON = {
   check:'<path d="M4 12.5l5.5 5.5L20 7"/>',
   deload:'<path d="M12 5v14M12 19l-4-4M12 19l4-4"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  move:'<path d="M5 9h9M5 9l3-3M5 9l3 3M19 15h-9M19 15l-3-3M19 15l-3 3"/>',
 };
 function svgIcon(name){ return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name] || ''}</svg>`; }
 
@@ -1463,6 +1490,8 @@ function render(){
   else if(view.name === 'exercise')        m.innerHTML = viewExercise();
   else if(view.name === 'history')         m.innerHTML = viewHistory();
   else if(view.name === 'gym')             m.innerHTML = viewGym();
+  else if(view.name === 'splits')          m.innerHTML = viewSplits();
+  else if(view.name === 'split')           m.innerHTML = viewSplit();
   else if(view.name === 'settings')        m.innerHTML = viewSettings();
   else                                     m.innerHTML = viewHome();
   afterRender();
@@ -1476,6 +1505,8 @@ function renderTop(){
   if(view.name === 'routine'){ t.innerHTML = routineHeadHTML(); return; }
   if(view.name === 'exercise'){ t.innerHTML = exerciseHeadHTML(); return; }
   if(view.name === 'gym'){ t.innerHTML = gymHeadHTML(); return; }
+  if(view.name === 'splits'){ t.innerHTML = splitsHeadHTML(); return; }
+  if(view.name === 'split'){ t.innerHTML = splitHeadHTML(); return; }
   const goal = db.settings.goal ? GOALS[db.settings.goal].label : null;
   const title = view.name === 'history' ? 'Historial' : (view.name === 'settings' ? 'Ajustes' : 'Rutinas');
   t.innerHTML = `
@@ -1489,7 +1520,7 @@ function renderTop(){
 
 function renderTabs(){
   const inSession = !!db.active;
-  const rutinasOn = ['home','routine','exercise'].includes(view.name);
+  const rutinasOn = ['home','routine','exercise','splits','split'].includes(view.name);
   const tab = (icon, label, on, fn) =>
     `<button class="tab ${on ? 'on' : ''}" onclick="${fn}">${svgIcon(icon)}<span>${label}</span></button>`;
   document.getElementById('tabs').innerHTML = `
@@ -1556,6 +1587,47 @@ function dismissRIR(){
   save(); render();
 }
 
+/* =====================================================================
+   SPLITS
+   Las rutinas son los días de un plan ordenado. Saber el orden es lo que
+   permite decir qué toca hoy — y guardar un plan sin perder nada, porque
+   el progreso vive en el ejercicio, no en la rutina.
+   ===================================================================== */
+function activeSplit(){ return db.splits.find(s => s.active) || db.splits[0] || null; }
+function splitRoutines(id){ return db.routines.filter(r => r.split === id); }
+/* a qué día pertenece una sesión: manda el id, y el nombre solo se usa
+   cuando no lo hay (historial viejo o importado). Si no, dos días con el
+   mismo nombre en splits distintos se robarían las sesiones. */
+function sessionRoutine(h, days){
+  const known = db.routines.some(r => r.id === h.routineId);
+  return (h.routineId && known)
+    ? days.find(r => r.id === h.routineId)
+    : days.find(r => r.name === h.routineName);
+}
+function splitSessions(id){
+  const days = splitRoutines(id);
+  return db.history.filter(h => !!sessionRoutine(h, days));
+}
+/* el día que toca: el siguiente al último que entrenaste, dando la vuelta */
+function nextDay(){
+  const sp = activeSplit();
+  if(!sp) return null;
+  const days = splitRoutines(sp.id);
+  if(!days.length) return null;
+  let lastI = -1, lastH = null;
+  for(const h of db.history){
+    const r = sessionRoutine(h, days);
+    if(r && (!lastH || h.date > lastH.date)){ lastI = days.indexOf(r); lastH = h; }
+  }
+  const idx = lastI < 0 ? 0 : (lastI + 1) % days.length;
+  return { split:sp, routine:days[idx], idx, total:days.length,
+           last: lastH ? { name: days[lastI].name, date: lastH.date } : null };
+}
+function daysAgoText(iso){
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
+  return d <= 0 ? 'hoy' : (d === 1 ? 'ayer' : `hace ${d} días`);
+}
+
 /* ---------- HOME ---------- */
 /* resumen de los últimos 7 días para la tira superior */
 function weekStats(){
@@ -1578,17 +1650,9 @@ function fmtVolShort(kg){
 }
 
 function viewHome(){
-  const rows = db.routines.map(r => {
-    const lastS = [...db.history].reverse().find(h => h.routineId === r.id || h.routineName === r.name);
-    return `
-    <button class="rowitem" onclick="go({name:'routine', id:'${r.id}'})">
-      <span class="grow">
-        <span class="row-name" style="display:block">${esc(r.name)}</span>
-        <span class="row-sub" style="display:block">${r.exercises.length} ejercicio${r.exercises.length===1?'':'s'}${lastS ? ` · ${fmtDate(lastS.date)}` : ''}</span>
-      </span>
-      <span class="chev">›</span>
-    </button>`;
-  }).join('');
+  const sp = activeSplit();
+  const days = sp ? splitRoutines(sp.id) : [];
+  const nx = db.active ? null : nextDay();
 
   const w = weekStats();
   const strip = w.sessions ? `
@@ -1603,6 +1667,19 @@ function viewHome(){
     <button class="btn" style="margin-top:18px" onclick="go({name:'session'})">
       Continuar sesión — ${esc(db.active.routineName)}
     </button>` : '';
+
+  /* la tarjeta de arriba: qué toca hoy */
+  const today = nx ? `
+    <div class="today">
+      <div class="row" style="justify-content:space-between">
+        <span class="load-l">Hoy toca</span>
+        <span class="pill">Día ${nx.idx + 1} de ${nx.total}</span>
+      </div>
+      <button class="today-n" onclick="go({name:'routine', id:'${nx.routine.id}'})">${esc(nx.routine.name)}</button>
+      <div class="row-sub">${nx.routine.exercises.length} ejercicio${nx.routine.exercises.length===1?'':'s'}${
+        nx.last ? ` · ${daysAgoText(nx.last.date)} hiciste ${esc(nx.last.name)}` : ' · tu primera sesión de este plan'}</div>
+      <button class="btn" style="margin-top:15px" onclick="startSession('${nx.routine.id}')">Empezar</button>
+    </div>` : '';
 
   const fat = systemicFatigue();
   const fatBanner = fat ? `
@@ -1636,21 +1713,316 @@ function viewHome(){
   if(!db.routines.length){
     return `${resume}${fatBanner}${rirBanner}${backupBanner}
       <div class="empty">
-        <div class="big">Sin rutinas</div>
-        <p>Empieza por crear la primera.</p>
-        <p class="muted">Por ejemplo “Torso”, “Pierna” o “Full body”. Después le agregas los ejercicios.</p>
+        <div class="big">Sin días</div>
+        <p>Empieza por crear el primero.</p>
+        <p class="muted">Por ejemplo “Torso”, “Pierna” o “Full body”. El orden en que los crees es el orden
+          en que la app te los irá pidiendo.</p>
       </div>
-      <button class="btn" onclick="promptNewRoutine()">Nueva rutina</button>`;
+      <button class="btn" onclick="promptNewRoutine()">Crear el primer día</button>`;
   }
+
+  const rows = days.map((r, i) => {
+    const lastS = [...db.history].reverse().find(h => h.routineId === r.id || h.routineName === r.name);
+    const esHoy = nx && nx.routine.id === r.id;
+    return `
+    <button class="rowitem${esHoy ? ' next' : ''}" onclick="go({name:'routine', id:'${r.id}'})">
+      <span class="dayn">${i + 1}</span>
+      <span class="grow">
+        <span class="row-name" style="display:block">${esc(r.name)}${esHoy ? ' <i class="dot up" style="display:inline-block;margin-left:7px;transform:none"></i>' : ''}</span>
+        <span class="row-sub" style="display:block">${r.exercises.length} ejercicio${r.exercises.length===1?'':'s'}${lastS ? ` · ${fmtDate(lastS.date)}` : ''}</span>
+      </span>
+      <span class="chev">›</span>
+    </button>`;
+  }).join('');
 
   return `
     ${resume}
+    ${today}
     ${strip}
     ${fatBanner}${rirBanner}${backupBanner}
-    <div class="sect">Tus rutinas</div>
-    ${rows}
-    <div style="margin-top:20px"><button class="btn ghost" onclick="promptNewRoutine()">Nueva rutina</button></div>
-    <div class="hint">Toca una rutina para revisar las sugerencias del coach antes de empezar.</div>`;
+    <div class="row" style="justify-content:space-between;margin:26px 0 6px">
+      <div class="sect" style="margin:0">${sp ? esc(sp.name) : 'Tus rutinas'} · ${days.length} día${days.length===1?'':'s'}</div>
+      <button class="note-a" style="margin:0" onclick="go({name:'splits'})">Cambiar ›</button>
+    </div>
+    ${rows || `<div class="hint">Este plan no tiene días todavía.</div>`}
+    <div style="margin-top:20px"><button class="btn ghost" onclick="promptNewRoutine()">Agregar día</button></div>
+    <div class="hint">${ days.length > 1
+      ? 'El punto verde marca el día que sigue en la rotación. Si te saltas uno no pasa nada: se cuenta desde el último que entrenaste, no desde el calendario.'
+      : 'Toca un día para revisar las sugerencias del coach antes de empezar.' }</div>`;
+}
+
+/* ---------- SPLITS: lista y detalle ---------- */
+function splitsHeadHTML(){
+  const g = db.splits.filter(x => !x.active).length;
+  return `
+    <button class="back" onclick="go({name:'home'})">‹ Rutinas</button>
+    <div class="head-row">
+      <div class="title sm">Splits</div>
+      <div class="tools"><button aria-label="Nuevo split" onclick="promptNewSplit()">${svgIcon('plus')}</button></div>
+    </div>
+    <div class="meta">${db.splits.length ? '1 en curso' : 'Ninguno'}${g ? ` · ${g} guardado${g===1?'':'s'}` : ''}</div>
+    <div class="knurl"></div>`;
+}
+
+function viewSplits(){
+  const act = activeSplit();
+  const otros = db.splits.filter(x => !act || x.id !== act.id);
+
+  const card = sp => {
+    const days = splitRoutines(sp.id);
+    const ses = splitSessions(sp.id);
+    const hechos = new Set();
+    /* cuántos días distintos llevas de la vuelta actual */
+    for(let i = ses.length - 1; i >= 0 && hechos.size < days.length; i--){
+      const r = days.find(x => x.id === ses[i].routineId || x.name === ses[i].routineName);
+      if(!r) continue;
+      if(hechos.has(r.id)) break;
+      hechos.add(r.id);
+    }
+    return `
+    <button class="card" style="border-color:rgba(127,211,168,.3);text-align:left" onclick="go({name:'split', id:'${sp.id}'})">
+      <div class="card-top">
+        <div>
+          <div class="ex-title" style="font-size:17px">${esc(sp.name)} <i class="dot up" style="display:inline-block;margin-left:6px;transform:none"></i></div>
+          <div class="last">${days.length} día${days.length===1?'':'s'}${sp.created ? ` · desde el ${fmtDateShort(sp.created)}` : ''} · ${ses.length} sesion${ses.length===1?'':'es'}</div>
+        </div>
+        <div class="chev">›</div>
+      </div>
+      ${ days.length ? `<div class="steps" style="margin-top:12px">
+        <div class="bars">${days.map((_, i) => `<i class="${i < hechos.size ? 'up' : ''}"></i>`).join('')}</div>
+        <div class="steps-v"><b>${hechos.size}</b>/${days.length} días esta vuelta</div>
+      </div>` : '' }
+    </button>`;
+  };
+
+  const fila = sp => {
+    const days = splitRoutines(sp.id);
+    const ses = splitSessions(sp.id);
+    const ult = ses.length ? ses[ses.length-1].date : null;
+    return `
+    <button class="rowitem" onclick="go({name:'split', id:'${sp.id}'})">
+      <span class="grow">
+        <span class="row-name" style="display:block">${esc(sp.name)}</span>
+        <span class="row-sub" style="display:block">${days.length} día${days.length===1?'':'s'} · ${ses.length} sesion${ses.length===1?'':'es'}${ult ? ` · hasta el ${fmtDateShort(ult)}` : ''}</span>
+      </span>
+      <span class="chev">›</span>
+    </button>`;
+  };
+
+  return `
+    ${ act ? `<div class="sect">En curso</div>${card(act)}` : '' }
+    ${ otros.length ? `<div class="sect">Guardados</div>${otros.map(fila).join('')}` : '' }
+    <div class="note">
+      <div class="note-t">Cambiar de split no borra tu progreso</div>
+      <div class="note-d">Tus marcas viven en cada ejercicio, no en la rutina. Si el press de banca estaba
+        en Torso y ahora está en Push, llega con su historial, su récord y la sugerencia del coach
+        exactamente donde la dejaste.</div>
+    </div>
+    <div style="margin-top:4px"><button class="btn ghost" onclick="promptNewSplit()">Nuevo split</button></div>`;
+}
+
+function splitHeadHTML(){
+  const sp = db.splits.find(x => x.id === view.id);
+  if(!sp) return '';
+  const days = splitRoutines(sp.id);
+  const ses = splitSessions(sp.id);
+  const ult = ses.length ? ses[ses.length-1].date : null;
+  return `
+    <button class="back" onclick="go({name:'splits'})">‹ Splits</button>
+    <div class="head-row">
+      <div class="title sm">${esc(sp.name)}</div>
+      <div class="tools">
+        ${days.length > 1 ? `<button aria-label="Reordenar días" onclick="toggleSort()">${svgIcon('sort')}</button>` : ''}
+        <button aria-label="Renombrar" onclick="promptRenameSplit('${sp.id}')">${svgIcon('copy')}</button>
+        <button aria-label="Borrar split" onclick="deleteSplit('${sp.id}')">${svgIcon('trash')}</button>
+      </div>
+    </div>
+    <div class="meta">${sp.active ? 'En curso' : 'Guardado'} · ${ses.length} sesion${ses.length===1?'':'es'}${ult ? ` · hasta el ${fmtDateShort(ult)}` : ''}</div>
+    <div class="knurl"></div>`;
+}
+
+function viewSplit(){
+  const sp = db.splits.find(x => x.id === view.id);
+  if(!sp) return viewSplits();
+  const days = splitRoutines(sp.id);
+  const ses = splitSessions(sp.id);
+  const vol = ses.reduce((a,h) => a + h.entries.reduce((b,e) => b + e.sets.reduce((c,x) => c + x.w*x.r, 0), 0), 0);
+
+  if(view.sort){
+    return `<div style="margin-top:18px">
+      ${days.map((r, i) => `
+        <div class="rowitem">
+          <span class="dayn">${i+1}</span>
+          <span class="grow"><span class="row-name">${esc(r.name)}</span></span>
+          <button class="chev" style="font-size:17px" aria-label="Subir" ${i===0?'disabled style="opacity:.25;font-size:17px"':''}
+            onclick="moveRoutine('${r.id}',-1)">↑</button>
+          <button class="chev" style="font-size:17px" aria-label="Bajar" ${i===days.length-1?'disabled style="opacity:.25;font-size:17px"':''}
+            onclick="moveRoutine('${r.id}',1)">↓</button>
+        </div>`).join('')}
+      <div class="hint">Este es el orden en que la app te irá pidiendo los días.</div>
+      <div class="dock"><button class="btn" onclick="toggleSort()">Listo</button></div>
+    </div>`;
+  }
+
+  return `
+    <div class="sect">Sus días</div>
+    ${ days.map((r, i) => `
+      <button class="rowitem" onclick="go({name:'routine', id:'${r.id}'})">
+        <span class="dayn">${i+1}</span>
+        <span class="grow">
+          <span class="row-name" style="display:block">${esc(r.name)}</span>
+          <span class="row-sub" style="display:block">${r.exercises.length} ejercicio${r.exercises.length===1?'':'s'}</span>
+        </span>
+        <span class="chev">›</span>
+      </button>`).join('') || '<div class="hint">Todavía no tiene días.</div>' }
+
+    ${ ses.length ? `
+      <div class="sect">Cuánto lo usaste</div>
+      <div class="list">
+        <div class="line"><div class="l-t">Sesiones</div><div class="l-v">${ses.length}</div></div>
+        <div class="line"><div class="l-t">Del</div><div class="l-v">${fmtDateShort(ses[0].date)} al ${fmtDateShort(ses[ses.length-1].date)}</div></div>
+        ${ vol ? `<div class="line"><div class="l-t">Volumen movido</div><div class="l-v">${fmtVolShort(vol).replace('<i>','').replace('</i>',' ')}</div></div>` : '' }
+      </div>` : '' }
+
+    <div class="dock">
+      ${ sp.active
+        ? `<button class="btn ghost" onclick="go({name:'home'})">Ver sus días en el inicio</button>`
+        : `<button class="btn" onclick="activateSplit('${sp.id}')">Ponerlo en curso</button>
+           <div class="hint" style="text-align:center;margin-top:12px">${
+             activeSplit() ? `${esc(activeSplit().name)} pasa a guardados. Nada se borra.` : 'Nada se borra.'}</div>` }
+    </div>`;
+}
+
+/* ---------- acciones de splits ---------- */
+function promptNewSplit(){
+  openModal(`
+    <h2>Nuevo split</h2>
+    <p class="muted">Un split es el orden de tus días. Ponle nombre y luego le vas creando los días
+      que quieras — sin plantillas ni ataduras.</p>
+    <form onsubmit="createSplit(event)" class="stack" autocomplete="off">
+      <input type="text" id="newsplit" placeholder="Ej. PPL, Upper/Lower, Torso/Pierna" autocomplete="off">
+      <button class="btn" type="submit">Crear y ponerlo en curso</button>
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+    </form>
+    <div class="hint">El que tengas ahora pasa a guardados. Puedes volver a él cuando quieras, y tu
+      progreso no se toca: vive en cada ejercicio, no en la rutina.</div>`);
+  setTimeout(() => document.getElementById('newsplit')?.focus(), 60);
+}
+function createSplit(ev){
+  ev.preventDefault();
+  const name = document.getElementById('newsplit').value.trim();
+  if(!name) return;
+  const sp = { id:uid(), name, active:true, created:new Date().toISOString() };
+  db.splits.forEach(x => { x.active = false; });
+  db.splits.push(sp);
+  save(); closeModal(); go({name:'home'});
+}
+function activateSplit(id){
+  db.splits.forEach(x => { x.active = (x.id === id); });
+  save(); go({name:'home'});
+}
+function promptRenameSplit(id){
+  const sp = db.splits.find(x => x.id === id);
+  if(!sp) return;
+  openModal(`
+    <h2>Renombrar split</h2>
+    <form onsubmit="renameSplit(event,'${id}')" class="stack" autocomplete="off">
+      <input type="text" id="splitname" value="${esc(sp.name)}" autocomplete="off">
+      <button class="btn" type="submit">Guardar</button>
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+    </form>`);
+  setTimeout(() => document.getElementById('splitname')?.select(), 60);
+}
+function renameSplit(ev, id){
+  ev.preventDefault();
+  const sp = db.splits.find(x => x.id === id);
+  const v = document.getElementById('splitname').value.trim();
+  if(sp && v) sp.name = v;
+  save(); closeModal(); render();
+}
+function deleteSplit(id){
+  const sp = db.splits.find(x => x.id === id);
+  if(!sp) return;
+  if(db.splits.length <= 1){
+    infoModal('Es tu único split', 'Necesitas al menos uno. Crea otro antes de borrar este, o renómbralo.');
+    return;
+  }
+  const days = splitRoutines(id);
+  confirmModal(`¿Borrar “${esc(sp.name)}”?`,
+    `Se van también sus ${days.length} día${days.length===1?'':'s'}. Tu historial de sesiones NO se borra, y las marcas de cada ejercicio se conservan: si vuelves a crear ese día, llega con su progreso.`,
+    'Borrar split', () => {
+      db.routines = db.routines.filter(r => r.split !== id);
+      db.splits = db.splits.filter(x => x.id !== id);
+      if(!db.splits.some(x => x.active)) db.splits[0].active = true;
+      save(); go({name:'splits'});
+    });
+}
+/* mover un día dentro de su split */
+function moveRoutine(rid, dir){
+  const r = db.routines.find(x => x.id === rid);
+  if(!r) return;
+  const hermanas = splitRoutines(r.split);
+  const i = hermanas.indexOf(r), j = i + dir;
+  if(j < 0 || j >= hermanas.length) return;
+  const a = db.routines.indexOf(hermanas[i]), b = db.routines.indexOf(hermanas[j]);
+  [db.routines[a], db.routines[b]] = [db.routines[b], db.routines[a]];
+  save(); render();
+}
+/* mover o copiar un día a otro split */
+function promptMoveRoutine(rid){
+  const r = db.routines.find(x => x.id === rid);
+  if(!r) return;
+  if(db.splits.length < 2){
+    infoModal('Solo tienes un split', 'Crea otro desde Rutinas → Cambiar y entonces podrás mover días entre ellos.');
+    return;
+  }
+  window.__moveTo = db.splits.find(x => x.id !== r.split).id;
+  window.__moveCopy = false;
+  const actual = db.splits.find(x => x.id === r.split);
+  openModal(`
+    <h2>¿A qué split?</h2>
+    <p class="muted">Ahora mismo <b>${esc(r.name)}</b> vive en ${esc(actual ? actual.name : '—')}. Su historial no se
+      toca: las sesiones ya guardadas siguen contando igual.</p>
+    <div class="stack" id="movelist">
+      ${db.splits.map(sp => `
+        <button class="opt ${sp.id === window.__moveTo ? 'on' : ''}" type="button" data-sp="${sp.id}"
+          onclick="pickMoveTarget('${sp.id}')">
+          <b>${esc(sp.name)}</b><span>${sp.active ? 'En curso' : 'Guardado'} · ${splitRoutines(sp.id).length} día${splitRoutines(sp.id).length===1?'':'s'}${sp.id === r.split ? ' · donde está ahora' : ''}</span>
+        </button>`).join('')}
+    </div>
+    <div class="sect">Cómo</div>
+    <div class="stack" id="movemode">
+      <button class="opt on" type="button" data-copy="0" onclick="pickMoveMode(0)">
+        <b>Mover</b><span>Deja de estar en ${esc(actual ? actual.name : '—')}.</span></button>
+      <button class="opt" type="button" data-copy="1" onclick="pickMoveMode(1)">
+        <b>Copiar</b><span>Queda en los dos, cada uno editable por separado.</span></button>
+    </div>
+    <button class="btn" style="margin-top:18px" onclick="doMoveRoutine('${rid}')">Aplicar</button>
+    <button class="btn ghost" onclick="closeModal()">Cancelar</button>`);
+}
+function pickMoveTarget(id){
+  window.__moveTo = id;
+  const list = document.getElementById('movelist');
+  if(list) for(const b of list.querySelectorAll('button')) b.classList.toggle('on', b.dataset.sp === id);
+}
+function pickMoveMode(copy){
+  window.__moveCopy = !!copy;
+  const list = document.getElementById('movemode');
+  if(list) for(const b of list.querySelectorAll('button')) b.classList.toggle('on', b.dataset.copy === String(copy));
+}
+function doMoveRoutine(rid){
+  const r = db.routines.find(x => x.id === rid);
+  const to = window.__moveTo;
+  if(!r || !to) return;
+  if(window.__moveCopy){
+    const copia = { id:uid(), name:r.name, split:to,
+                    exercises:r.exercises.map(e => ({ id:uid(), name:e.name, key:e.key })) };
+    db.routines.push(copia);
+    save(); closeModal(); go({name:'routine', id:copia.id});
+  } else {
+    r.split = to;
+    save(); closeModal(); render();
+  }
 }
 
 /* ---------- RUTINA ---------- */
@@ -1674,6 +2046,7 @@ function routineHeadHTML(){
       <div class="title sm">${esc(r.name)}</div>
       <div class="tools">
         ${r.exercises.length > 1 ? `<button aria-label="Reordenar ejercicios" onclick="toggleSort()">${svgIcon('sort')}</button>` : ''}
+        ${db.splits.length > 1 ? `<button aria-label="Mover a otro split" onclick="promptMoveRoutine('${r.id}')">${svgIcon('move')}</button>` : ''}
         <button aria-label="Duplicar rutina" onclick="duplicateRoutine('${r.id}')">${svgIcon('copy')}</button>
         <button aria-label="Eliminar rutina" onclick="deleteRoutine('${r.id}')">${svgIcon('trash')}</button>
       </div>
@@ -3046,7 +3419,12 @@ function createRoutine(ev){
   ev.preventDefault();
   const name = document.getElementById('newroutine').value.trim();
   if(!name) return;
-  const r = { id:uid(), name, exercises:[] };
+  const sp = activeSplit();
+  const r = { id:uid(), name, split: sp ? sp.id : null, exercises:[] };
+  if(!sp){
+    const nuevo = { id:uid(), name:'Mi entrenamiento', active:true, created:new Date().toISOString() };
+    db.splits.push(nuevo); r.split = nuevo.id;
+  }
   db.routines.push(r); save(); closeModal();
   go({name:'routine', id:r.id});
 }
@@ -3205,7 +3583,7 @@ function doDuplicateEx(ev){
 
 function duplicateRoutine(rid){
   const r = db.routines.find(x => x.id === rid);
-  const copy = { id:uid(), name: r.name + ' (copia)',
+  const copy = { id:uid(), name: r.name + ' (copia)', split: r.split,
     exercises: r.exercises.map(e => ({ id:uid(), name:e.name, key:e.key })) };
   db.routines.push(copy);
   save(); go({name:'routine', id:copy.id});

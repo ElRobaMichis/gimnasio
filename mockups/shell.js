@@ -28,6 +28,8 @@ const ICON = {
   plus:'<path d="M12 5v14M5 12h14"/>',
   deload:'<path d="M12 5v14M12 19l-4-4M12 19l4-4"/>',
   trash:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
+  sort:'<path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
 };
 const svgIcon = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[n] || ''}</svg>`;
 
