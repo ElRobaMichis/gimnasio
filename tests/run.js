@@ -1027,8 +1027,12 @@ chk(toast().includes('Versión nueva lista'), 'y aparece en cuanto terminas la s
 
 dismissUpdate();
 chk(toast() === '', '«Ahora no» lo quita');
-chk(APP_VERSION === 'v11', 'y ajustes enseña qué versión tienes puesta');
-chk(viewSettings().includes(APP_VERSION), 'en el pie');
+chk(/^\d+\.\d+\.\d+$/.test(APP_VERSION), 'la versión sigue el formato MAYOR.MENOR.PARCHE');
+chk(viewSettings().includes(APP_VERSION), 'y ajustes la enseña en el pie');
+/* olvidar subir una de las dos es el fallo fácil: la caché quedaría vieja */
+const swSrc = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
+chk(new RegExp("const CACHE = 'hierro-" + APP_VERSION.replace(/\./g, '\\.') + "'").test(swSrc),
+    'y el service worker usa esa misma versión para su caché');
 updateReady = false; updateDismissed = false; showUpdateToast();
 
 suite('Una sesión interrumpida no se pierde');

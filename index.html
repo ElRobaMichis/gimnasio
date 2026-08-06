@@ -517,9 +517,14 @@
    ===================================================================== */
 
 const LS_KEY = 'hierro.v1';
-/* se sube a la vez que CACHE en sw.js: sirve para saber de un vistazo
-   qué versión tienes puesta cuando algo no cuadra */
-const APP_VERSION = 'v11';
+/* Versionado semántico: MAYOR.MENOR.PARCHE
+     MAYOR  cambia cuando algo deja de ser compatible — por ejemplo si un
+            respaldo viejo ya no se pudiera restaurar.
+     MENOR  cuando entran funciones nuevas sin romper nada.
+     PARCHE cuando solo se arreglan fallos.
+   Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
+   comprueba, porque olvidar uno de los dos es el fallo fácil. */
+const APP_VERSION = '1.0.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.

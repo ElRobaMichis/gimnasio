@@ -10,7 +10,8 @@
    Antes todo era caché primero, y eso hacía que una versión nueva
    tardara dos arranques en verse: el primero servía la vieja y dejaba
    la nueva lista para el siguiente. */
-const CACHE = 'hierro-v11';
+/* va siempre igual que APP_VERSION en index.html — hay un test que lo verifica */
+const CACHE = 'hierro-1.0.0';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const ASSETS = [
   './',
