@@ -427,6 +427,30 @@
   .modal textarea{margin-top:4px}
   .modal .stack{gap:9px}
 
+  /* ---------- aviso de versión nueva ---------- */
+  .toast{
+    position:fixed;left:16px;right:16px;z-index:45;
+    bottom:calc(78px + env(safe-area-inset-bottom));
+    max-width:428px;margin:0 auto;
+    background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;
+    padding:13px 14px;display:flex;align-items:center;gap:10px;
+    box-shadow:0 18px 44px rgba(0,0,0,.6);
+    animation:toastIn .22s ease-out;
+  }
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){ .toast{animation:none} }
+  .toast .t{flex:1;min-width:0}
+  .toast .t b{display:block;font-size:14px;font-weight:600;letter-spacing:-.015em}
+  .toast .t span{display:block;font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4}
+  .toast .go{
+    flex:none;background:var(--bone);color:#0B0B0D;border-radius:10px;
+    padding:10px 14px;font-size:13px;font-weight:600;
+  }
+  .toast .no{
+    flex:none;color:var(--dim);font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.12em;text-transform:uppercase;padding:6px 2px;
+  }
+
   /* ---------- splits: qué toca hoy y los días ---------- */
   .today{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-top:18px}
   .today-n{
@@ -1492,7 +1516,7 @@
     </button>
     <div class="hint">El CSV de Hevy se saca en Perfil → Ajustes → Export data. Importar dos veces no duplica nada.</div>
 
-    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v3 · datos guardados en este dispositivo</div></main>
+    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v11 · datos guardados en este dispositivo</div></main>
       </div>
       <nav class="tabs">
     <div class="inner">
@@ -3132,7 +3156,7 @@
     </button>
     <div class="hint">El CSV de Hevy se saca en Perfil → Ajustes → Export data. Importar dos veces no duplica nada.</div>
 
-    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v3 · datos guardados en este dispositivo</div></main>
+    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v11 · datos guardados en este dispositivo</div></main>
       </div>
       <nav class="tabs">
     <div class="inner">
@@ -4589,7 +4613,7 @@
     </button>
     <div class="hint">El CSV de Hevy se saca en Perfil → Ajustes → Export data. Importar dos veces no duplica nada.</div>
 
-    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v3 · datos guardados en este dispositivo</div></main>
+    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v11 · datos guardados en este dispositivo</div></main>
       </div>
       <nav class="tabs">
     <div class="inner">

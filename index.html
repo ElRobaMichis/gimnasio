@@ -436,6 +436,30 @@
   .modal textarea{margin-top:4px}
   .modal .stack{gap:9px}
 
+  /* ---------- aviso de versión nueva ---------- */
+  .toast{
+    position:fixed;left:16px;right:16px;z-index:45;
+    bottom:calc(78px + env(safe-area-inset-bottom));
+    max-width:428px;margin:0 auto;
+    background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;
+    padding:13px 14px;display:flex;align-items:center;gap:10px;
+    box-shadow:0 18px 44px rgba(0,0,0,.6);
+    animation:toastIn .22s ease-out;
+  }
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){ .toast{animation:none} }
+  .toast .t{flex:1;min-width:0}
+  .toast .t b{display:block;font-size:14px;font-weight:600;letter-spacing:-.015em}
+  .toast .t span{display:block;font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4}
+  .toast .go{
+    flex:none;background:var(--bone);color:#0B0B0D;border-radius:10px;
+    padding:10px 14px;font-size:13px;font-weight:600;
+  }
+  .toast .no{
+    flex:none;color:var(--dim);font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.12em;text-transform:uppercase;padding:6px 2px;
+  }
+
   /* ---------- splits: qué toca hoy y los días ---------- */
   .today{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:16px;margin-top:18px}
   .today-n{
@@ -479,6 +503,7 @@
 </div>
 <nav class="tabs" id="tabs"></nav>
 <div id="modalhost"></div>
+<div id="toasthost"></div>
 
 <script>
 'use strict';
@@ -495,18 +520,28 @@ const LS_KEY = 'hierro.v1';
 /* se sube a la vez que CACHE en sw.js: sirve para saber de un vistazo
    qué versión tienes puesta cuando algo no cuadra */
 const APP_VERSION = 'v11';
-let updateReady = false;
+let updateReady = false, updateDismissed = false;
 
-/* aviso de que ya hay una versión nueva descargada y lista */
-function updateBannerHTML(){
-  if(!updateReady) return '';
-  return `<div class="note up">
-    <div class="note-t">Hay una versión nueva de la app</div>
-    <div class="note-d">Ya está descargada. Recarga para usarla — tus rutinas, tu historial y tus
-      ajustes no se tocan.</div>
-    <button class="note-a" onclick="location.reload()">Actualizar ahora</button>
-  </div>`;
+/* Aviso de versión nueva, abajo y por encima de todo.
+   Nunca durante una sesión: ahí estorba y da miedo tocarlo. Se espera a
+   que termines y aparece entonces — la actualización no corre prisa. */
+function showUpdateToast(){
+  if(!updateReady || updateDismissed || db.active){
+    document.getElementById('toasthost').innerHTML = '';
+    return;
+  }
+  document.getElementById('toasthost').innerHTML = `
+    <div class="toast" role="status">
+      <div class="t">
+        <b>Versión nueva lista</b>
+        <span>Tus rutinas y tu historial no se tocan.</span>
+      </div>
+      <button class="no" onclick="dismissUpdate()">Ahora no</button>
+      <button class="go" onclick="applyUpdate()">Actualizar</button>
+    </div>`;
 }
+function dismissUpdate(){ updateDismissed = true; showUpdateToast(); }
+function applyUpdate(){ save(); location.reload(); }
 
 const GOALS = {
   hipertrofia: { label:'Hipertrofia', lo:8,  hi:12, rest:90,  desc:'Ganar músculo · series de 8–12 reps' },
@@ -1518,6 +1553,7 @@ function render(){
   else if(view.name === 'split')           m.innerHTML = viewSplit();
   else if(view.name === 'settings')        m.innerHTML = viewSettings();
   else                                     m.innerHTML = viewHome();
+  showUpdateToast();
   afterRender();
 }
 
@@ -1735,7 +1771,7 @@ function viewHome(){
     </div>` : '';
 
   if(!db.routines.length){
-    return `${updateBannerHTML()}${resume}${fatBanner}${rirBanner}${backupBanner}
+    return `${resume}${fatBanner}${rirBanner}${backupBanner}
       <div class="empty">
         <div class="big">Sin días</div>
         <p>Empieza por crear el primero.</p>
@@ -1760,7 +1796,6 @@ function viewHome(){
   }).join('');
 
   return `
-    ${updateBannerHTML()}
     ${resume}
     ${today}
     ${strip}
@@ -3474,7 +3509,6 @@ function viewSettings(){
     </button>
     <div class="hint">El CSV de Hevy se saca en Perfil → Ajustes → Export data. Importar dos veces no duplica nada.</div>
 
-    ${updateBannerHTML()}
     <div class="hint" style="text-align:center;margin-top:28px">Hierro · ${APP_VERSION} · datos guardados en este dispositivo</div>`;
 }
 
@@ -4031,6 +4065,7 @@ function finishSession(){
   db.history.push(rec);
   db.active = null;
   restUntil = null;
+  showUpdateToast();   /* si había una actualización esperando, ya puede salir */
   releaseWake();
   save();
   if(!isDeload) for(const e of entries) updateProgress(e.key, e.sets, rec.date);

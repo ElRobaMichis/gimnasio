@@ -55,9 +55,10 @@ code = code
   .replace(/^\s*'use strict';/, '')
   .replace("let db = load();", 'globalThis.db = load();')
   .replace("let view = { name:'home' };", "globalThis.view = { name:'home' };")
-  .replace('let updateReady = false;', 'globalThis.updateReady = false;')
+  .replace('let updateReady = false, updateDismissed = false;',
+           'globalThis.updateReady = false; globalThis.updateDismissed = false;')
   /* los const del módulo no se filtran del eval: se exponen a propósito */
-  + '\nglobalThis.APP_VERSION = APP_VERSION;';
+  + '\nglobalThis.APP_VERSION = APP_VERSION; globalThis.LS_KEY = LS_KEY;';
 eval(code);
 window.scrollTo = () => {};
 
@@ -1002,18 +1003,64 @@ setExStack('cable row', 'unit', 'kg');
 chk(Math.abs(parseFloat(db.active.exercises[0].sets[0].w) - 20) < 0.01, 'y de vuelta a 20 kg');
 db.active = null;
 
-suite('Actualizaciones — que se note que hay una nueva');
+suite('Actualizaciones — que se note, pero sin estorbar');
 resetDB();
-updateReady = false;
-chk(updateBannerHTML() === '', 'sin versión nueva no molesta con nada');
+const toast = () => document.getElementById('toasthost').innerHTML;
+updateReady = false; updateDismissed = false;
+showUpdateToast();
+chk(toast() === '', 'sin versión nueva no aparece nada');
+
 updateReady = true;
-chk(updateBannerHTML().includes('versión nueva'), 'cuando la hay, lo dice');
-chk(updateBannerHTML().includes('no se tocan'), 'y tranquiliza sobre los datos');
-chk(viewHome().includes('versión nueva'), 'sale en el inicio');
-chk(viewSettings().includes('versión nueva'), 'y en ajustes');
-chk(viewSettings().includes(APP_VERSION), 'ajustes enseña qué versión tienes puesta');
-updateReady = false;
-chk(!viewHome().includes('versión nueva'), 'y desaparece al recargar');
+showUpdateToast();
+chk(toast().includes('Versión nueva lista'), 'cuando la hay, sale el aviso abajo');
+chk(toast().includes('no se tocan'), 'y tranquiliza sobre los datos');
+chk(toast().includes('Actualizar') && toast().includes('Ahora no'), 'con las dos salidas');
+
+/* lo importante: durante una sesión no interrumpe */
+db.routines.push({ id:'r1', name:'P', split:(db.splits[0]||{}).id, exercises:[{ id:'a', name:'Sq', key:'sq' }] });
+startSession('r1');
+showUpdateToast();
+chk(toast() === '', 'con una sesión en curso se calla: ahí estorba');
+db.active.exercises[0].sets[0] = { w:'60', r:'10', rir:'' };
+finishSession();
+chk(toast().includes('Versión nueva lista'), 'y aparece en cuanto terminas la sesión');
+
+dismissUpdate();
+chk(toast() === '', '«Ahora no» lo quita');
+chk(APP_VERSION === 'v11', 'y ajustes enseña qué versión tienes puesta');
+chk(viewSettings().includes(APP_VERSION), 'en el pie');
+updateReady = false; updateDismissed = false; showUpdateToast();
+
+suite('Una sesión interrumpida no se pierde');
+resetDB();
+db.routines.push({ id:'r1', name:'Pierna', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Squat', key:'squat' }] });
+startSession('r1');
+db.active.start = Date.now() - 34*60*1000;      /* lleva 34 minutos */
+setVal(0, 0, 'w', '60'); setVal(0, 0, 'r', '10'); setVal(0, 0, 'rir', '2');
+toggleSetDone(0, 0);
+addSet(0);
+setVal(0, 1, 'w', '60'); setVal(0, 1, 'r', '9');
+
+/* «se cierra la app o entra una actualización»: se relee lo guardado,
+   igual que hace la app al arrancar */
+const enDisco = localStorage.getItem(LS_KEY);
+db = normalize(JSON.parse(enDisco));
+chk(!!db.active, 'al volver a abrir, la sesión sigue en curso');
+chk(db.active.routineName === 'Pierna', 'con su rutina');
+chk(db.active.exercises[0].sets.length === 2, 'y las series que llevaba');
+chk(db.active.exercises[0].sets[0].w === '60' && db.active.exercises[0].sets[0].r === '10',
+    'lo escrito, intacto');
+chk(db.active.exercises[0].sets[0].done === true, 'incluida la serie que ya había cerrado');
+chk(db.active.exercises[0].sets[1].r === '9', 'y la que estaba a medio anotar');
+chk(Math.round((Date.now() - db.active.start)/60000) === 34,
+    'el cronómetro sigue contando desde que empezó, no desde cero');
+
+/* y se termina y se guarda como si nada hubiera pasado */
+finishSession();
+chk(db.history.length === 1, 'la sesión se guarda en el historial');
+chk(db.history[0].entries[0].sets.length === 2, 'con sus dos series');
+chk(db.active === null, 'y deja de estar en curso');
 
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
