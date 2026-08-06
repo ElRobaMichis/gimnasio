@@ -54,7 +54,10 @@ code = code
   .replace(/\(function init\(\)\{[\s\S]*?\}\)\(\);/, '')
   .replace(/^\s*'use strict';/, '')
   .replace("let db = load();", 'globalThis.db = load();')
-  .replace("let view = { name:'home' };", "globalThis.view = { name:'home' };");
+  .replace("let view = { name:'home' };", "globalThis.view = { name:'home' };")
+  .replace('let updateReady = false;', 'globalThis.updateReady = false;')
+  /* los const del módulo no se filtran del eval: se exponen a propósito */
+  + '\nglobalThis.APP_VERSION = APP_VERSION;';
 eval(code);
 window.scrollTo = () => {};
 
@@ -998,6 +1001,19 @@ chk(Math.abs(parseFloat(db.active.exercises[0].sets[0].w) - 44.09) < 0.1,
 setExStack('cable row', 'unit', 'kg');
 chk(Math.abs(parseFloat(db.active.exercises[0].sets[0].w) - 20) < 0.01, 'y de vuelta a 20 kg');
 db.active = null;
+
+suite('Actualizaciones — que se note que hay una nueva');
+resetDB();
+updateReady = false;
+chk(updateBannerHTML() === '', 'sin versión nueva no molesta con nada');
+updateReady = true;
+chk(updateBannerHTML().includes('versión nueva'), 'cuando la hay, lo dice');
+chk(updateBannerHTML().includes('no se tocan'), 'y tranquiliza sobre los datos');
+chk(viewHome().includes('versión nueva'), 'sale en el inicio');
+chk(viewSettings().includes('versión nueva'), 'y en ajustes');
+chk(viewSettings().includes(APP_VERSION), 'ajustes enseña qué versión tienes puesta');
+updateReady = false;
+chk(!viewHome().includes('versión nueva'), 'y desaparece al recargar');
 
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));

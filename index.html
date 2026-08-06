@@ -492,6 +492,21 @@
    ===================================================================== */
 
 const LS_KEY = 'hierro.v1';
+/* se sube a la vez que CACHE en sw.js: sirve para saber de un vistazo
+   qué versión tienes puesta cuando algo no cuadra */
+const APP_VERSION = 'v11';
+let updateReady = false;
+
+/* aviso de que ya hay una versión nueva descargada y lista */
+function updateBannerHTML(){
+  if(!updateReady) return '';
+  return `<div class="note up">
+    <div class="note-t">Hay una versión nueva de la app</div>
+    <div class="note-d">Ya está descargada. Recarga para usarla — tus rutinas, tu historial y tus
+      ajustes no se tocan.</div>
+    <button class="note-a" onclick="location.reload()">Actualizar ahora</button>
+  </div>`;
+}
 
 const GOALS = {
   hipertrofia: { label:'Hipertrofia', lo:8,  hi:12, rest:90,  desc:'Ganar músculo · series de 8–12 reps' },
@@ -1720,7 +1735,7 @@ function viewHome(){
     </div>` : '';
 
   if(!db.routines.length){
-    return `${resume}${fatBanner}${rirBanner}${backupBanner}
+    return `${updateBannerHTML()}${resume}${fatBanner}${rirBanner}${backupBanner}
       <div class="empty">
         <div class="big">Sin días</div>
         <p>Empieza por crear el primero.</p>
@@ -1745,6 +1760,7 @@ function viewHome(){
   }).join('');
 
   return `
+    ${updateBannerHTML()}
     ${resume}
     ${today}
     ${strip}
@@ -3458,7 +3474,8 @@ function viewSettings(){
     </button>
     <div class="hint">El CSV de Hevy se saca en Perfil → Ajustes → Export data. Importar dos veces no duplica nada.</div>
 
-    <div class="hint" style="text-align:center;margin-top:28px">Hierro · v3 · datos guardados en este dispositivo</div>`;
+    ${updateBannerHTML()}
+    <div class="hint" style="text-align:center;margin-top:28px">Hierro · ${APP_VERSION} · datos guardados en este dispositivo</div>`;
 }
 
 /* =====================================================================
@@ -4784,8 +4801,27 @@ function migrateTypes(){
 /* ---------- arranque ---------- */
 (function init(){
   /* PWA: registrar el service worker para funcionar sin conexión */
-  if('serviceWorker' in navigator && location.protocol === 'https:'){
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  const seguro = location.protocol === 'https:' || location.hostname === 'localhost';
+  if('serviceWorker' in navigator && seguro){
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      /* cuando termine de bajarse una versión nueva, avisar en pantalla */
+      reg.addEventListener('updatefound', () => {
+        const nuevo = reg.installing;
+        if(!nuevo) return;
+        nuevo.addEventListener('statechange', () => {
+          if(nuevo.state === 'installed' && navigator.serviceWorker.controller){
+            updateReady = true;
+            render();
+          }
+        });
+      });
+      /* buscarla al abrir y cada vez que vuelves a la app */
+      const buscar = () => { try{ reg.update(); }catch(e){} };
+      buscar();
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') buscar();
+      });
+    }).catch(() => {});
   }
   /* el wake lock se libera solo al minimizar; re-adquirirlo al volver */
   document.addEventListener('visibilitychange', () => {
