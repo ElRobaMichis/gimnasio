@@ -2147,8 +2147,11 @@ function exerciseHistory(key){
 
 function exerciseHeadHTML(){
   const eq = exEquip(view.exname);
+  const volver = (view.from === 'session' && db.active)
+    ? `<button class="back" onclick="go({name:'session'})">‹ Sesión en curso</button>`
+    : `<button class="back" onclick="go({name:'routine', id:'${view.rid}'})">‹ Volver</button>`;
   return `
-    <button class="back" onclick="go({name:'routine', id:'${view.rid}'})">‹ Volver</button>
+    ${volver}
     <div class="title big">${esc(exBaseName(view.exname))}</div>
     ${eq ? `<div class="title-sub">${esc(eq)}</div>` : '<div style="height:12px"></div>'}
     <div class="knurl"></div>`;
@@ -2423,21 +2426,23 @@ function equipConfigHTML(key, meta){
   return '';
 }
 
-function setExType(key, t){ exMeta(key).type = t; save(); render(); }
-function setExPoints(key, n){ exMeta(key).points = n; save(); render(); }
+function setExType(key, t){ withExChange(key, () => { exMeta(key).type = t; }); render(); }
+function setExPoints(key, n){ withExChange(key, () => { exMeta(key).points = n; }); render(); }
 function setExBase(key, v){
-  const x = parseFloat(v);
-  exMeta(key).base = (isNaN(x) || x <= 0) ? null : Math.round(toKg(x)*1000)/1000;
-  save();
+  withExChange(key, () => {
+    const x = parseFloat(v);
+    exMeta(key).base = (isNaN(x) || x <= 0) ? null : Math.round(toKg(x)*1000)/1000;
+  });
 }
 function setExStack(key, field, v){
-  const st = exMeta(key).stack;
-  if(field === 'unit') st.unit = v;
-  else {
-    const x = parseFloat(v);
-    st[field] = (isNaN(x) || x <= 0) ? null : x;
-  }
-  save();
+  withExChange(key, () => {
+    const st = exMeta(key).stack;
+    if(field === 'unit') st.unit = v;
+    else {
+      const x = parseFloat(v);
+      st[field] = (isNaN(x) || x <= 0) ? null : x;
+    }
+  });
   if(field === 'unit') render(); else renderStackHint(key);
 }
 /* al teclear el salto no se re-renderiza todo: solo se refresca la torre */
@@ -2451,20 +2456,25 @@ function renderStackHint(key){
     : 'Escribe de cuánto en cuánto sube y te enseño la torre entera.';
 }
 function setExEquip(key, v){
-  const m = exMeta(key);
-  m.equip = EQUIP[v] ? v : null;
-  if(v !== 'barra') m.bar = null;
-  save(); render();
+  withExChange(key, () => {
+    const m = exMeta(key);
+    m.equip = EQUIP[v] ? v : null;
+    if(v !== 'barra') m.bar = null;
+  });
+  render();
 }
-function setExBarSel(key, v){ exMeta(key).bar = (v === 'auto') ? null : v; save(); render(); }
+function setExBarSel(key, v){
+  withExChange(key, () => { exMeta(key).bar = (v === 'auto') ? null : v; });
+  render();
+}
 function setExRange(key, which, val){
-  const v = parseInt(val,10);
-  exMeta(key)[which] = isNaN(v) ? null : v;
-  save();
+  withExChange(key, () => {
+    const v = parseInt(val,10);
+    exMeta(key)[which] = isNaN(v) ? null : v;
+  });
 }
 function setExStep(key, val){
-  exMeta(key).step = (val === 'auto') ? null : parseFloat(val);
-  save();
+  withExChange(key, () => { exMeta(key).step = (val === 'auto') ? null : parseFloat(val); });
 }
 /* opciones de salto en la unidad activa; el valor guardado siempre es kg */
 function stepOptionsHTML(cur){
@@ -2489,9 +2499,10 @@ function setExRest(key, val){
 }
 function setExMuscle(key, val){ exMeta(key).muscle = val; save(); }
 function setExCap(key, val){
-  const v = parseFloat(val);
-  exMeta(key).cap = (isNaN(v) || v <= 0) ? null : Math.round(toKgEx(key, v)*1000)/1000;
-  save();
+  withExChange(key, () => {
+    const v = parseFloat(val);
+    exMeta(key).cap = (isNaN(v) || v <= 0) ? null : Math.round(toKgEx(key, v)*1000)/1000;
+  });
 }
 
 /* ---------- SESIÓN ACTIVA ---------- */
@@ -2706,14 +2717,51 @@ function showLoad(xi){
     ${ p.kind === 'barra' ? `<button class="btn ghost" onclick="closeModal(); pickBar('${key}')">Cambiar de barra</button>` : '' }`);
 }
 
-/* abrir la ficha desde la sesión, sin pasar por la rutina */
-function openExerciseByKey(key){
+/* abrir la ficha desde la sesión, sin pasar por la rutina.
+   Recuerda de dónde vienes para que «volver» te devuelva ahí. */
+function openExerciseByKey(key, from){
   for(const r of db.routines){
     const ex = r.exercises.find(e => e.key === key);
-    if(ex){ go({ name:'exercise', key, exname:ex.name, rid:r.id }); return; }
+    if(ex){ go({ name:'exercise', key, exname:ex.name, rid:r.id, from }); return; }
   }
   const a = db.active && db.active.exercises.find(e => e.key === key);
-  if(a) go({ name:'exercise', key, exname:a.name, rid:(db.active.routineId || '') });
+  if(a) go({ name:'exercise', key, exname:a.name, rid:(db.active.routineId || ''), from });
+}
+function openExFromSession(xi){
+  const ex = db.active && db.active.exercises[xi];
+  if(ex) openExerciseByKey(ex.key, 'session');
+}
+
+/* al tocar algo de la ficha con una sesión en curso, la sugerencia de hoy
+   se recalcula al vuelo: si acabas de decir que es de placas, el coach
+   deja de proponer kilos que esa máquina no tiene */
+function refreshActiveSugg(key){
+  if(!db.active) return;
+  for(const ex of db.active.exercises){
+    if(ex.key !== key) continue;
+    let sg = computeSuggestion(key);
+    if(db.active.deload) sg = deloadSugg(key, sg);
+    ex.sugg = sg;
+  }
+}
+/* si el cambio mueve la unidad del ejercicio (una torre en libras), lo ya
+   escrito en la sesión se convierte para que siga significando lo mismo */
+function withExChange(key, fn){
+  const antes = exUnit(key);
+  fn();
+  const ahora = exUnit(key);
+  if(antes !== ahora && db.active){
+    const f = (ahora === 'lb') ? 1/LB_KG : LB_KG;
+    for(const ex of db.active.exercises){
+      if(ex.key !== key) continue;
+      for(const st of ex.sets){
+        const n = parseFloat(st.w);
+        if(st.w !== '' && st.w !== undefined && !isNaN(n)) st.w = String(Math.round(n * f * 100) / 100);
+      }
+    }
+  }
+  refreshActiveSugg(key);
+  save();
 }
 
 /* elegir barra para este ejercicio, desde la sesión o desde la ficha */
@@ -2736,8 +2784,8 @@ function pickBar(key){
     <button class="btn ghost" style="margin-top:14px" onclick="closeModal()">Cancelar</button>`);
 }
 function setExBar(key, id){
-  exMeta(key).bar = id;
-  save(); closeModal(); render();
+  withExChange(key, () => { exMeta(key).bar = id; });
+  closeModal(); render();
 }
 
 function sessionHeadHTML(){
@@ -2812,7 +2860,9 @@ function viewSession(){
 
     return `
     <div class="ex-open" id="exb-${xi}">
-      <div class="ex-title">${exTitleHTML(ex.name)} ${typePill(ex.key)}</div>
+      <button class="ex-title" style="width:100%" onclick="openExFromSession(${xi})">
+        ${exTitleHTML(ex.name)} ${typePill(ex.key)} <span class="chev" style="font-size:13px">›</span>
+      </button>
       ${lastLineHTML(ex.key)}
       ${ meta.notes ? `<div class="exnote">${esc(meta.notes)}</div>` : '' }
       ${ ex.sugg ? verdictHTML(ex.sugg, true) : `<div class="why" style="padding-left:0;margin-top:10px">${firstMsg}</div>` }
@@ -2833,6 +2883,7 @@ function viewSession(){
         <button onclick="addSet(${xi})">+ Serie</button>
         <button onclick="showWarmup(${xi})">Calentamiento</button>
         <button onclick="editExNotes(${xi})">Notas</button>
+        <button onclick="openExFromSession(${xi})">Ajustes</button>
       </div>
     </div>`;
   }).join('');

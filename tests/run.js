@@ -962,6 +962,43 @@ chk(pinEnPlaca(4, 12, 104) === 4, 'el pin cae en la placa 4, no en otra');
 chk(pinEnPlaca(1, 12, 104) === 1, 'y en la 1 cuando toca la primera');
 chk(pinEnPlaca(12, 12, 104) === 12, 'y en la última cuando toca el final');
 
+suite('Configurar sin parar la sesión');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+db.routines.push({ id:'r1', name:'Pierna', split:db.splits[0] && db.splits[0].id,
+  exercises:[{ id:'a', name:'Leg Press', key:'leg press' }] });
+sess('leg press', [S(100,12), S(100,12)]);
+startSession('r1');
+const sug0 = db.active.exercises[0].sugg.w;
+chk(sug0 === 102.5, 'al empezar, sin configurar, sugiere el salto genérico');
+
+/* se abre la ficha desde la sesión y se vuelve a ella */
+openExFromSession(0);
+chk(view.name === 'exercise' && view.from === 'session', 'la ficha se abre desde la sesión y recuerda el origen');
+chk(view.key === 'leg press', 'y es la del ejercicio abierto');
+
+/* configurarlo a media sesión recalcula la sugerencia de hoy */
+setExEquip('leg press', 'discos');
+setExPoints('leg press', 4);
+chk(effPoints('leg press') === 4, 'queda como prensa de 4 pitones');
+chk(db.active.exercises[0].sugg.w === 105, 'y la sugerencia de la sesión se recalcula al vuelo (102,5 → 105)');
+chk(loadPlan('leg press', db.active.exercises[0].sugg.w).points === 4, 'la carga ya se reparte entre los 4');
+
+/* una torre en libras convierte lo ya escrito */
+resetDB();
+db.routines.push({ id:'r2', name:'Torso', split:db.splits[0] && db.splits[0].id,
+  exercises:[{ id:'b', name:'Cable Row', key:'cable row' }] });
+startSession('r2');
+db.active.exercises[0].sets[0].w = '20';          /* escrito en kg */
+setExEquip('cable row', 'placas');
+setExStack('cable row', 'unit', 'lb');
+chk(exUnit('cable row') === 'lb', 'el ejercicio pasa a libras');
+chk(Math.abs(parseFloat(db.active.exercises[0].sets[0].w) - 44.09) < 0.1,
+    'y los 20 kg ya escritos se convierten a 44,09 lb: siguen siendo el mismo peso');
+setExStack('cable row', 'unit', 'kg');
+chk(Math.abs(parseFloat(db.active.exercises[0].sets[0].w) - 20) < 0.01, 'y de vuelta a 20 kg');
+db.active = null;
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
