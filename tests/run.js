@@ -1066,6 +1066,117 @@ chk(db.history.length === 1, 'la sesión se guarda en el historial');
 chk(db.history[0].entries[0].sets.length === 2, 'con sus dos series');
 chk(db.active === null, 'y deja de estar en curso');
 
+/* =====================================================================
+   GIMNASIOS: plantillas de equipo por establecimiento
+   ===================================================================== */
+suite('Gimnasios — migración desde 1.0');
+db = normalize({ routines:[], history:[], settings:{ unit:'lb' },
+  gym:{ plates:[{ kg:10, pairs:2, on:true }] },
+  exmeta:{ 'remo cable': { type:'normal', lo:null, hi:null, step:null, notes:'', rest:null,
+    muscle:null, equip:'placas', bar:null, points:null, base:null,
+    stack:{ unit:'lb', step:5, start:10 } } } });
+chk(db.gyms.length === 1 && db.gyms[0].name === 'Mi gimnasio', 'el equipo de 1.0 pasa a ser el primer gimnasio');
+chk(db.gym.plates.length === 1 && db.gym.plates[0].kg === 10 && db.gym.bars.length > 0,
+    'db.gym sigue funcionando: apunta al gimnasio activo');
+chk(exUnit('remo cable') === 'lb', 'las máquinas ya configuradas no se tocan');
+chk(db.gym.unit === 'lb', 'y el gimnasio recuerda la unidad del usuario');
+chk(JSON.parse(JSON.stringify(db)).gym === undefined, 'el respaldo no duplica: el equipo vive en db.gyms');
+
+suite('Gimnasios — la configuración viaja con cada gimnasio');
+resetDB();
+db.gyms = [normGym({ name:'Forum Buenavista', unit:'kg' }, 'kg')];
+db.settings.gymId = db.gyms[0].id;
+invalidatePlates();
+/* el caso real: lateral raise en polea, con la torre en libras */
+exMeta('lateral raise polea').equip = 'placas';
+Object.assign(exMeta('lateral raise polea').stack, { unit:'lb', step:5, start:5 });
+chk(exUnit('lateral raise polea') === 'lb', 'en Forum la máquina va en libras');
+const gymA = db.settings.gymId;
+
+/* el gimnasio de la pareja: copia de Forum, y ahí la torre va en kilos */
+window.__gymBase = 'copy';
+document.getElementById('newgymname').value = 'Gym de mi pareja';
+createGym({ preventDefault(){} });
+chk(db.gyms.length === 2 && db.gym.name === 'Gym de mi pareja', 'crear un gimnasio te cambia ahí');
+const gymB = db.settings.gymId;
+chk(exUnit('lateral raise polea') === 'lb', 'la copia arranca igual que el original');
+Object.assign(exMeta('lateral raise polea').stack, { unit:'kg', step:5, start:5 });
+chk(exUnit('lateral raise polea') === 'kg', 'y se ajusta a la máquina de ese gimnasio');
+
+setActiveGym(gymA);
+chk(exUnit('lateral raise polea') === 'lb', 'volver a Forum devuelve las libras — sin reconfigurar nada');
+setActiveGym(gymB);
+chk(exUnit('lateral raise polea') === 'kg', 'y el otro sigue en kilos');
+
+/* el inventario también es de cada gimnasio */
+setActiveGym(gymA);
+db.gym.plates = db.gym.plates.filter(p => Math.abs(p.kg - 1.25) > 1e-9); invalidatePlates();
+chk(plateMinStep(2) === 5, 'en Forum ya no hay discos de 1,25: salto mínimo 5');
+setActiveGym(gymB);
+chk(db.gym.plates.some(p => Math.abs(p.kg - 1.25) < 1e-9), 'pero en el otro gimnasio siguen estando');
+chk(plateMinStep(2) === 2.5, 'y su salto mínimo no se contagia');
+
+/* cada gimnasio recuerda su unidad de vista */
+setUnit('lb');
+setActiveGym(gymA);
+chk(db.settings.unit === 'kg', 'Forum se ve en kilos');
+setActiveGym(gymB);
+chk(db.settings.unit === 'lb', 'y el de la pareja en libras: cada uno con la suya');
+setUnit('kg');
+
+suite('Gimnasios — cambiar a media sesión');
+db.routines.push({ id:'rg', name:'Hombro', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'x', name:'Lateral Raise Polea', key:'lateral raise polea' }] });
+startSession('rg');
+db.active.exercises[0].sets[0].w = '20';          /* escrito con la torre en kg */
+setActiveGym(gymA);
+chk(exUnit('lateral raise polea') === 'lb', 'en Forum el ejercicio pasa a libras');
+chk(Math.abs(parseFloat(db.active.exercises[0].sets[0].w) - 44.09) < 0.1,
+    'los 20 kg ya escritos se convierten a 44,09 lb: el mismo peso');
+setActiveGym(gymB);
+chk(Math.abs(parseFloat(db.active.exercises[0].sets[0].w) - 20) < 0.01, 'y de vuelta sin deriva');
+db.active = null;
+
+suite('Gimnasios — desde cero y perfiles compartibles');
+window.__gymBase = 'kg';
+document.getElementById('newgymname').value = 'Gym vacío';
+createGym({ preventDefault(){} });
+chk(db.gym.name === 'Gym vacío' && stackConf('lateral raise polea') === null,
+    'desde cero: la torre queda sin configurar');
+chk(exMeta('lateral raise polea').equip === 'placas', 'pero el implemento se adivina del nombre («polea»)');
+
+/* compartir el gimnasio de la pareja: el perfil lleva equipo y máquinas */
+const prof = gymProfile(gymB);
+chk(prof.kind === 'gimnasio' && prof.gym.name === 'Gym de mi pareja', 'el perfil es un .json del gimnasio');
+chk(prof.gym.machines['lateral raise polea'].stack.unit === 'kg', 'con la config de sus máquinas');
+chk(prof.gym.id === undefined, 'y sin id: al importarlo se genera otro');
+
+/* la pareja lo importa en su app */
+const nAntes = db.gyms.length;
+window.__gymImport = JSON.parse(JSON.stringify(prof));
+applyGymImport();
+chk(db.gyms.length === nAntes + 1 && db.gym.name === 'Gym de mi pareja', 'importarlo lo agrega y te cambia ahí');
+chk(exUnit('lateral raise polea') === 'kg', 'con las máquinas ya configuradas');
+
+/* el restaurador de respaldos también reconoce un perfil de gimnasio */
+importBackup(JSON.stringify(prof));
+chk(els['modalhost'].innerHTML.includes('Agregar el gimnasio'), 'importarlo por «Restaurar respaldo» redirige bien');
+closeModal();
+
+/* administrar: renombrar y eliminar */
+document.getElementById('gymrename').value = 'Smart Fit Coapa';
+renameGym({ preventDefault(){} }, db.settings.gymId);
+chk(db.gym.name === 'Smart Fit Coapa', 'renombrar el gimnasio');
+askDeleteGym(db.settings.gymId);
+chk(els['modalhost'].innerHTML.includes('actual'), 'el gimnasio activo no se elimina: pide cambiarte antes');
+closeModal();
+const otroId = db.gyms.find(g => g.id !== db.settings.gymId).id;
+window.__confirmFn = null;
+askDeleteGym(otroId);
+window.__confirmFn();
+chk(!db.gyms.some(g => g.id === otroId), 'uno guardado sí se elimina');
+chk(db.gyms.length >= 1 && db.gyms.some(g => g.id === db.settings.gymId), 'y siempre queda un gimnasio activo');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

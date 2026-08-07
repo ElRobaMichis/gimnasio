@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -669,11 +669,43 @@ function normalize(d){
   }
   if(d.splits.length && !d.splits.some(sp => sp.active)) d.splits[0].active = true;
 
-  d.gym = (d.gym && typeof d.gym === 'object') ? d.gym : {};
-  const def = defaultGym(d.settings.unit);
-  for(const k of ['plates','bars','dumbbells'])
-    if(!Array.isArray(d.gym[k]) || !d.gym[k].length) d.gym[k] = def[k];
+  /* gimnasios: cada uno guarda su equipo, su unidad y la config de sus
+     máquinas. El único d.gym de la 1.0 pasa a ser el primero de la lista. */
+  const legacy = Object.getOwnPropertyDescriptor(d, 'gym');
+  delete d.gym;
+  d.gyms = (Array.isArray(d.gyms) ? d.gyms : []).filter(g => g && typeof g === 'object');
+  if(!d.gyms.length){
+    const base = (legacy && legacy.value && typeof legacy.value === 'object') ? legacy.value : {};
+    d.gyms.push(Object.assign({ name:'Mi gimnasio' }, base));
+  }
+  for(const g of d.gyms) normGym(g, d.settings.unit);
+  if(!d.gyms.some(g => g.id === d.settings.gymId)) d.settings.gymId = d.gyms[0].id;
+  /* la unidad visible manda; el gimnasio activo la recuerda para cuando vuelvas */
+  d.gyms.find(g => g.id === d.settings.gymId).unit = d.settings.unit;
+  /* d.gym sigue siendo "el equipo": apunta al gimnasio activo. No se
+     serializa (los datos viven en d.gyms) y asignarle un inventario entero
+     —como hacen los tests— cae sobre el activo. */
+  Object.defineProperty(d, 'gym', {
+    configurable: true,
+    get(){ return d.gyms.find(g => g.id === d.settings.gymId) || d.gyms[0]; },
+    set(v){
+      if(!v || typeof v !== 'object') return;
+      const g = d.gyms.find(x => x.id === d.settings.gymId) || d.gyms[0];
+      for(const k of ['plates','bars','dumbbells']) if(Array.isArray(v[k])) g[k] = v[k];
+    }
+  });
   return d;
+}
+/* deja un gimnasio completo: id, nombre, unidad, equipo y máquinas */
+function normGym(g, unitFallback){
+  if(!g.id) g.id = uid();
+  if(!g.name || typeof g.name !== 'string') g.name = 'Mi gimnasio';
+  if(g.unit !== 'kg' && g.unit !== 'lb') g.unit = unitFallback === 'lb' ? 'lb' : 'kg';
+  const def = defaultGym(g.unit);
+  for(const k of ['plates','bars','dumbbells'])
+    if(!Array.isArray(g[k]) || !g[k].length) g[k] = def[k];
+  if(!g.machines || typeof g.machines !== 'object') g.machines = {};
+  return g;
 }
 function load(){
   try{
@@ -1733,6 +1765,16 @@ function viewHome(){
       Continuar sesión — ${esc(db.active.routineName)}
     </button>` : '';
 
+  /* con más de un gimnasio: decir dónde estás y poder cambiar antes de empezar */
+  const gymRow = db.gyms.length > 1 ? `
+    <button class="rowitem" style="border-bottom:0;padding:14px 0 0" onclick="gymPickerModal()">
+      <span class="grow row" style="gap:9px">
+        <span class="load-l">Entrenando en</span>
+        <span class="l-v" style="color:var(--bone)">${esc(db.gym.name)}</span>
+      </span>
+      <span class="note-a" style="margin:0">Cambiar ›</span>
+    </button>` : '';
+
   /* la tarjeta de arriba: qué toca hoy */
   const today = nx ? `
     <div class="today">
@@ -1776,7 +1818,7 @@ function viewHome(){
     </div>` : '';
 
   if(!db.routines.length){
-    return `${resume}${fatBanner}${rirBanner}${backupBanner}
+    return `${resume}${gymRow}${fatBanner}${rirBanner}${backupBanner}
       <div class="empty">
         <div class="big">Sin días</div>
         <p>Empieza por crear el primero.</p>
@@ -1802,6 +1844,7 @@ function viewHome(){
 
   return `
     ${resume}
+    ${gymRow}
     ${today}
     ${strip}
     ${fatBanner}${rirBanner}${backupBanner}
@@ -2314,6 +2357,8 @@ function viewExercise(){
     ${ !meta.equip ? `<div class="hint">Sin elegir, el coach progresa igual pero no puede decirte cómo
       cargar nada. Se adivina del nombre del ejercicio; toca el que corresponda si falló.</div>` : '' }
     ${ equipConfigHTML(key, meta) }
+    ${ db.gyms.length > 1 && meta.equip ? `<div class="hint">Esto es de <b>${esc(db.gym.name)}</b> —
+      cada gimnasio guarda su propia configuración de máquinas y equipo.</div>` : '' }
 
     <div class="sect">Ajustes del ejercicio</div>
     <div class="list">
@@ -2858,6 +2903,9 @@ function sessionHeadHTML(){
       <div class="sess-actions">
         <button class="end" onclick="askFinish()">Terminar</button>
         <button class="unitbtn" aria-label="Cambiar unidad de peso" onclick="askUnitSwitch()">${uLabel()} ⇄</button>
+        ${ db.gyms.length > 1 ? `
+        <button class="unitbtn" style="max-width:132px;overflow:hidden;text-overflow:ellipsis"
+          aria-label="Cambiar de gimnasio" onclick="gymPickerModal()">${esc(db.gym.name)}</button>` : '' }
       </div>
     </div>
     ${ rest ? `
@@ -3179,6 +3227,267 @@ function saveEditedSession(){
   rebuildProgress(); render();
 }
 
+/* =====================================================================
+   GIMNASIOS
+   Cada gimnasio es una plantilla completa: su equipo (discos, barras,
+   mancuernas), su unidad y la configuración de SUS máquinas — torres,
+   saltos, topes, peso de aparatos. Cambiar de gimnasio ajusta todo de
+   golpe; la progresión y el historial no se tocan porque viven en el
+   ejercicio, siempre en kg.
+   La config de máquinas del gimnasio ACTIVO vive en db.exmeta (como en
+   la 1.0); al cambiar se guarda una foto en gym.machines y se aplica la
+   del gimnasio nuevo. Así el motor sigue leyendo de un solo sitio.
+   ===================================================================== */
+const MACHINE_FIELDS = ['equip','points','base','bar','step','cap','stack'];
+/* lo que un ejercicio tiene configurado de SU máquina; null si nada */
+function machineSnapshot(m){
+  const out = {}; let any = false;
+  for(const f of MACHINE_FIELDS){
+    let v = m[f];
+    if(f === 'stack') v = (v && (v.unit != null || v.step != null || v.start != null))
+      ? { unit: v.unit ?? null, step: v.step ?? null, start: v.start ?? null } : null;
+    if(v !== null && v !== undefined){ out[f] = v; any = true; }
+  }
+  return any ? out : null;
+}
+/* la foto del gimnasio activo: el equipo ya vive ahí, se congela lo de exmeta */
+function snapshotActiveGym(){
+  const g = db.gym;
+  g.machines = {};
+  for(const k in db.exmeta){
+    const snap = machineSnapshot(db.exmeta[k]);
+    if(snap) g.machines[k] = snap;
+  }
+  g.unit = db.settings.unit;
+}
+/* volcar las máquinas de un gimnasio sobre exmeta; lo no configurado se
+   limpia y el implemento se vuelve a adivinar del nombre */
+function applyGymMachines(g){
+  const keys = new Set([...Object.keys(db.exmeta), ...Object.keys(g.machines)]);
+  for(const k of keys){
+    const m = exMeta(k), mc = g.machines[k] || null;
+    m.equip  = (mc && EQUIP[mc.equip]) ? mc.equip : guessEquip(k);
+    m.points = (mc && mc.points != null) ? mc.points : null;
+    m.base   = (mc && mc.base   != null) ? mc.base   : null;
+    m.bar    = (mc && mc.bar    != null) ? mc.bar    : null;
+    m.step   = (mc && mc.step   != null) ? mc.step   : null;
+    m.cap    = (mc && mc.cap    != null) ? mc.cap    : null;
+    m.stack  = (mc && mc.stack)
+      ? { unit: mc.stack.unit ?? null, step: mc.stack.step ?? null, start: mc.stack.start ?? null }
+      : { unit:null, step:null, start:null };
+  }
+}
+function setActiveGym(id){
+  if(id === db.settings.gymId || !db.gyms.some(g => g.id === id)) return;
+  /* con sesión en curso: recordar la unidad de cada ejercicio para convertir lo escrito */
+  const antes = {};
+  if(db.active) for(const ex of db.active.exercises) antes[ex.key] = exUnit(ex.key);
+  snapshotActiveGym();
+  db.settings.gymId = id;
+  const g = db.gym;
+  applyGymMachines(g);
+  db.settings.unit = g.unit === 'lb' ? 'lb' : 'kg';
+  invalidatePlates();
+  if(db.active){
+    for(const ex of db.active.exercises){
+      const ahora = exUnit(ex.key);
+      if(antes[ex.key] && antes[ex.key] !== ahora){
+        const f = (ahora === 'lb') ? 1/LB_KG : LB_KG;
+        for(const st of ex.sets){
+          const n = parseFloat(st.w);
+          if(st.w !== '' && st.w !== undefined && !isNaN(n)) st.w = String(Math.round(n * f * 100) / 100);
+        }
+      }
+      refreshActiveSugg(ex.key);
+    }
+  }
+  save(); render();
+}
+function gymMachineCount(g){
+  if(g.id === db.settings.gymId){
+    let n = 0;
+    for(const k in db.exmeta) if(machineSnapshot(db.exmeta[k])) n++;
+    return n;
+  }
+  return Object.keys(g.machines || {}).length;
+}
+function gymSummary(g){
+  const n = gymMachineCount(g);
+  return `${g.unit === 'lb' ? 'Libras' : 'Kilos'} · ${n
+    ? `${n} ejercicio${n===1?'':'s'} configurado${n===1?'':'s'}`
+    : 'máquinas sin configurar'}`;
+}
+
+/* ---------- elegir / crear / administrar ---------- */
+function gymPickerModal(){
+  openModal(`
+    <h2>¿En qué gimnasio entrenas?</h2>
+    <p class="muted">Cada gimnasio guarda su propio equipo y la configuración de sus máquinas —
+      unidades, torres y saltos. Al cambiar, todo se ajusta solo; tu progresión y tu historial no se tocan.</p>
+    <div class="stack">
+      ${db.gyms.map(g => `
+        <div class="row">
+          <button class="opt ${g.id === db.settings.gymId ? 'on' : ''} grow" onclick="pickGym('${g.id}')">
+            <b>${esc(g.name)}</b><span>${gymSummary(g)}${g.id === db.settings.gymId ? ' · aquí entrenas' : ''}</span>
+          </button>
+          <button class="xbtn" aria-label="Editar gimnasio" onclick="gymEditModal('${g.id}')">✎</button>
+        </div>`).join('')}
+    </div>
+    <button class="btn quiet" style="margin-top:14px" onclick="promptNewGym()">Nuevo gimnasio</button>
+    <button class="btn ghost" style="margin-top:9px" onclick="document.getElementById('gymfile').click()">Importar un gimnasio (.json)</button>
+    <input type="file" id="gymfile" accept=".json,application/json" style="display:none"
+      onchange="importGymFile(this.files[0]); this.value=''">
+    <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cerrar</button>`);
+}
+function pickGym(id){
+  closeModal();
+  if(id !== db.settings.gymId) setActiveGym(id);
+}
+function promptNewGym(){
+  window.__gymBase = 'copy';
+  openModal(`
+    <h2>Nuevo gimnasio</h2>
+    <p class="muted">Una plantilla aparte: lo que ajustes ahí no toca a “${esc(db.gym.name)}”.</p>
+    <form onsubmit="createGym(event)" class="stack" autocomplete="off">
+      <input type="text" id="newgymname" placeholder="Ej. Forum Buenavista, gym de casa" autocomplete="off">
+      <button type="button" class="opt on" id="gopt-copy" onclick="selGymBase('copy')">
+        <b>Empezar como copia de “${esc(db.gym.name)}”</b>
+        <span>Mismo equipo y mismas máquinas de partida. Después ajustas solo lo distinto —
+          que una torre va en kilos, que no hay discos chicos…</span>
+      </button>
+      <button type="button" class="opt" id="gopt-kg" onclick="selGymBase('kg')">
+        <b>Desde cero, en kilos</b><span>Equipo estándar en kg; las máquinas, sin configurar.</span>
+      </button>
+      <button type="button" class="opt" id="gopt-lb" onclick="selGymBase('lb')">
+        <b>Desde cero, en libras</b><span>Equipo estándar en lb; las máquinas, sin configurar.</span>
+      </button>
+      <button class="btn" type="submit">Crear y entrenar ahí</button>
+      <button class="btn ghost" type="button" onclick="gymPickerModal()">Cancelar</button>
+    </form>`);
+  setTimeout(() => document.getElementById('newgymname')?.focus(), 60);
+}
+function selGymBase(v){
+  window.__gymBase = v;
+  for(const k of ['copy','kg','lb']){
+    const el = document.getElementById('gopt-' + k);
+    if(el) el.className = 'opt' + (k === v ? ' on' : '');
+  }
+}
+function createGym(ev){
+  ev.preventDefault();
+  const name = (document.getElementById('newgymname').value || '').trim();
+  if(!name) return;
+  const base = window.__gymBase || 'copy';
+  let g;
+  if(base === 'copy'){
+    snapshotActiveGym();
+    const src = db.gym;
+    g = normGym(JSON.parse(JSON.stringify({ name, unit:src.unit, plates:src.plates,
+      bars:src.bars, dumbbells:src.dumbbells, machines:src.machines })), db.settings.unit);
+  } else {
+    g = normGym({ name, unit: base }, base);
+  }
+  db.gyms.push(g);
+  closeModal();
+  setActiveGym(g.id);
+}
+function gymEditModal(id){
+  const g = db.gyms.find(x => x.id === id);
+  if(!g) return;
+  openModal(`
+    <h2>${esc(g.name)}</h2>
+    <form onsubmit="renameGym(event,'${id}')" class="stack" autocomplete="off">
+      <div class="field"><span>Nombre</span>
+        <input type="text" id="gymrename" value="${esc(g.name)}" autocomplete="off"></div>
+      <button class="btn sm" type="submit">Guardar nombre</button>
+    </form>
+    <button class="btn quiet sm" style="margin-top:9px" onclick="exportGym('${id}')">Compartir este gimnasio (.json)</button>
+    ${db.gyms.length > 1 ? `
+    <button class="btn danger sm" style="margin-top:9px" onclick="askDeleteGym('${id}')">Eliminar gimnasio</button>` : ''}
+    <button class="btn ghost sm" style="margin-top:9px" onclick="gymPickerModal()">‹ Volver</button>
+    <div class="hint">El .json lleva el equipo y la configuración de las máquinas — nada de tu historial.
+      Pásaselo a quien entrene ahí: lo importa desde Ajustes → Mi equipo → Gimnasio y se ahorra
+      configurar todo a mano.</div>`);
+}
+function renameGym(ev, id){
+  ev.preventDefault();
+  const g = db.gyms.find(x => x.id === id);
+  const name = (document.getElementById('gymrename').value || '').trim();
+  if(!g || !name) return;
+  g.name = name;
+  save(); gymPickerModal(); render();
+}
+function askDeleteGym(id){
+  const g = db.gyms.find(x => x.id === id);
+  if(!g || db.gyms.length <= 1) return;
+  if(id === db.settings.gymId){
+    infoModal('Es tu gimnasio actual', 'Cámbiate primero a otro gimnasio y desde ahí elimina este.');
+    return;
+  }
+  confirmModal(`¿Eliminar “${esc(g.name)}”?`,
+    'Se pierde su equipo y la configuración de sus máquinas. El historial de sesiones no se toca — vive en los ejercicios, no en el gimnasio.',
+    'Eliminar gimnasio', () => {
+      db.gyms = db.gyms.filter(x => x.id !== id);
+      save(); gymPickerModal(); render();
+    });
+}
+
+/* ---------- compartir: el perfil .json de un gimnasio ---------- */
+function gymProfile(id){
+  const g = db.gyms.find(x => x.id === id);
+  if(!g) return null;
+  if(g.id === db.settings.gymId) snapshotActiveGym();
+  return { app:'hierro', kind:'gimnasio', version:APP_VERSION,
+    gym: JSON.parse(JSON.stringify({ name:g.name, unit:g.unit, plates:g.plates,
+      bars:g.bars, dumbbells:g.dumbbells, machines:g.machines })) };
+}
+function exportGym(id){
+  const prof = gymProfile(id);
+  if(!prof) return;
+  const slug = prof.gym.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'perfil';
+  const blob = new Blob([JSON.stringify(prof)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hierro-gimnasio-${slug}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+function importGymFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => infoModal('No se pudo leer el archivo', 'Vuelve a intentarlo.');
+  reader.onload = () => {
+    try{
+      const d = JSON.parse(String(reader.result));
+      if(!d || d.kind !== 'gimnasio' || !d.gym || typeof d.gym !== 'object') throw new Error('estructura');
+      confirmGymImport(d);
+    }catch(e){
+      infoModal('Archivo no válido', 'No parece un gimnasio de Hierro (el .json que se comparte desde Ajustes → Mi equipo → Gimnasio).');
+    }
+  };
+  reader.readAsText(file);
+}
+function confirmGymImport(d){
+  window.__gymImport = d;
+  const n = Object.keys(d.gym.machines || {}).length;
+  confirmModal(`¿Agregar el gimnasio “${esc(d.gym.name || 'Sin nombre')}”?`,
+    `Trae su equipo${n ? ` y la configuración de ${n} ejercicio${n===1?'':'s'}` : ''}. Se agrega como
+     un gimnasio más y te cambia ahí — tus rutinas y tu historial no se tocan.`,
+    'Agregar y entrenar ahí', applyGymImport, true);
+}
+function applyGymImport(){
+  const d = window.__gymImport;
+  window.__gymImport = null;
+  if(!d) return;
+  const g = normGym(JSON.parse(JSON.stringify(d.gym)), db.settings.unit);
+  g.id = uid();   /* nunca chocar con uno ya existente */
+  db.gyms.push(g);
+  save();
+  setActiveGym(g.id);
+}
+
 /* ---------- MI EQUIPO ---------- */
 const GYM_TITLE = { plates:'Discos', bars:'Barras', dumbbells:'Mancuernas' };
 function gymKind(){ return GYM_TITLE[view.kind] ? view.kind : 'plates'; }
@@ -3450,6 +3759,12 @@ function viewSettings(){
 
     <div class="sect">Mi equipo</div>
     <div class="list">
+      <button class="line" onclick="gymPickerModal()">
+        <div><div class="l-t">Gimnasio</div><div class="l-d">${ db.gyms.length > 1
+          ? `${db.gyms.length} guardados · cada uno con su equipo y sus máquinas`
+          : 'Crea otro para el gym de tu pareja, el de casa…' }</div></div>
+        <div class="l-v">${esc(db.gym.name)} <span class="chev">›</span></div>
+      </button>
       <button class="line" onclick="go({name:'gym', kind:'plates'})">
         <div><div class="l-t">Discos</div><div class="l-d">${(() => {
           const on = db.gym.plates.filter(p => p.on);
@@ -3477,7 +3792,9 @@ function viewSettings(){
       </button>
     </div>
     <div class="hint">Con esto la app te dice qué discos poner en cada lado — en las series de trabajo y en
-      el calentamiento — y redondea las sugerencias a pesos que de verdad puedes armar.</div>
+      el calentamiento — y redondea las sugerencias a pesos que de verdad puedes armar.
+      Todo lo de arriba (discos, barras, mancuernas y la configuración de cada máquina) es de
+      <b>${esc(db.gym.name)}</b>: al cambiar de gimnasio, cambia contigo.</div>
 
     <div class="sect">Guía rápida</div>
     <div class="list">
@@ -4106,7 +4423,8 @@ function askUnitSwitch(target){
   confirmModal(`¿Cambiar a ${nu === 'lb' ? 'libras (lb)' : 'kilos (kg)'}?`,
     `Tus datos guardados NO se modifican — internamente todo vive en kg y solo cambia cómo se muestra y cómo escribes.
      ${db.active ? 'Lo que ya escribiste en esta sesión se convierte automáticamente a la nueva unidad.' : ''}
-     Puedes alternar cuando quieras (ej. si entrenas en otro gimnasio).`,
+     Puedes alternar cuando quieras. Si es porque entrenas en OTRO gimnasio, mejor crea un gimnasio
+     en Ajustes → Mi equipo: guarda su unidad, su equipo y sus máquinas completas.`,
     `Cambiar a ${nu}`, () => setUnit(nu), true);
 }
 function setUnit(u){
@@ -4125,6 +4443,7 @@ function setUnit(u){
     }
   }
   db.settings.unit = u;
+  db.gym.unit = u;   /* el gimnasio activo recuerda su unidad para los cambios */
   /* regenerar sugerencias: sus textos llevan la unidad y el redondeo cambia */
   if(db.active) for(const ex of db.active.exercises) ex.sugg = computeSuggestion(ex.key);
   save(); render();
@@ -4495,6 +4814,8 @@ function importBackup(file){
   reader.onload = () => {
     try{
       const d = JSON.parse(String(reader.result));
+      /* si es un perfil de gimnasio compartido, se importa como gimnasio */
+      if(d && d.kind === 'gimnasio' && d.gym && typeof d.gym === 'object'){ confirmGymImport(d); return; }
       if(!d || !Array.isArray(d.routines) || !Array.isArray(d.history)) throw new Error('estructura');
       window.__backup = d;
       confirmModal('¿Restaurar este respaldo?',
