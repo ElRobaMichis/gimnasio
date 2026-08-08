@@ -3,7 +3,11 @@
    Estrategia mixta, elegida por lo que falla si te equivocas:
    · el documento va a RED PRIMERO (con 3 s de paciencia). Si hay
      internet ves la versión nueva en cuanto recargas; si no la hay,
-     entra la copia guardada y la app abre igual.
+     entra la copia guardada y la app abre igual — pero la descarga
+     NO se abandona: sigue en segundo plano, se guarda al llegar y
+     se le avisa a la app para que busque la versión nueva ya mismo.
+     Sin esto, con la red lenta del gimnasio la actualización nunca
+     llegaba ahí: aparecía hasta llegar a casa con buen wifi.
    · los iconos, el manifiesto y las tipografías van a CACHÉ PRIMERO:
      no cambian casi nunca y así el arranque es instantáneo.
 
@@ -11,7 +15,7 @@
    tardara dos arranques en verse: el primero servía la vieja y dejaba
    la nueva lista para el siguiente. */
 /* va siempre igual que APP_VERSION en index.html — hay un test que lo verifica */
-const CACHE = 'hierro-1.1.0';
+const CACHE = 'hierro-1.1.1';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const ASSETS = [
   './',
@@ -54,15 +58,12 @@ function guardar(req, res){
   }
   return res;
 }
-/* la red, pero sin quedarse colgado: si tarda demasiado se da por perdida */
-function redConPrisa(req, ms){
-  return new Promise(resolve => {
-    let resuelto = false;
-    const fin = v => { if (!resuelto) { resuelto = true; resolve(v); } };
-    const t = setTimeout(() => fin(null), ms);
-    fetch(req).then(res => { clearTimeout(t); fin(res); })
-              .catch(() => { clearTimeout(t); fin(null); });
-  });
+/* cuando el documento fresco llega tarde (ya se sirvió la copia), avisar a
+   las pestañas: la red ya respira, es buen momento de buscar versión nueva */
+function avisarDocumentoFresco(){
+  self.clients.matchAll({ type: 'window' }).then(list => {
+    for (const c of list) c.postMessage({ tipo: 'documento-fresco' });
+  }).catch(() => {});
 }
 function deLaCopia(req){
   return caches.match(req, { ignoreSearch: true })
@@ -93,11 +94,26 @@ self.addEventListener('fetch', e => {
                       url.pathname.endsWith('/') ||
                       url.pathname.endsWith('index.html');
   if (esDocumento) {
+    /* responder YA (la copia local si la red tarda más de RED_MS), pero sin
+       rendirse: la descarga sigue por detrás y, si llega, queda guardada
+       para el próximo arranque y se le avisa a la app */
+    let servidoDeCopia = false;
+    const red = fetch(e.request)
+      .then(res => guardar(e.request, res))
+      .then(res => {
+        if (res && res.ok && servidoDeCopia) avisarDocumentoFresco();
+        return res;
+      })
+      .catch(() => null);
+    const prisa = new Promise(resolve => setTimeout(() => resolve(null), RED_MS));
     e.respondWith(
-      redConPrisa(e.request, RED_MS)
-        .then(res => res ? guardar(e.request, res) : deLaCopia(e.request))
-        .catch(() => deLaCopia(e.request))
+      Promise.race([red, prisa]).then(res => {
+        if (res) return res;
+        servidoDeCopia = true;
+        return deLaCopia(e.request);
+      })
     );
+    e.waitUntil(red);   /* que el navegador no mate al SW con la descarga a medias */
     return;
   }
 

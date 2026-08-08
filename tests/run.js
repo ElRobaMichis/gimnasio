@@ -1177,6 +1177,20 @@ window.__confirmFn();
 chk(!db.gyms.some(g => g.id === otroId), 'uno guardado sí se elimina');
 chk(db.gyms.length >= 1 && db.gyms.some(g => g.id === db.settings.gymId), 'y siempre queda un gimnasio activo');
 
+/* =====================================================================
+   ACTUALIZAR EN SEGUNDO PLANO: el aviso llega en el gimnasio
+   ===================================================================== */
+suite('Actualizar en segundo plano — la red lenta ya no lo impide');
+/* con la red del gym, el documento se sirve de la copia local pero la
+   descarga sigue por detrás; estas piezas tienen que existir en pareja */
+chk(swSrc.includes('e.waitUntil(red)'), 'el SW no abandona la descarga cuando gana la copia local');
+chk(/servidoDeCopia/.test(swSrc) && swSrc.includes('avisarDocumentoFresco'),
+    'y solo avisa cuando el fresco llegó tarde (si llegó a tiempo, ya lo estás viendo)');
+chk(/documento-fresco/.test(swSrc) && /documento-fresco/.test(html),
+    'el mensaje del SW y el que escucha la app son el mismo');
+chk(html.includes("addEventListener('online'"), 'la app también busca versión al recuperar la conexión');
+chk(!swSrc.includes('redConPrisa'), 'la carrera vieja (que tiraba la descarga) ya no existe');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

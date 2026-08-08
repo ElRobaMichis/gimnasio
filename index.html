@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -5182,6 +5182,14 @@ function migrateTypes(){
       document.addEventListener('visibilitychange', () => {
         if(document.visibilityState === 'visible') buscar();
       });
+      /* la red del gym: si el documento fresco llegó tarde (se sirvió la
+         copia local), el SW avisa en cuanto termina la descarga — la red
+         ya respira y es EL momento de buscar la versión nueva, en vez de
+         esperar a que llegues a tu casa con buen wifi */
+      navigator.serviceWorker.addEventListener('message', ev => {
+        if(ev.data && ev.data.tipo === 'documento-fresco') buscar();
+      });
+      window.addEventListener('online', buscar);
     }).catch(() => {});
   }
   /* el wake lock se libera solo al minimizar; re-adquirirlo al volver */
