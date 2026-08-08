@@ -1191,6 +1191,64 @@ chk(/documento-fresco/.test(swSrc) && /documento-fresco/.test(html),
 chk(html.includes("addEventListener('online'"), 'la app también busca versión al recuperar la conexión');
 chk(!swSrc.includes('redConPrisa'), 'la carrera vieja (que tiraba la descarga) ya no existe');
 
+/* =====================================================================
+   ARREGLOS DE SESIÓN EN CURSO: quitar ejercicios y el default al agregar
+   ===================================================================== */
+suite('Quitar un ejercicio de la sesión en curso');
+resetDB();
+db.routines.push({ id:'r1', name:'Torso', split:(db.splits[0]||{}).id, exercises:[
+  { id:'a', name:'Banca', key:'banca' }, { id:'b', name:'Remo', key:'remo' }] });
+startSession('r1');
+/* el que se agregó por error, guardado también en la rutina */
+window.__keepRoutine = true;
+document.getElementById('sessnewex').value = 'Curl raro';
+sessionAddExercise({ preventDefault(){} });
+chk(db.active.exercises.length === 3 && db.routines[0].exercises.length === 3,
+    'el error de la pareja: agregado a la sesión Y a la rutina');
+removeSessionEx(2);
+chk(els['modalhost'].innerHTML.includes('también de la rutina'),
+    'como también vive en la rutina, pregunta qué hacer');
+doRemoveSessionEx(true);
+chk(db.active.exercises.length === 2, 'se quita de la sesión');
+chk(db.routines[0].exercises.length === 2 && !db.routines[0].exercises.some(e => e.key === 'curl raro'),
+    'y también de la rutina: el error queda deshecho');
+/* quitar solo de hoy: la rutina no se toca */
+db.active.open = 1;
+removeSessionEx(0);
+chk(els['modalhost'].innerHTML.includes('Quitar solo de la sesión'), 'ofrece quitarlo solo por hoy');
+doRemoveSessionEx(false);
+chk(db.active.exercises.length === 1 && db.active.exercises[0].key === 'remo',
+    'desaparece de la sesión de hoy');
+chk(db.routines[0].exercises.length === 2, 'pero la rutina queda como estaba');
+chk(db.active.open === 0, 'y el ejercicio que estaba abierto sigue siendo el mismo');
+/* uno que no está en la rutina: sin preguntas de rutina */
+window.__keepRoutine = false;
+document.getElementById('sessnewex').value = 'Face pull';
+sessionAddExercise({ preventDefault(){} });
+removeSessionEx(1);
+chk(!els['modalhost'].innerHTML.includes('también de la rutina'),
+    'si no vive en la rutina, no pregunta por ella');
+doRemoveSessionEx(false);
+chk(db.active.exercises.length === 1, 'y se quita sin más');
+db.active = null;
+
+suite('Agregar a media sesión — dos botones, la rutina por defecto');
+resetDB();
+db.routines.push({ id:'r1', name:'Pull', split:(db.splits[0]||{}).id, exercises:[] });
+startSession('r1');
+promptAddExercise();
+chk(window.__keepRoutine === true, 'el default es guardar en la rutina, no «solo por hoy»');
+chk(els['modalhost'].innerHTML.includes('Agregar a la rutina') &&
+    els['modalhost'].innerHTML.includes('Solo por hoy'),
+    'dos botones explícitos en lugar del switch');
+chk(!els['modalhost'].innerHTML.includes('keepRoutineBtn'), 'el switch confuso ya no existe');
+chk(els['modalhost'].innerHTML.includes('Pull'), 'el texto dice a qué rutina se guarda');
+document.getElementById('sessnewex').value = 'Press militar';
+sessionAddExercise({ preventDefault(){} });
+chk(db.routines[0].exercises.length === 1 && db.routines[0].exercises[0].key === 'press militar',
+    'con el default, el ejercicio queda guardado en la rutina');
+db.active = null;
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

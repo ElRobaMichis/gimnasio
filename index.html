@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -2988,6 +2988,7 @@ function viewSession(){
         <button onclick="showWarmup(${xi})">Calentamiento</button>
         <button onclick="editExNotes(${xi})">Notas</button>
         <button onclick="openExFromSession(${xi})">Ajustes</button>
+        <button onclick="removeSessionEx(${xi})">Quitar</button>
       </div>
     </div>`;
   }).join('');
@@ -4122,34 +4123,66 @@ function removeSet(xi, si){
   updateVsChip(xi); syncPlaceholders(xi);
 }
 
+/* ---------- quitar un ejercicio de la sesión en curso ---------- */
+/* el caso típico: lo agregaste por error a media sesión. Se pregunta qué
+   hacer con la rutina solo si el ejercicio también vive ahí. */
+function removeSessionEx(xi){
+  const s = db.active;
+  if(!s || !s.exercises[xi]) return;
+  const ex = s.exercises[xi];
+  const hasData = ex.sets.some(st => st.done || (st.w !== '' && st.w !== undefined) || (st.r !== '' && st.r !== undefined));
+  const r = db.routines.find(x => x.id === s.routineId);
+  const inRoutine = !!(r && r.exercises.some(e => e.key === ex.key));
+  window.__removeExIdx = xi;
+  openModal(`
+    <h2>¿Quitar “${esc(exBaseName(ex.name))}”?</h2>
+    <p class="muted">${hasData ? 'Tiene series anotadas hoy: se pierden. Tu historial de otras sesiones no se toca.'
+                               : 'No tiene nada anotado todavía.'}</p>
+    ${ inRoutine ? `
+    <button class="btn" onclick="doRemoveSessionEx(false)">Quitar solo de la sesión de hoy</button>
+    <button class="btn quiet" onclick="doRemoveSessionEx(true)">Quitarlo también de la rutina</button>`
+    : `<button class="btn" onclick="doRemoveSessionEx(false)">Quitar de la sesión</button>` }
+    <button class="btn ghost" onclick="closeModal()">Cancelar</button>`);
+}
+function doRemoveSessionEx(alsoRoutine){
+  const s = db.active;
+  const xi = window.__removeExIdx;
+  window.__removeExIdx = null;
+  if(!s || xi == null || !s.exercises[xi]) return;
+  const ex = s.exercises[xi];
+  s.exercises.splice(xi, 1);
+  /* si había un ejercicio fijado como abierto, que siga siendo el mismo */
+  if(typeof s.open === 'number'){
+    if(s.open === xi) delete s.open;
+    else if(s.open > xi) s.open--;
+  }
+  if(alsoRoutine){
+    const r = db.routines.find(x => x.id === s.routineId);
+    if(r) r.exercises = r.exercises.filter(e => e.key !== ex.key);
+  }
+  save(); closeModal(); render();
+}
+
 /* ---------- agregar ejercicio a la sesión en curso ---------- */
 function promptAddExercise(){
-  window.__keepRoutine = false;
+  window.__keepRoutine = true;   /* el default: guardarlo en la rutina */
+  const r = db.routines.find(x => x.id === db.active.routineId);
   openModal(`
     <h2>Agregar ejercicio</h2>
-    <p class="muted">Se suma a la sesión de hoy. Si ya lo conoces de otra rutina o del historial,
-      el coach trae su progresión.</p>
+    <p class="muted">Si ya lo conoces de otra rutina o del historial, el coach trae su progresión.
+      <b>Agregar a la rutina</b> lo guarda en “${esc(r ? r.name : db.active.routineName)}” para las
+      próximas sesiones; <b>Solo por hoy</b> no toca la rutina.</p>
     <form onsubmit="sessionAddExercise(event)" class="stack" autocomplete="off">
       <div class="acwrap">
         <input type="text" id="sessnewex" placeholder="Nombre del ejercicio" autocomplete="off"
           oninput="acUpdateSession()" onfocus="acUpdateSession()" onblur="acHideSession()">
         <div class="aclist" id="aclist2" style="display:none" role="listbox"></div>
       </div>
-      <button class="opt" type="button" id="keepRoutineBtn" onclick="toggleKeepRoutine()">
-        <b id="keepRoutineLabel">Solo por hoy</b>
-        <span>Toca para alternar: solo esta sesión, o guardarlo también en la rutina.</span>
-      </button>
-      <button class="btn" type="submit">Agregar a la sesión</button>
+      <button class="btn" type="submit" onclick="window.__keepRoutine = true">Agregar a la rutina</button>
+      <button class="btn quiet" type="submit" onclick="window.__keepRoutine = false">Solo por hoy</button>
       <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
     </form>`);
   setTimeout(() => document.getElementById('sessnewex')?.focus(), 60);
-}
-function toggleKeepRoutine(){
-  window.__keepRoutine = !window.__keepRoutine;
-  const lbl = document.getElementById('keepRoutineLabel');
-  const btn = document.getElementById('keepRoutineBtn');
-  if(lbl) lbl.textContent = window.__keepRoutine ? 'Guardar también en la rutina ✓' : 'Solo por hoy';
-  if(btn) btn.classList.toggle('on', window.__keepRoutine);
 }
 function acUpdateSession(){
   const inp = document.getElementById('sessnewex');
