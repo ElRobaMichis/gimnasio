@@ -1249,6 +1249,20 @@ chk(db.routines[0].exercises.length === 1 && db.routines[0].exercises[0].key ===
     'con el default, el ejercicio queda guardado en la rutina');
 db.active = null;
 
+suite('El botón del gimnasio siempre a la vista en la sesión');
+/* el caso real: 90 minutos adentro de un gimnasio nuevo, con UN solo
+   gimnasio configurado — el botón para crear el segundo tiene que estar
+   ahí mismo, en la cabecera de la sesión */
+resetDB();
+db.gyms = [normGym({ name:'Mi gimnasio', unit:'kg' }, 'kg')];
+db.settings.gymId = db.gyms[0].id;
+invalidatePlates();
+db.routines.push({ id:'r1', name:'T', split:(db.splits[0]||{}).id, exercises:[] });
+startSession('r1');
+chk(sessionHeadHTML().includes('Mi gimnasio'), 'con un solo gimnasio el botón sale igual, con su nombre');
+chk(sessionHeadHTML().includes('gymPickerModal'), 'y abre el selector, que tiene «Nuevo gimnasio» a un toque');
+db.active = null;
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

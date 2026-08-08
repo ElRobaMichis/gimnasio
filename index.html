@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -2903,9 +2903,8 @@ function sessionHeadHTML(){
       <div class="sess-actions">
         <button class="end" onclick="askFinish()">Terminar</button>
         <button class="unitbtn" aria-label="Cambiar unidad de peso" onclick="askUnitSwitch()">${uLabel()} ⇄</button>
-        ${ db.gyms.length > 1 ? `
         <button class="unitbtn" style="max-width:132px;overflow:hidden;text-overflow:ellipsis"
-          aria-label="Cambiar de gimnasio" onclick="gymPickerModal()">${esc(db.gym.name)}</button>` : '' }
+          aria-label="Cambiar de gimnasio" onclick="gymPickerModal()">${esc(db.gym.name)}</button>
       </div>
     </div>
     ${ rest ? `
