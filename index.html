@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -2483,6 +2483,15 @@ function viewExercise(){
       const spId = ctxSplitId(), sp = db.splits.find(x => x.id === spId);
       if(!sp) return '';
       const oc = (sp.exconf || {})[key] || {};
+      /* plegado tras un botón: solo se despliega si ya hay algo configurado
+         o si lo pediste — así la ficha no enseña dos bloques casi iguales */
+      if(!Object.keys(oc).length && !view.splitConf){
+        return `
+      <button class="btn quiet sm" style="margin-top:14px" onclick="openSplitConf()">
+        Personalizar para este split (${esc(sp.name)})</button>
+      <div class="hint">Rango, series y descanso propios solo dentro de “${esc(sp.name)}” —
+        lo general de arriba no se toca y sigue rigiendo en tus otros splits.</div>`;
+      }
       const phLo = meta.lo ?? (porTiempo ? TIEMPO_RANGE.lo : g.lo);
       const phHi = meta.hi ?? (porTiempo ? TIEMPO_RANGE.hi : g.hi);
       return `
@@ -2703,6 +2712,7 @@ function stepOptionsHTML(cur){
   if(!matched) html += `<option value="${cur}" selected>Actual: ${fmtW(cur)} ${uLabel()}</option>`;
   return html;
 }
+function openSplitConf(){ view.splitConf = true; render(); }
 /* escribir la config por split del ejercicio (rango, series, descanso) */
 function setSplitConf(key, field, val){
   const sp = db.splits.find(x => x.id === ctxSplitId());

@@ -1444,7 +1444,13 @@ chk(effRange('banca').hi === 12 && exMeta('banca').lo == null,
 
 /* los inputs de la ficha escriben en el split del contexto */
 view = { name:'exercise', key:'banca', exname:'Banca', rid:'rh' };
-chk(viewExercise().includes('Solo en este split'), 'la ficha muestra la sección por split (hay 2 splits)');
+chk(viewExercise().includes('Personalizar para este split') && !viewExercise().includes('Solo en este split'),
+    'sin nada configurado, la ficha solo enseña el botón de personalizar');
+view.splitConf = true;   /* lo que hace el botón (openSplitConf), sin el render del stub */
+chk(viewExercise().includes('Solo en este split'), 'al tocarlo se despliega la sección del split');
+setSplitConf('banca', 'sets', '2');
+view = { name:'exercise', key:'banca', exname:'Banca', rid:'rh' };   /* ficha reabierta, sin tocar el botón */
+chk(viewExercise().includes('Solo en este split'), 'con algo ya configurado, la sección sale desplegada sola');
 setSplitConf('banca', 'sets', '2');
 chk(db.splits.find(x => x.id === 'sh').exconf['banca'].sets === 2, 'escribe en el split de la rutina de origen');
 setSplitConf('banca', 'sets', '');
