@@ -1329,6 +1329,31 @@ askResetGymKind('bars');
 window.__confirmFn();
 chk(db.gym.bars.find(b => b.def).kg === 20, 'las barras también se restauran (olímpica de 20 kg)');
 
+suite('Unidades — el juego estándar intacto sigue a la unidad, solo');
+resetDB();
+db.gyms = [normGym({ name:'G', unit:'kg' }, 'kg')];
+db.settings.gymId = db.gyms[0].id;
+db.settings.unit = 'kg'; db.gym.unit = 'kg';
+db.gym.plates = defaultGym('kg').plates;
+db.gym.bars = defaultGym('kg').bars;
+db.gym.dumbbells = defaultGym('kg').dumbbells;
+invalidatePlates();
+setUnit('lb');
+chk(fmtW(db.gym.plates[0].kg) === '45', 'sin tocar nada, en lb aparecen los discos estándar de lb (45…), no 55,12');
+chk(fmtW(db.gym.dumbbells[0].kg) === '5', 'y las mancuernas de 5 en 5 lb');
+setUnit('kg');
+chk(db.gym.plates.map(p => p.kg).join(',') === '25,20,15,10,5,2.5,1.25', 'de regreso, el juego de kg limpio');
+setUnit('lb'); setUnit('kg'); setUnit('lb'); setUnit('kg');
+chk(db.gym.plates[0].kg === 25, 'infinitas vueltas: siempre limpio, sin botones');
+/* un inventario EDITADO no se reemplaza: esos discos existen de verdad */
+db.gym.plates.find(p => Math.abs(p.kg - 1.25) < 1e-9).on = false;
+setUnit('lb');
+chk(Math.abs(db.gym.plates[0].kg - 25) < 1e-9 && fmtW(db.gym.plates[0].kg) === '55,12',
+    'editado (destildaste el de 1,25): se conserva y en lb se ve su peso real, 55,12');
+setUnit('kg');
+chk(db.gym.plates.find(p => Math.abs(p.kg - 1.25) < 1e-9).on === false,
+    'y tu edición sigue ahí al volver a kg');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

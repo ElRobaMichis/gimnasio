@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.3';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -3631,8 +3631,21 @@ function viewGym(){
     <div class="dock"><button class="btn" onclick="go({name:'settings'})">Listo</button></div>`;
 }
 
+/* ¿esta lista sigue siendo el juego estándar intacto de esa unidad?
+   (mismos pesos, mismos pares, nada agregado ni destildado) */
+function gymKindPristine(kind, unit){
+  const cur = db.gym[kind], def = defaultGym(unit)[kind];
+  if(!Array.isArray(cur) || cur.length !== def.length) return false;
+  return cur.every((x, i) => {
+    const d = def[i];
+    if(x.custom || Math.abs(x.kg - d.kg) > 1e-6) return false;
+    if(kind === 'plates') return x.on === d.on && x.pairs === d.pairs;
+    if(kind === 'bars')   return x.on === d.on && x.def === d.def;
+    return x.on === d.on;
+  });
+}
 /* rehacer una lista con el juego estándar de la unidad actual: el remedio
-   para un inventario sembrado en la otra unidad (todo con decimales) */
+   para un inventario EDITADO que se sembró en la otra unidad */
 function askResetGymKind(kind){
   const t = { plates:'los discos', bars:'las barras', dumbbells:'las mancuernas' }[kind];
   confirmModal(`¿Restaurar ${t}?`,
@@ -4500,6 +4513,14 @@ function setUnit(u){
       for(const st of ex.sets) convertTypedW(st, db.settings.unit, u);
     }
   }
+  /* el juego estándar INTACTO sigue a la unidad: en lb los discos
+     estándar son otros (45, 35, 25…), no los de kg con decimales.
+     Un inventario que editaste no se toca: esos discos existen de
+     verdad y en la otra unidad pesan lo que pesan (25 kg = 55,12 lb). */
+  const prev = db.settings.unit;
+  for(const kind of ['plates','bars','dumbbells'])
+    if(gymKindPristine(kind, prev)) db.gym[kind] = defaultGym(u)[kind];
+  invalidatePlates();
   db.settings.unit = u;
   db.gym.unit = u;   /* el gimnasio activo recuerda su unidad para los cambios */
   /* regenerar sugerencias: sus textos llevan la unidad y el redondeo cambia */
