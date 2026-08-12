@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.5.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -863,16 +863,32 @@ function avgRIR(sets){
 }
 
 /* último registro histórico de un ejercicio (opcional: solo antes de una fecha).
-   Las sesiones de descarga no cuentan: son mantenimiento, no datos de progresión. */
-function lastEntry(key, beforeISO){
-  let best = null;
+   Las sesiones de descarga no cuentan: son mantenimiento, no datos de progresión.
+   Hay dos hilos: el del split en contexto (ctx) y el global (any). El coach
+   ancla en el del split — así un plan de fuerza (30 kg × 6) y uno de
+   hipertrofia (16 kg × 15) del mismo ejercicio no se pisan los pesos. */
+function historySplitId(h){
+  const known = h.routineId && db.routines.find(r => r.id === h.routineId);
+  const r = known || db.routines.find(r => r.name === h.routineName);
+  return (r && r.split) || null;
+}
+function lastEntries(key, beforeISO){
+  const ctx = ctxSplitId();
+  let any = null, inCtx = null;
   for(const s of db.history){
     if(s.deload) continue;
     if(beforeISO && s.date >= beforeISO) continue;
     const e = s.entries.find(x => x.key === key);
-    if(e && e.sets.length && (!best || s.date > best.session.date)) best = { entry:e, session:s };
+    if(!e || !e.sets.length) continue;
+    if(!any || s.date > any.session.date) any = { entry:e, session:s };
+    if(ctx && historySplitId(s) === ctx && (!inCtx || s.date > inCtx.session.date))
+      inCtx = { entry:e, session:s };
   }
-  return best;
+  return { ctx: inCtx, any };
+}
+function lastEntry(key, beforeISO){
+  const r = lastEntries(key, beforeISO);
+  return r.ctx || r.any;
 }
 
 /* transformar la sugerencia normal en objetivo de descarga:
@@ -1137,7 +1153,8 @@ function fitSuggestion(key, sugg){
 /*  computeSuggestion(key) → null (primera vez) o
     { w, reps, sets, type, msg, why }                                   */
 function computeSuggestion(key){
-  const last = lastEntry(key);
+  const both = lastEntries(key);
+  const last = both.ctx || both.any;
   if(!last) return null;
 
   const meta = exMeta(key);
@@ -1155,8 +1172,10 @@ function computeSuggestion(key){
   const rir = avgRIR(atW);
   const step = effStep(key, w);
 
-  /* vuelta tras una pausa: la fuerza cae tras ~2 semanas sin un ejercicio → descontar */
-  const gapDays = Math.floor((Date.now() - new Date(last.session.date).getTime()) / 864e5);
+  /* vuelta tras una pausa: la fuerza cae tras ~2 semanas sin un ejercicio → descontar.
+     La pausa se mide sobre el MOVIMIENTO en cualquier split: si lo seguiste
+     entrenando en otro plan, no hay desentrenamiento que descontar */
+  const gapDays = Math.floor((Date.now() - new Date(both.any.session.date).getTime()) / 864e5);
   if(gapDays >= 14){
     const factor = gapDays < 28 ? 0.925 : (gapDays < 60 ? 0.85 : 0.8);
     const weeks = Math.round(gapDays / 7);

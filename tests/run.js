@@ -1487,6 +1487,67 @@ chk(els['modalhost'].innerHTML === '' && window.__quotaWarned === true,
 localStorage.setItem = setItemReal;
 save();
 
+/* =====================================================================
+   CADA SPLIT PROGRESA POR SU HILO (historial compartido)
+   ===================================================================== */
+suite('El coach ancla en la última sesión DEL split en contexto');
+resetDB();
+db.splits = [
+  { id:'sA', name:'A', active:true,  created:new Date().toISOString(), exconf:{} },
+  { id:'sB', name:'B', active:false, created:new Date().toISOString(), exconf:{ calf: { lo:6, hi:8, sets:1 } } }];
+db.routines = [
+  { id:'rA', name:'Pierna A', split:'sA', exercises:[{ id:'a', name:'Calf', key:'calf' }] },
+  { id:'rB', name:'Pierna B', split:'sB', exercises:[{ id:'b', name:'Calf', key:'calf' }] }];
+Object.assign(exMeta('calf'), { lo:15, hi:20, step:2 });
+/* historia: 16×15×2 en A (hace 4 días) y luego 18×6 en B (hace 2) */
+db.history.push({ id:'h1', routineId:'rA', routineName:'Pierna A',
+  date:new Date(Date.now() - 4*864e5).toISOString(), duration:60,
+  entries:[{ key:'calf', name:'Calf', sets:[S(16,15), S(16,15)] }] });
+db.history.push({ id:'h2', routineId:'rB', routineName:'Pierna B',
+  date:new Date(Date.now() - 2*864e5).toISOString(), duration:60,
+  entries:[{ key:'calf', name:'Calf', sets:[S(18,6)] }] });
+view = { name:'routine', id:'rA' };
+let sgg = computeSuggestion('calf');
+chk(sgg.w === 16 && sgg.sets === 2 && sgg.type === 'reps',
+    'en A ancla en SU 16×15: mismo 16 kg y 2 series — ya no «consolida 18»');
+view = { name:'routine', id:'rB' };
+sgg = computeSuggestion('calf');
+chk(sgg.w === 18 && sgg.sets === 1, 'y B sigue su propio hilo desde el 18×6');
+
+suite('Un mes en el otro split — sin castigo por pausa ni saltos de peso');
+/* A quedó hace 30 días; B se siguió entrenando (hace 2, ya en 30 kg) */
+db.history[0].date = new Date(Date.now() - 30*864e5).toISOString();
+db.history[1].entries[0].sets = [S(30,8)];
+view = { name:'routine', id:'rA' };
+sgg = computeSuggestion('calf');
+chk(sgg.type !== 'back', 'volver a A tras un mes NO descuenta por pausa: el movimiento siguió vivo en B');
+chk(sgg.w === 16, 'y retoma el hilo de A donde quedó (16 kg) — nunca salta a los 30 de B');
+view = { name:'routine', id:'rB' };
+chk(computeSuggestion('calf').w > 30 || computeSuggestion('calf').reps > 0, 'B sigue progresando desde sus 30');
+/* abandonado en TODOS los splits, la pausa sí aplica */
+db.history[1].date = new Date(Date.now() - 30*864e5 + 36e5).toISOString();
+view = { name:'routine', id:'rA' };
+chk(computeSuggestion('calf').type === 'back', 'un mes sin hacerlo en NINGÚN split → sí es vuelta tras pausa');
+
+suite('Hilos por split — bordes');
+/* primera vez en un split nuevo: usa el historial global, no arranca de cero */
+db.splits.push({ id:'sC', name:'C', active:false, created:new Date().toISOString(), exconf:{} });
+db.routines.push({ id:'rC', name:'Pierna C', split:'sC', exercises:[{ id:'c', name:'Calf', key:'calf' }] });
+view = { name:'routine', id:'rC' };
+let le = lastEntry('calf');
+chk(le !== null && le.entry.sets[0].w === 30, 'un split que nunca lo vio cae al hilo global (la sesión más reciente)');
+/* borrar la rutina de B: sus sesiones quedan sin split y solo alimentan el global */
+db.routines = db.routines.filter(r => r.id !== 'rB');
+view = { name:'routine', id:'rA' };
+chk(computeSuggestion('calf') !== null && lastEntry('calf').entry.sets[0].w === 16,
+    'borrada la rutina de B, el hilo de A sigue intacto y nada revienta');
+/* historial importado (sin routineId) se atribuye por nombre de rutina */
+db.history.push({ id:'h3', routineId:null, routineName:'Pierna A',
+  date:new Date().toISOString(), duration:60,
+  entries:[{ key:'calf', name:'Calf', sets:[S(17,15)] }] });
+chk(lastEntry('calf').entry.sets[0].w === 17, 'una sesión importada cuenta en el hilo del día con su nombre');
+view = { name:'home' };
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
