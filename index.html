@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.2.3';
+const APP_VERSION = '1.3.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -1395,6 +1395,7 @@ const ICON = {
   deload:'<path d="M12 5v14M12 19l-4-4M12 19l4-4"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   move:'<path d="M5 9h9M5 9l3-3M5 9l3 3M19 15h-9M19 15l-3-3M19 15l-3 3"/>',
+  edit:'<path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 7.5l3 3"/>',
 };
 function svgIcon(name){ return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name] || ''}</svg>`; }
 
@@ -1941,7 +1942,7 @@ function splitHeadHTML(){
       <div class="title sm">${esc(sp.name)}</div>
       <div class="tools">
         ${days.length > 1 ? `<button aria-label="Reordenar días" onclick="toggleSort()">${svgIcon('sort')}</button>` : ''}
-        <button aria-label="Renombrar" onclick="promptRenameSplit('${sp.id}')">${svgIcon('copy')}</button>
+        <button aria-label="Renombrar" onclick="promptRenameSplit('${sp.id}')">${svgIcon('edit')}</button>
         <button aria-label="Borrar split" onclick="deleteSplit('${sp.id}')">${svgIcon('trash')}</button>
       </div>
     </div>
@@ -2153,6 +2154,7 @@ function routineHeadHTML(){
     <div class="head-row">
       <div class="title sm">${esc(r.name)}</div>
       <div class="tools">
+        <button aria-label="Renombrar día" onclick="promptRenameRoutine('${r.id}')">${svgIcon('edit')}</button>
         ${r.exercises.length > 1 ? `<button aria-label="Reordenar ejercicios" onclick="toggleSort()">${svgIcon('sort')}</button>` : ''}
         ${db.splits.length > 1 ? `<button aria-label="Mover a otro split" onclick="promptMoveRoutine('${r.id}')">${svgIcon('move')}</button>` : ''}
         <button aria-label="Duplicar rutina" onclick="duplicateRoutine('${r.id}')">${svgIcon('copy')}</button>
@@ -3900,6 +3902,30 @@ function createRoutine(ev){
   }
   db.routines.push(r); save(); closeModal();
   go({name:'routine', id:r.id});
+}
+function promptRenameRoutine(id){
+  const r = db.routines.find(x => x.id === id);
+  if(!r) return;
+  openModal(`
+    <h2>Renombrar día</h2>
+    <p class="muted">Su historial y el progreso de sus ejercicios no se tocan.</p>
+    <form onsubmit="renameRoutine(event,'${id}')" class="stack" autocomplete="off">
+      <input type="text" id="routinename" value="${esc(r.name)}" autocomplete="off">
+      <button class="btn" type="submit">Guardar</button>
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+    </form>`);
+  setTimeout(() => document.getElementById('routinename')?.select(), 60);
+}
+function renameRoutine(ev, id){
+  ev.preventDefault();
+  const r = db.routines.find(x => x.id === id);
+  const v = document.getElementById('routinename').value.trim();
+  if(r && v){
+    r.name = v;
+    /* si justo es la sesión en curso, que la cabecera diga el nombre nuevo */
+    if(db.active && db.active.routineId === id) db.active.routineName = v;
+  }
+  save(); closeModal(); render();
 }
 function deleteRoutine(id){
   const r = db.routines.find(x => x.id === id);

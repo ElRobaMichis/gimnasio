@@ -1354,6 +1354,35 @@ setUnit('kg');
 chk(db.gym.plates.find(p => Math.abs(p.kg - 1.25) < 1e-9).on === false,
     'y tu edición sigue ahí al volver a kg');
 
+suite('Renombrar splits y días');
+resetDB();
+db.splits = [{ id:'s1', name:'PPL', active:true, created:new Date().toISOString() }];
+db.routines.push({ id:'ra', name:'Armas/Delts', split:'s1', exercises:[] });
+db.history.push({ id:'h1', routineId:'ra', routineName:'Armas/Delts',
+  date:new Date().toISOString(), duration:60, entries:[] });
+/* el caso real: el typo «Armas/Delts» */
+startSession('ra');
+document.getElementById('routinename').value = 'Arms/Delts';
+renameRoutine({ preventDefault(){} }, 'ra');
+chk(db.routines[0].name === 'Arms/Delts', 'el día se renombra: adiós «Armas»');
+chk(db.active.routineName === 'Arms/Delts', 'la sesión en curso adopta el nombre nuevo');
+chk(splitSessions('s1').length === 1, 'el historial no se desengancha: las sesiones van por id, no por nombre');
+db.active = null;
+/* el split también */
+document.getElementById('splitname').value = 'Arnold Split';
+renameSplit({ preventDefault(){} }, 's1');
+chk(db.splits[0].name === 'Arnold Split', 'el split se renombra');
+/* y los botones están donde se esperan, con el lápiz (no el icono de copiar) */
+const lapiz = 'M4 20l1-4L16 5l3 3L8 19l-4 1z';
+view = { name:'routine', id:'ra' };
+chk(routineHeadHTML().includes('promptRenameRoutine') && routineHeadHTML().includes(lapiz),
+    'la cabecera del día tiene su botón de renombrar con lápiz');
+view = { name:'split', id:'s1' };
+const cabSplit = splitHeadHTML();
+chk(cabSplit.includes('promptRenameSplit') && cabSplit.includes(lapiz),
+    'el del split ya no se disfraza de icono de duplicar');
+view = { name:'home' };
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
