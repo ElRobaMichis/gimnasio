@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -2845,6 +2845,21 @@ function refreshActiveSugg(key){
     ex.sugg = sg;
   }
 }
+/* convertir lo escrito a otra unidad SIN acumular error de redondeo:
+   la primera conversión fija el peso canónico en kg (st.wkg) y todas
+   las siguientes parten de ahí — 10 lb → 4,54 kg → 10 lb, no 10,01.
+   Re-escribir el peso borra el canónico (setVal), porque el número
+   nuevo es la verdad nueva. */
+function convertTypedW(st, uAntes, uAhora){
+  if(st.w === '' || st.w === undefined) return;
+  const n = parseFloat(st.w);
+  if(isNaN(n)) return;
+  let kg = parseFloat(st.wkg);
+  if(isNaN(kg)) kg = uAntes === 'lb' ? n * LB_KG : n;
+  st.wkg = kg;
+  const out = uAhora === 'lb' ? kg / LB_KG : kg;
+  st.w = String(Math.round(out * 100) / 100);
+}
 /* si el cambio mueve la unidad del ejercicio (una torre en libras), lo ya
    escrito en la sesión se convierte para que siga significando lo mismo */
 function withExChange(key, fn){
@@ -2852,13 +2867,9 @@ function withExChange(key, fn){
   fn();
   const ahora = exUnit(key);
   if(antes !== ahora && db.active){
-    const f = (ahora === 'lb') ? 1/LB_KG : LB_KG;
     for(const ex of db.active.exercises){
       if(ex.key !== key) continue;
-      for(const st of ex.sets){
-        const n = parseFloat(st.w);
-        if(st.w !== '' && st.w !== undefined && !isNaN(n)) st.w = String(Math.round(n * f * 100) / 100);
-      }
+      for(const st of ex.sets) convertTypedW(st, antes, ahora);
     }
   }
   refreshActiveSugg(key);
@@ -3292,11 +3303,7 @@ function setActiveGym(id){
     for(const ex of db.active.exercises){
       const ahora = exUnit(ex.key);
       if(antes[ex.key] && antes[ex.key] !== ahora){
-        const f = (ahora === 'lb') ? 1/LB_KG : LB_KG;
-        for(const st of ex.sets){
-          const n = parseFloat(st.w);
-          if(st.w !== '' && st.w !== undefined && !isNaN(n)) st.w = String(Math.round(n * f * 100) / 100);
-        }
+        for(const st of ex.sets) convertTypedW(st, antes[ex.key], ahora);
       }
       refreshActiveSugg(ex.key);
     }
@@ -3557,6 +3564,10 @@ function viewGym(){
       ${rows}
       <div class="hint">Los pares importan: si solo tienes un par de 20, la app no te propondrá cargar dos
         por lado. El <b>+</b> de arriba sirve para discos raros — fraccionales o viejos en libras.</div>
+      <button class="btn quiet sm" style="margin-top:14px" onclick="askResetGymKind('plates')">
+        Restaurar el juego estándar en ${uLabel()}</button>
+      <div class="hint">Para cuando la lista se creó en la otra unidad y todo se ve con decimales:
+        la rehace limpia en ${uLabel() === 'lb' ? 'libras' : 'kilos'}.</div>
       <div class="dock"><button class="btn" onclick="go({name:'settings'})">Listo</button></div>`;
   }
 
@@ -3579,6 +3590,8 @@ function viewGym(){
       ${rows}
       <div class="hint">Cada barra pesa distinto y eso cambia toda la cuenta. La multipower va aparte porque
         su barra guiada suele pesar otra cosa: si no sabes cuánto, déjala fuera.</div>
+      <button class="btn quiet sm" style="margin-top:14px" onclick="askResetGymKind('bars')">
+        Restaurar el juego estándar en ${uLabel()}</button>
       <div class="dock"><button class="btn" onclick="go({name:'settings'})">Listo</button></div>`;
   }
 
@@ -3616,6 +3629,20 @@ function viewGym(){
     </div>
     ${rows}
     <div class="dock"><button class="btn" onclick="go({name:'settings'})">Listo</button></div>`;
+}
+
+/* rehacer una lista con el juego estándar de la unidad actual: el remedio
+   para un inventario sembrado en la otra unidad (todo con decimales) */
+function askResetGymKind(kind){
+  const t = { plates:'los discos', bars:'las barras', dumbbells:'las mancuernas' }[kind];
+  confirmModal(`¿Restaurar ${t}?`,
+    `Se reemplaza la lista actual de este gimnasio por el juego estándar en
+     ${uLabel() === 'lb' ? 'libras' : 'kilos'}. Lo que agregaste o destildaste a mano se pierde.`,
+    'Restaurar', () => {
+      db.gym[kind] = defaultGym(db.settings.unit)[kind];
+      if(kind === 'plates') invalidatePlates();
+      save(); render();
+    }, true);
 }
 
 function toggleGym(kind, i){
@@ -4046,6 +4073,7 @@ function setVal(xi, si, field, val){
   const st = db.active.exercises[xi].sets[si];
   const wasEmpty = (st[field] === '' || st[field] === undefined);
   st[field] = val;
+  if(field === 'w') delete st.wkg;   /* el número nuevo es la verdad nueva */
   db.active.lastLog = Date.now();
   save();
   updateVsChip(xi);
@@ -4316,7 +4344,11 @@ function collectEntries(s){
     const sets = ex.sets.map(st => {
       let w = parseFloat(st.w);
       if(isNaN(w) && corp && st.r !== '' && st.r !== undefined) w = 0;  /* corporal/tiempo: peso en blanco = 0 */
-      if(!isNaN(w)) w = Math.round(toKgEx(ex.key, w)*1000)/1000;        /* lo escrito está en la unidad de esa máquina → kg */
+      /* si hubo conversiones de unidad, mandan los kg canónicos: así el
+         historial no hereda el redondeo de la pantalla (10 lb, no 10,01) */
+      const canon = parseFloat(st.wkg);
+      if(!isNaN(w)) w = !isNaN(canon) ? Math.round(canon*1000)/1000
+                                      : Math.round(toKgEx(ex.key, w)*1000)/1000;
       const r = parseInt(st.r,10);
       const out = { w, r };
       const rir = parseInt(st.rir,10);
@@ -4463,15 +4495,9 @@ function setUnit(u){
   if(db.settings.unit === u) return;
   /* convertir lo ya escrito en la sesión activa (estaba en la unidad anterior) */
   if(db.active){
-    const f = (u === 'lb') ? 1/LB_KG : LB_KG;
     for(const ex of db.active.exercises){
       if(pinnedUnit(ex.key)) continue;   /* esa torre tiene su propia unidad */
-      for(const st of ex.sets){
-        const n = parseFloat(st.w);
-        if(st.w !== '' && st.w !== undefined && !isNaN(n)){
-          st.w = String(Math.round(n * f * 100) / 100);
-        }
-      }
+      for(const st of ex.sets) convertTypedW(st, db.settings.unit, u);
     }
   }
   db.settings.unit = u;

@@ -1263,6 +1263,72 @@ chk(sessionHeadHTML().includes('Mi gimnasio'), 'con un solo gimnasio el botón s
 chk(sessionHeadHTML().includes('gymPickerModal'), 'y abre el selector, que tiene «Nuevo gimnasio» a un toque');
 db.active = null;
 
+/* =====================================================================
+   UNIDADES SIN DERIVA: kg → lb → kg tiene que volver exacto
+   ===================================================================== */
+suite('Unidades — ida y vuelta sin deriva (lo que reportó la pareja)');
+resetDB();
+db.gyms = [normGym({ name:'Mi gimnasio', unit:'lb' }, 'lb')];
+db.settings.gymId = db.gyms[0].id;
+invalidatePlates();
+db.settings.unit = 'lb';
+db.routines.push({ id:'r1', name:'T', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Curl', key:'curl' }] });
+startSession('r1');
+setVal(0, 0, 'w', '10'); setVal(0, 0, 'r', '10');
+setUnit('kg');
+chk(db.active.exercises[0].sets[0].w === '4.54', '10 lb escritas se ven como 4,54 kg');
+setUnit('lb');
+chk(db.active.exercises[0].sets[0].w === '10', 'y de vuelta son 10 lb exactas (antes quedaban 10,01)');
+setUnit('kg'); setUnit('lb'); setUnit('kg'); setUnit('lb');
+chk(db.active.exercises[0].sets[0].w === '10', 'ni con varias vueltas seguidas se degrada');
+/* re-escribir el peso actualiza el canónico */
+setVal(0, 0, 'w', '12');
+setUnit('kg');
+chk(db.active.exercises[0].sets[0].w === '5.44', 'un valor re-escrito parte de cero: 12 lb → 5,44 kg');
+setUnit('lb');
+chk(db.active.exercises[0].sets[0].w === '12', 'y también regresa exacto');
+/* guardar viendo la otra unidad ya no contamina el historial */
+setUnit('kg');
+finishSession();
+setUnit('lb');
+chk(fmtW(db.history[db.history.length-1].entries[0].sets[0].w) === '12',
+    'guardado viendo kg, el historial en lb dice 12 — no 12,01');
+
+/* torre de placas: el mismo arreglo al alternar la unidad de la máquina */
+startSession('r1');
+setVal(0, 0, 'w', '10');
+exMeta('curl').equip = 'placas';
+setExStack('curl', 'unit', 'kg');
+chk(db.active.exercises[0].sets[0].w === '4.54', 'la torre pasa a kg y lo escrito se convierte');
+setExStack('curl', 'unit', 'lb');
+chk(db.active.exercises[0].sets[0].w === '10', 'torre de vuelta a lb: exacto, sin 10,01');
+db.active = null;
+exMeta('curl').equip = null;
+exMeta('curl').stack = { unit:null, step:null, start:null };
+
+suite('Unidades — el inventario no se corrompe: solo cambia el lente');
+setUnit('kg');
+db.gym.plates = [10, 20, 2.5, 5].map(kg => ({ kg, pairs:2, on:true }));
+invalidatePlates();
+setUnit('lb'); setUnit('kg');
+chk(db.gym.plates.map(p => p.kg).join(',') === '10,20,2.5,5',
+    'alternar unidades jamás reescribe los discos guardados');
+/* los decimales que vio la pareja: inventario SEMBRADO en libras, visto en kilos */
+db.gym.plates = defaultGym('lb').plates;
+invalidatePlates();
+chk(fmtW(db.gym.plates[0].kg) === '20,41',
+    'un juego sembrado en lb se ve con decimales en kg (un disco de 45 lb SON 20,41 kg): no es corrupción');
+/* y su remedio: restaurar el juego estándar en la unidad actual */
+window.__confirmFn = null;
+askResetGymKind('plates');
+window.__confirmFn();
+chk(db.gym.plates.map(p => p.kg).join(',') === '25,20,15,10,5,2.5,1.25',
+    'restaurar deja el juego estándar limpio en kg');
+askResetGymKind('bars');
+window.__confirmFn();
+chk(db.gym.bars.find(b => b.def).kg === 20, 'las barras también se restauran (olímpica de 20 kg)');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
