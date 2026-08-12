@@ -1383,6 +1383,104 @@ chk(cabSplit.includes('promptRenameSplit') && cabSplit.includes(lapiz),
     'el del split ya no se disfraza de icono de duplicar');
 view = { name:'home' };
 
+/* =====================================================================
+   CONFIG POR SPLIT: el mismo ejercicio, reglas distintas por plan
+   ===================================================================== */
+suite('Config por split — rango, series y descanso propios');
+resetDB();
+db.splits = [
+  { id:'sh', name:'Hipertrofia', active:true,  created:new Date().toISOString(), exconf:{} },
+  { id:'sf', name:'Fuerza',      active:false, created:new Date().toISOString(), exconf:{} }];
+db.routines = [
+  { id:'rh', name:'Torso H', split:'sh', exercises:[{ id:'a', name:'Banca', key:'banca' }] },
+  { id:'rf', name:'Torso F', split:'sf', exercises:[{ id:'b', name:'Banca', key:'banca' }] }];
+/* en el split de fuerza: 4–6 reps, 2 series y 4:00 de descanso */
+db.splits[1].exconf['banca'] = { lo:4, hi:6, sets:2, rest:240 };
+sess('banca', [S(60,6), S(60,6), S(60,6)]);   /* historial COMPARTIDO: 60×6 */
+
+view = { name:'routine', id:'rh' };
+chk(effRange('banca').lo === 8 && effRange('banca').hi === 12, 'en hipertrofia rige lo general (8–12)');
+let sg = computeSuggestion('banca');
+chk(sg.type === 'hold' && sg.sets === 3, 'con 6 reps ahí toca consolidar, en sus 3 series');
+chk(restSecs('banca') === 90, 'y descansar 1:30 (el general de hipertrofia)');
+
+view = { name:'routine', id:'rf' };
+chk(effRange('banca').lo === 4 && effRange('banca').hi === 6, 'en fuerza rigen SUS 4–6');
+sg = computeSuggestion('banca');
+chk(sg.type === 'up', 'las MISMAS 6 reps ahí son tope del rango → subir peso');
+chk(sg.sets === 2, 'en las 2 series fijadas de ese split');
+chk(restSecs('banca') === 240, 'con su descanso de 4:00');
+chk(exMeta('banca').lo == null && exMeta('banca').hi == null,
+    'todo sin tocar la config general del ejercicio');
+
+suite('Config por split — la sesión manda sobre el split en curso');
+startSession('rf');                /* sesión del split de fuerza… */
+activateSplit('sh');               /* …y a media sesión pones en curso el otro */
+chk(effRange('banca').hi === 6, 'la sesión sigue rigiéndose por SU split (fuerza), no por el activo');
+db.active.exercises[0].sets[0] = { w:'62.5', r:'6', rir:'' };
+finishSession();
+chk(prog('banca').fail === 0,
+    'al guardar, 6 reps se juzgan con el rango de fuerza (éxito) — no con el 8–12 del split activo');
+view = { name:'home' };
+chk(effRange('banca').hi === 12, 'sin sesión, vuelve a mandar el split en curso');
+
+suite('Config por split — sobrevive, viaja y muere con su split');
+chk(db.splits.find(x => x.id === 'sf').exconf['banca'].lo === 4,
+    'cambiar de split en curso no toca la config: vive en su split');
+/* copiar un día a otro split lleva su config, sin pisar la del destino */
+db.splits.push({ id:'s2', name:'Nuevo', active:false, created:new Date().toISOString(), exconf:{} });
+window.__moveTo = 's2'; window.__moveCopy = true;
+doMoveRoutine('rf');
+chk(db.splits.find(x => x.id === 's2').exconf['banca'].hi === 6,
+    'copiar el día lleva la config de sus ejercicios al split destino');
+/* borrar el split se lleva su config; lo general queda intacto */
+window.__confirmFn = null;
+deleteSplit('sf');
+window.__confirmFn();
+view = { name:'home' };
+chk(!db.splits.some(x => x.id === 'sf'), 'el split de fuerza se borra');
+chk(effRange('banca').hi === 12 && exMeta('banca').lo == null,
+    'banca vuelve a lo general, que nunca se tocó');
+
+/* los inputs de la ficha escriben en el split del contexto */
+view = { name:'exercise', key:'banca', exname:'Banca', rid:'rh' };
+chk(viewExercise().includes('Solo en este split'), 'la ficha muestra la sección por split (hay 2 splits)');
+setSplitConf('banca', 'sets', '2');
+chk(db.splits.find(x => x.id === 'sh').exconf['banca'].sets === 2, 'escribe en el split de la rutina de origen');
+setSplitConf('banca', 'sets', '');
+chk(!db.splits.find(x => x.id === 'sh').exconf['banca'], 'en blanco, la config vacía se limpia sola');
+view = { name:'home' };
+
+/* series fijadas: el coach no suma la serie extra por estancamiento */
+resetDB();
+db.splits = [{ id:'s1', name:'A', active:true, created:new Date().toISOString(),
+  exconf:{ curl: { sets:2 } } }];
+const planas = [S(30,9), S(30,9)];
+sess('curl', planas); sess('curl', planas); sess('curl', planas); sess('curl', planas);
+sg = computeSuggestion('curl');
+chk(db.progress['curl'].stall >= 3 && sg.sets === 2,
+    'estancado 3+ sesiones, pero las 2 series fijadas se respetan: sin serie extra');
+
+suite('Almacenamiento — tamaño real y cuota');
+/* la cuota típica de localStorage es ~5 MB por sitio; medir lo que ocupa todo */
+const kb = JSON.stringify(db).length / 1024;
+chk(kb < 5000, `los datos actuales ocupan ${Math.round(kb)} KB: sobra sitio (cuota ~5 MB)`);
+chk(viewSettings().includes(' KB'), 'ajustes muestra cuánto ocupan tus datos');
+/* si el navegador rechazara la escritura, la app no revienta y avisa UNA vez */
+const setItemReal = localStorage.setItem;
+localStorage.setItem = () => { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; };
+window.__quotaWarned = false;
+let exploto = false;
+try{ save(); }catch(e){ exploto = true; }
+chk(!exploto, 'save() sobrevive a un QuotaExceededError sin reventar');
+chk(els['modalhost'].innerHTML.includes('No se pudo guardar'), 'y avisa que descargues respaldo');
+els['modalhost'].innerHTML = '';
+save();
+chk(els['modalhost'].innerHTML === '' && window.__quotaWarned === true,
+    'el aviso sale una sola vez, no en cada tecla');
+localStorage.setItem = setItemReal;
+save();
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -668,6 +668,8 @@ function normalize(d){
     for(const r of huerfanas) r.split = sp.id;
   }
   if(d.splits.length && !d.splits.some(sp => sp.active)) d.splits[0].active = true;
+  /* config por split: reglas propias de un ejercicio dentro de ese plan */
+  for(const sp of d.splits) if(!sp.exconf || typeof sp.exconf !== 'object') sp.exconf = {};
 
   /* gimnasios: cada uno guarda su equipo, su unidad y la config de sus
      máquinas. El único d.gym de la 1.0 pasa a ser el primero de la lista. */
@@ -714,7 +716,21 @@ function load(){
   }catch(e){}
   return normalize(null);
 }
-function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+function save(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(db));
+  }catch(e){
+    /* la cuota (~5 MB) equivale a décadas de sesiones, pero si el navegador
+       rechaza la escritura que no sea en silencio: sin guardar, todo lo que
+       hagas se esfuma al cerrar */
+    if(!window.__quotaWarned){
+      window.__quotaWarned = true;
+      infoModal('No se pudo guardar', `El navegador rechazó la escritura (¿almacenamiento lleno?).
+        Descarga un respaldo desde Ajustes ahora mismo y libera espacio del sitio; sin espacio,
+        lo que registres se pierde al cerrar la app.`);
+    }
+  }
+}
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function exKey(name){
@@ -808,7 +824,8 @@ function guessMuscle(name){
 function effRange(key){
   const m = exMeta(key);
   const g = m.type === 'tiempo' ? TIEMPO_RANGE : goalRange();
-  let lo = parseInt(m.lo,10), hi = parseInt(m.hi,10);
+  const oc = splitConf(key) || {};   /* el split en contexto puede pisar el rango */
+  let lo = parseInt(oc.lo ?? m.lo, 10), hi = parseInt(oc.hi ?? m.hi, 10);
   if(isNaN(lo) || lo < 1) lo = g.lo;
   if(isNaN(hi) || hi < 1) hi = g.hi;
   if(hi <= lo) hi = lo + 1;
@@ -1166,7 +1183,7 @@ function computeSuggestion(key){
         msg:`Vuelta tras ~${weeks} semanas: <b>${fmtWEx(key, nw)} ${uLabelEx(key)} × ${lo}</b> (~${Math.round((1-factor)*100)} % menos)`,
         why:`Llevas ${gapDays} días sin hacer este ejercicio y la fuerza cae un poco con la pausa. Arranca más liviano — en 1–2 sesiones estás de vuelta en ${fmtWEx(key, w)} ${uLabelEx(key)}. Esto evita lesiones y agujetas brutales.` };
     }
-    back.sets = Math.max(1, nSets - (gapDays >= 28 ? 1 : 0));
+    back.sets = splitSetsOverride(key) || Math.max(1, nSets - (gapDays >= 28 ? 1 : 0));
     return back;
   }
 
@@ -1283,15 +1300,18 @@ function computeSuggestion(key){
   }
 
   fitSuggestion(key, sugg);
-  sugg.sets = nSets;
-  if(p.stall >= 3 && nSets < MAX_SETS_SUGG && sugg.type !== 'up' && sugg.type !== 'deload'){
+  /* series fijadas en el split: mandan sobre el conteo del historial y
+     desactivan los ajustes automáticos de volumen (serie extra, concentrar) */
+  const fixedSets = splitSetsOverride(key);
+  sugg.sets = fixedSets || nSets;
+  if(!fixedSets && p.stall >= 3 && nSets < MAX_SETS_SUGG && sugg.type !== 'up' && sugg.type !== 'deload'){
     sugg.sets = nSets + 1;
     sugg.msg += ` · y suma una serie extra (${nSets + 1} en total)`;
     sugg.why = `Varias sesiones sin avanzar: más volumen semanal también genera progreso (con retornos decrecientes). ` + sugg.why;
   }
   /* consolidación de series: 5+ series del mismo ejercicio rinden poco por sesión
      (Pelland 2025 per-session: retornos decrecientes fuertes tras 3-4 series) */
-  if(nSets >= 5 && meta.type === 'normal'){
+  if(!fixedSets && nSets >= 5 && meta.type === 'normal'){
     const target = Math.max(3, nSets - 2);
     const flat = (maxR - minAll) <= 1;   /* reps casi idénticas en todas → mucha reserva */
     let nwC = 0;
@@ -1692,6 +1712,42 @@ function dismissRIR(){
    el progreso vive en el ejercicio, no en la rutina.
    ===================================================================== */
 function activeSplit(){ return db.splits.find(s => s.active) || db.splits[0] || null; }
+
+/* ---------- configuración por split ----------
+   El mismo ejercicio puede pedir otra cosa en cada plan: 8–12 reps en el
+   split de hipertrofia y 4–6 con menos series en el de fuerza. Lo fijado
+   aquí vive en el split (sp.exconf[key]) y solo pisa lo general. */
+let ctxSplitOverride = null;   /* para juzgar la progresión con el split correcto al guardar */
+function ctxSplitId(){
+  if(ctxSplitOverride) return ctxSplitOverride;
+  /* una sesión en curso manda: su rutina dice de qué split es */
+  if(db.active){
+    const r = db.routines.find(x => x.id === db.active.routineId);
+    if(r && r.split) return r.split;
+  }
+  /* viendo una rutina, o la ficha de un ejercicio abierta desde una */
+  if(view && view.name === 'routine' && view.id){
+    const r = db.routines.find(x => x.id === view.id);
+    if(r && r.split) return r.split;
+  }
+  if(view && view.name === 'exercise' && view.rid){
+    const r = db.routines.find(x => x.id === view.rid);
+    if(r && r.split) return r.split;
+  }
+  const sp = activeSplit();
+  return sp ? sp.id : null;
+}
+function splitConf(key){
+  const id = ctxSplitId();
+  const sp = id && db.splits.find(x => x.id === id);
+  return (sp && sp.exconf && sp.exconf[key]) || null;
+}
+/* series fijadas para este split, o null para dejar decidir al coach */
+function splitSetsOverride(key){
+  const oc = splitConf(key);
+  const n = oc ? parseInt(oc.sets, 10) : NaN;
+  return (!isNaN(n) && n >= 1) ? Math.min(10, n) : null;
+}
 function splitRoutines(id){ return db.routines.filter(r => r.split === id); }
 /* a qué día pertenece una sesión: manda el id, y el nombre solo se usa
    cuando no lo hay (historial viejo o importado). Si no, dos días con el
@@ -2021,7 +2077,7 @@ function createSplit(ev){
   ev.preventDefault();
   const name = document.getElementById('newsplit').value.trim();
   if(!name) return;
-  const sp = { id:uid(), name, active:true, created:new Date().toISOString() };
+  const sp = { id:uid(), name, active:true, created:new Date().toISOString(), exconf:{} };
   db.splits.forEach(x => { x.active = false; });
   db.splits.push(sp);
   save(); closeModal(); go({name:'home'});
@@ -2119,10 +2175,20 @@ function pickMoveMode(copy){
   const list = document.getElementById('movemode');
   if(list) for(const b of list.querySelectorAll('button')) b.classList.toggle('on', b.dataset.copy === String(copy));
 }
+/* al mover o copiar un día, su config por split lo acompaña (sin pisar la del destino) */
+function carryExconf(r, fromId, toId){
+  const from = db.splits.find(x => x.id === fromId), to = db.splits.find(x => x.id === toId);
+  if(!from || !to || !from.exconf) return;
+  if(!to.exconf || typeof to.exconf !== 'object') to.exconf = {};
+  for(const ex of r.exercises)
+    if(from.exconf[ex.key] && !to.exconf[ex.key])
+      to.exconf[ex.key] = JSON.parse(JSON.stringify(from.exconf[ex.key]));
+}
 function doMoveRoutine(rid){
   const r = db.routines.find(x => x.id === rid);
   const to = window.__moveTo;
   if(!r || !to) return;
+  carryExconf(r, r.split, to);
   if(window.__moveCopy){
     const copia = { id:uid(), name:r.name, split:to,
                     exercises:r.exercises.map(e => ({ id:uid(), name:e.name, key:e.key })) };
@@ -2412,6 +2478,48 @@ function viewExercise(){
           : 'El salto mínimo es el aumento más pequeño posible en tu gimnasio.'; })() }
       Si marcas el peso máximo, al alcanzarlo el coach progresa por reps y series en vez de pedirte kilos imposibles.</div>
 
+    ${ (() => {
+      if(db.splits.length < 2) return '';
+      const spId = ctxSplitId(), sp = db.splits.find(x => x.id === spId);
+      if(!sp) return '';
+      const oc = (sp.exconf || {})[key] || {};
+      const phLo = meta.lo ?? (porTiempo ? TIEMPO_RANGE.lo : g.lo);
+      const phHi = meta.hi ?? (porTiempo ? TIEMPO_RANGE.hi : g.hi);
+      return `
+      <div class="sect">Solo en este split — ${esc(sp.name)}</div>
+      <div class="list">
+        <div class="line">
+          <div class="l-t">${porTiempo ? 'Rango de segundos' : 'Rango de reps'}</div>
+          <div class="l-v">
+            <input type="number" inputmode="numeric" min="1" placeholder="${phLo}"
+              value="${oc.lo ?? ''}" aria-label="Mínimo en este split" oninput="setSplitConf('${key}','lo',this.value)">
+            <span style="color:var(--dim)">–</span>
+            <input type="number" inputmode="numeric" min="2" placeholder="${phHi}"
+              value="${oc.hi ?? ''}" aria-label="Máximo en este split" oninput="setSplitConf('${key}','hi',this.value)">
+          </div>
+        </div>
+        <div class="line">
+          <div><div class="l-t">Series</div><div class="l-d">Cuántas te propone el coach en este split</div></div>
+          <div class="l-v">
+            <input type="number" inputmode="numeric" min="1" max="10" placeholder="auto" style="width:52px"
+              value="${oc.sets ?? ''}" aria-label="Series en este split" oninput="setSplitConf('${key}','sets',this.value)">
+          </div>
+        </div>
+        <div class="line">
+          <div class="l-t">Descanso</div>
+          <div class="l-v"><select class="inline" onchange="setSplitConf('${key}','rest',this.value)">
+            <option value="auto" ${oc.rest == null ? 'selected' : ''}>El general</option>
+            ${[45,60,90,120,150,180,240].map(s => `
+              <option value="${s}" ${String(oc.rest)===String(s)?'selected':''}>${fmtClock(s)}</option>`).join('')}
+          </select></div>
+        </div>
+      </div>
+      <div class="hint">En blanco se usa lo general de arriba. Esto vive en <b>${esc(sp.name)}</b>: el mismo
+        ejercicio en tu otro split usa su propia configuración — así conviven un plan de fuerza
+        (4–6 reps, pocas series) y uno de hipertrofia (8–12) sin pisarse. Con las series fijadas,
+        el coach tampoco te sumará series extra por estancamiento aquí.</div>`;
+    })() }
+
     <div class="sect">Otra máquina</div>
     <button class="btn quiet sm" onclick="promptDuplicateEx('${key}', '${esc(view.exname).replace(/'/g, "\\'")}')">
       Duplicar para otra máquina</button>
@@ -2594,6 +2702,19 @@ function stepOptionsHTML(cur){
   }
   if(!matched) html += `<option value="${cur}" selected>Actual: ${fmtW(cur)} ${uLabel()}</option>`;
   return html;
+}
+/* escribir la config por split del ejercicio (rango, series, descanso) */
+function setSplitConf(key, field, val){
+  const sp = db.splits.find(x => x.id === ctxSplitId());
+  if(!sp) return;
+  if(!sp.exconf || typeof sp.exconf !== 'object') sp.exconf = {};
+  const oc = sp.exconf[key] || (sp.exconf[key] = {});
+  const v = parseInt(val, 10);
+  if(val === '' || val === 'auto' || isNaN(v) || v < 1) delete oc[field];
+  else oc[field] = v;
+  if(!Object.keys(oc).length) delete sp.exconf[key];
+  refreshActiveSugg(key);
+  save();
 }
 function setExNotes(key, val){ exMeta(key).notes = val.slice(0,300); save(); }
 function setExRest(key, val){
@@ -3849,7 +3970,7 @@ function viewSettings(){
     <div class="sect">Tus datos</div>
     <div class="line">
       <div><div class="l-t">Respaldo</div><div class="l-d">${dsb === null ? 'Nunca' : `Último hace ${dsb} día${dsb===1?'':'s'}`} · viven solo en este navegador</div></div>
-      <div class="l-v dim">.json</div>
+      <div class="l-v dim">${Math.max(1, Math.round(JSON.stringify(db).length / 1024))} KB</div>
     </div>
     <button class="line" onclick="exportBackup()">
       <div class="l-t">Descargar respaldo</div>
@@ -4493,7 +4614,14 @@ function finishSession(){
   showUpdateToast();   /* si había una actualización esperando, ya puede salir */
   releaseWake();
   save();
-  if(!isDeload) for(const e of entries) updateProgress(e.key, e.sets, rec.date);
+  if(!isDeload){
+    /* la progresión se juzga con las reglas del split de ESTA sesión,
+       aunque hayas cambiado el split en curso antes de terminar */
+    const rr = db.routines.find(x => x.id === rec.routineId);
+    ctxSplitOverride = (rr && rr.split) || null;
+    for(const e of entries) updateProgress(e.key, e.sets, rec.date);
+    ctxSplitOverride = null;
+  }
   closeModal();
   if(isDeload){
     openModal(`
@@ -4697,7 +4825,10 @@ function showWarmup(xi){
 function restSecs(key){
   const r = db.settings.rest;
   if(r === 'off') return null;
-  if(key){                       /* descanso propio del ejercicio, si lo configuró */
+  if(key){                       /* descanso del split en contexto, o el propio del ejercicio */
+    const oc = splitConf(key);
+    const sr = oc ? parseInt(oc.rest, 10) : NaN;
+    if(!isNaN(sr) && sr > 0) return sr;
     const er = parseInt(exMeta(key).rest, 10);
     if(!isNaN(er) && er > 0) return er;
   }
@@ -5266,6 +5397,11 @@ function migrateTypes(){
 
 /* ---------- arranque ---------- */
 (function init(){
+  /* pedir almacenamiento persistente: sin esto, el navegador puede purgar
+     los datos del sitio si anda corto de espacio — y aquí viven tus marcas */
+  try{
+    if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  }catch(e){}
   /* PWA: registrar el service worker para funcionar sin conexión */
   const seguro = location.protocol === 'https:' || location.hostname === 'localhost';
   if('serviceWorker' in navigator && seguro){
