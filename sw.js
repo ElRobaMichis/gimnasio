@@ -15,7 +15,7 @@
    tardara dos arranques en verse: el primero servía la vieja y dejaba
    la nueva lista para el siguiente. */
 /* va siempre igual que APP_VERSION en index.html — hay un test que lo verifica */
-const CACHE = 'hierro-1.5.0';
+const CACHE = 'hierro-1.6.0';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const ASSETS = [
   './',

@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -2002,7 +2002,12 @@ function viewSplits(){
         en Torso y ahora está en Push, llega con su historial, su récord y la sugerencia del coach
         exactamente donde la dejaste.</div>
     </div>
-    <div style="margin-top:4px"><button class="btn ghost" onclick="promptNewSplit()">Nuevo split</button></div>`;
+    <div style="margin-top:4px"><button class="btn ghost" onclick="promptNewSplit()">Nuevo split</button></div>
+    <div style="margin-top:9px"><button class="btn ghost" onclick="document.getElementById('splitfile').click()">Importar un split (.json)</button></div>
+    <input type="file" id="splitfile" accept=".json,application/json" style="display:none"
+      onchange="importSplitFile(this.files[0]); this.value=''">
+    <div class="hint">El .json de un split se comparte desde su ficha (la flecha de descarga). Trae los días,
+      los ejercicios y su configuración — ideal para pasarle tu plan a alguien más.</div>`;
 }
 
 function splitHeadHTML(){
@@ -2018,6 +2023,7 @@ function splitHeadHTML(){
       <div class="tools">
         ${days.length > 1 ? `<button aria-label="Reordenar días" onclick="toggleSort()">${svgIcon('sort')}</button>` : ''}
         <button aria-label="Renombrar" onclick="promptRenameSplit('${sp.id}')">${svgIcon('edit')}</button>
+        <button aria-label="Compartir split (.json)" onclick="exportSplit('${sp.id}')">${svgIcon('down')}</button>
         <button aria-label="Borrar split" onclick="deleteSplit('${sp.id}')">${svgIcon('trash')}</button>
       </div>
     </div>
@@ -2124,6 +2130,115 @@ function renameSplit(ev, id){
   if(sp && v) sp.name = v;
   save(); closeModal(); render();
 }
+/* ---------- compartir splits completos ----------
+   El perfil lleva el plan entero: días en orden, ejercicios de cada día,
+   la configuración general de cada ejercicio (tipo, rango, equipo, torre…)
+   y la config por split (series, rango, descanso). No lleva historial. */
+function splitProfile(id){
+  const sp = db.splits.find(x => x.id === id);
+  if(!sp) return null;
+  const days = splitRoutines(id).map(r => ({
+    name: r.name,
+    exercises: r.exercises.map(e => ({ name: e.name, key: e.key })),
+  }));
+  const keys = new Set(days.flatMap(d => d.exercises.map(e => e.key)));
+  const exmeta = {}, exconf = {};
+  for(const k of keys){
+    if(db.exmeta[k]) exmeta[k] = JSON.parse(JSON.stringify(db.exmeta[k]));
+    if(sp.exconf && sp.exconf[k]) exconf[k] = JSON.parse(JSON.stringify(sp.exconf[k]));
+  }
+  return { app:'hierro', kind:'split', version:APP_VERSION,
+    split:{ name:sp.name, days, exconf, exmeta } };
+}
+function exportSplit(id){
+  const prof = splitProfile(id);
+  if(!prof) return;
+  const slug = prof.split.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'plan';
+  const blob = new Blob([JSON.stringify(prof)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hierro-split-${slug}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+function importSplitFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => infoModal('No se pudo leer el archivo', 'Vuelve a intentarlo.');
+  reader.onload = () => {
+    try{
+      const d = JSON.parse(String(reader.result));
+      if(!d || d.kind !== 'split' || !d.split || typeof d.split !== 'object') throw new Error('estructura');
+      confirmSplitImport(d);
+    }catch(e){
+      infoModal('Archivo no válido', 'No parece un split de Hierro (el .json que se comparte desde la ficha de un split).');
+    }
+  };
+  reader.readAsText(file);
+}
+function confirmSplitImport(d){
+  window.__splitImport = d;
+  const days = Array.isArray(d.split.days) ? d.split.days : [];
+  const nEx = days.reduce((a, x) => a + ((x && Array.isArray(x.exercises)) ? x.exercises.length : 0), 0);
+  confirmModal(`¿Agregar el split “${esc(d.split.name || 'Sin nombre')}”?`,
+    `Trae ${days.length} día${days.length===1?'':'s'} con ${nEx} ejercicio${nEx===1?'':'s'} y su configuración.
+     Se agrega como un split más y se pone en curso; el tuyo pasa a guardados y nada se borra.
+     Los ejercicios que ya conoces conservan TU configuración y tu progreso.`,
+    'Agregar y ponerlo en curso', applySplitImport, true);
+}
+function applySplitImport(){
+  const d = window.__splitImport;
+  window.__splitImport = null;
+  if(!d || !d.split || typeof d.split !== 'object') return;
+  const src = d.split;
+  const sp = { id:uid(), name:String(src.name || 'Split importado').slice(0,80),
+               active:true, created:new Date().toISOString(), exconf:{} };
+  /* config por split: solo campos conocidos y con números válidos */
+  if(src.exconf && typeof src.exconf === 'object'){
+    for(const k in src.exconf){
+      const o = src.exconf[k] || {}, out = {};
+      for(const f of ['lo','hi','sets','rest']){
+        const v = parseInt(o[f], 10);
+        if(!isNaN(v) && v >= 1) out[f] = v;
+      }
+      if(Object.keys(out).length) sp.exconf[k] = out;
+    }
+  }
+  db.splits.forEach(x => { x.active = false; });
+  db.splits.push(sp);
+  for(const day of (Array.isArray(src.days) ? src.days : [])){
+    if(!day || typeof day !== 'object') continue;
+    const exs = (Array.isArray(day.exercises) ? day.exercises : [])
+      .filter(e => e && typeof e.name === 'string' && e.name.trim())
+      .map(e => {
+        const name = e.name.trim().slice(0,120);
+        return { id:uid(), name, key:exKey(name) };   /* la clave se recalcula: nunca se confía en la del archivo */
+      });
+    db.routines.push({ id:uid(), name:String(day.name || 'Día').slice(0,80), split:sp.id, exercises:exs });
+  }
+  /* los ejercicios NUEVOS llegan con toda su configuración; en los que ya
+     conoces manda la tuya (tu máquina, tu tipo, tus notas) */
+  if(src.exmeta && typeof src.exmeta === 'object'){
+    for(const k in src.exmeta){
+      if(db.exmeta[k]) continue;
+      const o = src.exmeta[k];
+      if(!o || typeof o !== 'object') continue;
+      const m = exMeta(k);
+      for(const f of ['type','lo','hi','step','rest','muscle','notes','equip','points','base','bar','cap'])
+        if(o[f] !== undefined) m[f] = o[f];
+      if(o.stack && typeof o.stack === 'object')
+        m.stack = { unit:o.stack.unit ?? null, step:o.stack.step ?? null, start:o.stack.start ?? null };
+      if(!TYPE_LABEL.hasOwnProperty(String(m.type))) m.type = 'normal';
+      if(m.equip != null && !EQUIP[m.equip]) m.equip = guessEquip(k);
+      m.notes = String(m.notes || '').slice(0,300);
+    }
+  }
+  save();
+  go({name:'home'});
+}
+
 function deleteSplit(id){
   const sp = db.splits.find(x => x.id === id);
   if(!sp) return;
@@ -5079,8 +5194,9 @@ function importBackup(file){
   reader.onload = () => {
     try{
       const d = JSON.parse(String(reader.result));
-      /* si es un perfil de gimnasio compartido, se importa como gimnasio */
+      /* si es un perfil compartido (gimnasio o split), se importa como tal */
       if(d && d.kind === 'gimnasio' && d.gym && typeof d.gym === 'object'){ confirmGymImport(d); return; }
+      if(d && d.kind === 'split' && d.split && typeof d.split === 'object'){ confirmSplitImport(d); return; }
       if(!d || !Array.isArray(d.routines) || !Array.isArray(d.history)) throw new Error('estructura');
       window.__backup = d;
       confirmModal('¿Restaurar este respaldo?',

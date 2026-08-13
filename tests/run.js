@@ -1548,6 +1548,65 @@ db.history.push({ id:'h3', routineId:null, routineName:'Pierna A',
 chk(lastEntry('calf').entry.sets[0].w === 17, 'una sesión importada cuenta en el hilo del día con su nombre');
 view = { name:'home' };
 
+/* =====================================================================
+   COMPARTIR SPLITS COMPLETOS
+   ===================================================================== */
+suite('Compartir splits — exportar el plan entero');
+resetDB();
+db.splits = [{ id:'s1', name:'PPL de regalo', active:true, created:new Date().toISOString(),
+  exconf:{ 'lateral raise': { lo:12, hi:20, sets:4 } } }];
+db.routines = [
+  { id:'r1', name:'Push', split:'s1', exercises:[
+    { id:'a', name:'Bench Press (Barbell)', key:'bench press (barbell)' },
+    { id:'b', name:'Lateral Raise', key:'lateral raise' }] },
+  { id:'r2', name:'Pull', split:'s1', exercises:[{ id:'c', name:'Row', key:'row' }] }];
+Object.assign(exMeta('lateral raise'), { muscle:'hombros', equip:'placas' });
+Object.assign(exMeta('lateral raise').stack, { unit:'lb', step:5, start:5 });
+exMeta('bench press (barbell)').equip = 'barra';
+const sprof = splitProfile('s1');
+chk(sprof.kind === 'split' && sprof.split.days.length === 2, 'el perfil lleva el split con sus 2 días en orden');
+chk(sprof.split.days[0].exercises.length === 2 && sprof.split.days[1].exercises[0].name === 'Row',
+    'con los ejercicios de cada día');
+chk(sprof.split.exmeta['lateral raise'].stack.unit === 'lb' &&
+    sprof.split.exmeta['bench press (barbell)'].equip === 'barra',
+    'y la configuración completa de cada ejercicio (equipo, torre…)');
+chk(sprof.split.exconf['lateral raise'].sets === 4, 'incluida la config por split (series, rango)');
+
+suite('Compartir splits — la pareja lo importa');
+resetDB();
+db.splits = [{ id:'viejo', name:'Su split', active:true, created:new Date().toISOString(), exconf:{} }];
+exMeta('bench press (barbell)').equip = 'mancuerna';   /* SU config previa: no debe pisarse */
+window.__splitImport = JSON.parse(JSON.stringify(sprof));
+applySplitImport();
+const traido = db.splits.find(x => x.name === 'PPL de regalo');
+chk(!!traido && traido.active, 'el split llega y queda en curso');
+chk(db.splits.find(x => x.id === 'viejo').active === false, 'el suyo pasa a guardados, no se borra');
+chk(splitRoutines(traido.id).length === 2 && splitRoutines(traido.id)[0].exercises.length === 2,
+    'días y ejercicios completos');
+chk(traido.exconf['lateral raise'].sets === 4, 'la config por split viaja con él');
+chk(exMeta('lateral raise').equip === 'placas' && exMeta('lateral raise').stack.unit === 'lb',
+    'los ejercicios nuevos llegan configurados (la polea en lb, lista)');
+chk(exMeta('bench press (barbell)').equip === 'mancuerna',
+    'pero en los que ella ya tenía, SU configuración manda');
+chk(nextDay().routine.name === 'Push', 'y el coach ya sabe que hoy toca Push');
+/* el restaurador de respaldos también lo reconoce */
+importBackup(JSON.stringify(sprof));
+chk(els['modalhost'].innerHTML.includes('Agregar el split'), 'importarlo por «Restaurar respaldo» redirige bien');
+closeModal();
+/* un archivo roto no revienta nada */
+importSplitFile('{"kind":"split"}');
+chk(els['modalhost'].innerHTML.includes('no válido'), 'un .json incompleto avisa en vez de romper');
+closeModal();
+importSplitFile('esto no es json');
+chk(els['modalhost'].innerHTML.includes('no válido'), 'y uno corrupto también');
+closeModal();
+/* la lista de splits ofrece importar */
+view = { name:'splits' };
+chk(viewSplits().includes('importSplitFile') && splitHeadHTML() === '', 'la pantalla de splits tiene el botón de importar');
+view = { name:'split', id:traido.id };
+chk(splitHeadHTML().includes('exportSplit'), 'y la ficha del split, el de compartir');
+view = { name:'home' };
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
