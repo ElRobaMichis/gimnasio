@@ -1607,6 +1607,63 @@ view = { name:'split', id:traido.id };
 chk(splitHeadHTML().includes('exportSplit'), 'y la ficha del split, el de compartir');
 view = { name:'home' };
 
+/* =====================================================================
+   AL FALLO A PROPÓSITO: el aviso de RIR 0 respeta el programa
+   ===================================================================== */
+suite('Al fallo a propósito — por split, no global');
+resetDB();
+db.splits = [
+  { id:'mm', name:'Min-Max', active:true,  created:new Date().toISOString(), exconf:{}, failOk:true },
+  { id:'nm', name:'Normal',  active:false, created:new Date().toISOString(), exconf:{} }];
+db.routines = [
+  { id:'rm', name:'Upper MM', split:'mm', exercises:[{ id:'e1', name:'Press', key:'press' }] },
+  { id:'rn', name:'Upper N',  split:'nm', exercises:[{ id:'e2', name:'Press', key:'press' }] }];
+const rir0 = [S(50,8,0), S(50,8,0), S(50,7,0), S(50,6,0)];
+/* tres sesiones al fallo, todas del split marcado */
+for(let i = 0; i < 3; i++) db.history.push({ id:'f'+i, routineId:'rm', routineName:'Upper MM',
+  date:new Date(Date.now() - (5-i)*864e5).toISOString(), duration:60,
+  entries:[{ key:'press', name:'Press', sets:rir0 }] });
+chk(failureHabit() === null, 'RIR 0 sistemático en el split marcado NO dispara el regaño: es el programa');
+/* el mismo hábito en un split normal sigue protegido */
+for(let i = 0; i < 2; i++) db.history.push({ id:'n'+i, routineId:'rn', routineName:'Upper N',
+  date:new Date(Date.now() - (2-i)*864e5).toISOString(), duration:60,
+  entries:[{ key:'press', name:'Press', sets:rir0 }] });
+chk(failureHabit() !== null, 'en un split normal el aviso sigue vivo: la protección no se pierde');
+
+/* la nota al terminar la sesión también respeta la marca */
+startSession('rm');
+for(let i = 0; i < 4; i++){
+  if(!db.active.exercises[0].sets[i]) addSet(0);
+  setVal(0, i, 'w', '50'); setVal(0, i, 'r', '8'); setVal(0, i, 'rir', '0');
+}
+finishSession();
+chk(!els['modalhost'].innerHTML.includes('llegaste al fallo'),
+    'al guardar una sesión Min-Max, sin sermón por el RIR 0');
+closeModal();
+startSession('rn');
+for(let i = 0; i < 4; i++){
+  if(!db.active.exercises[0].sets[i]) addSet(0);
+  setVal(0, i, 'w', '50'); setVal(0, i, 'r', '8'); setVal(0, i, 'rir', '0');
+}
+finishSession();
+chk(els['modalhost'].innerHTML.includes('llegaste al fallo'),
+    'la misma sesión en el split normal sí recibe la nota educativa');
+closeModal();
+
+/* la marca viaja en el perfil compartible */
+const pfMM = splitProfile('mm');
+chk(pfMM.split.failOk === true, 'el .json del split lleva la marca de fallo a propósito');
+db.splits = [{ id:'v', name:'Suyo', active:true, created:new Date().toISOString(), exconf:{} }];
+db.routines = []; db.history = [];
+window.__splitImport = JSON.parse(JSON.stringify(pfMM));
+applySplitImport();
+chk(db.splits.find(x => x.name === 'Min-Max').failOk === true, 'y al importarlo se conserva');
+/* el toggle en la ficha del split */
+view = { name:'split', id: db.splits.find(x => x.name === 'Min-Max').id };
+chk(viewSplit().includes('toggleSplitFailOk') && viewSplit().includes('Al fallo a propósito'),
+    'la ficha del split tiene el toggle');
+view = { name:'home' };
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

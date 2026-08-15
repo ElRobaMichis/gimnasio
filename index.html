@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -1708,7 +1708,13 @@ function daysSinceBackup(){
 function failureHabit(){
   if(db.settings.rirDismissed &&
      (Date.now() - new Date(db.settings.rirDismissed).getTime()) < 14*864e5) return null;
-  const recent = db.history.slice(-5);
+  /* las sesiones de un split marcado «al fallo a propósito» no cuentan:
+     ahí el RIR 0 es el programa, no un hábito por corregir */
+  const aProposito = h => {
+    const sp = db.splits.find(x => x.id === historySplitId(h));
+    return !!(sp && sp.failOk);
+  };
+  const recent = db.history.filter(h => !aProposito(h)).slice(-5);
   let withData = 0, failSessions = 0;
   for(const h of recent){
     const rirs = h.entries.flatMap(e => e.sets)
@@ -2066,6 +2072,15 @@ function viewSplit(){
         <span class="chev">›</span>
       </button>`).join('') || '<div class="hint">Todavía no tiene días.</div>' }
 
+    <div class="sect">Cómo se entrena</div>
+    <div class="line">
+      <div><div class="l-t">Al fallo a propósito</div>
+        <div class="l-d">Para programas de bajo volumen (1–2 series a RIR 0, tipo Min-Max): el aviso de
+          «vienes llegando al fallo» no cuenta las sesiones de este plan. Tus otros splits siguen protegidos.</div></div>
+      <button class="tog ${sp.failOk ? 'on' : ''}" role="switch" aria-checked="${!!sp.failOk}"
+        aria-label="Entrenar al fallo a propósito" onclick="toggleSplitFailOk('${sp.id}')"><i></i></button>
+    </div>
+
     ${ ses.length ? `
       <div class="sect">Cuánto lo usaste</div>
       <div class="list">
@@ -2148,7 +2163,7 @@ function splitProfile(id){
     if(sp.exconf && sp.exconf[k]) exconf[k] = JSON.parse(JSON.stringify(sp.exconf[k]));
   }
   return { app:'hierro', kind:'split', version:APP_VERSION,
-    split:{ name:sp.name, days, exconf, exmeta } };
+    split:{ name:sp.name, failOk: !!sp.failOk, days, exconf, exmeta } };
 }
 function exportSplit(id){
   const prof = splitProfile(id);
@@ -2195,6 +2210,7 @@ function applySplitImport(){
   const src = d.split;
   const sp = { id:uid(), name:String(src.name || 'Split importado').slice(0,80),
                active:true, created:new Date().toISOString(), exconf:{} };
+  if(src.failOk === true) sp.failOk = true;   /* la marca «al fallo a propósito» viaja con el plan */
   /* config por split: solo campos conocidos y con números válidos */
   if(src.exconf && typeof src.exconf === 'object'){
     for(const k in src.exconf){
@@ -2239,6 +2255,12 @@ function applySplitImport(){
   go({name:'home'});
 }
 
+function toggleSplitFailOk(id){
+  const sp = db.splits.find(x => x.id === id);
+  if(!sp) return;
+  sp.failOk = !sp.failOk;
+  save(); render();
+}
 function deleteSplit(id){
   const sp = db.splits.find(x => x.id === id);
   if(!sp) return;
@@ -4741,10 +4763,13 @@ function finishSession(){
     entries
   };
   if(isDeload) rec.deload = true;
-  /* nota educativa: sesión mayormente al fallo (RIR 0) */
+  /* nota educativa: sesión mayormente al fallo (RIR 0) — salvo que el split
+     esté marcado «al fallo a propósito»: ahí es el programa, no un descuido */
+  const rrF = db.routines.find(x => x.id === rec.routineId);
+  const spF = rrF && db.splits.find(x => x.id === rrF.split);
   const rirAll = entries.flatMap(e => e.sets).filter(s => s.rir !== undefined && s.rir !== null);
   const zeros = rirAll.filter(s => s.rir === 0).length;
-  const failNote = (rirAll.length >= 4 && zeros / rirAll.length >= 0.7) ? `
+  const failNote = (!(spF && spF.failOk) && rirAll.length >= 4 && zeros / rirAll.length >= 0.7) ? `
     <div class="note" style="margin:0 0 18px">
       <div class="note-t">Hoy llegaste al fallo (RIR 0) en ${zeros} de ${rirAll.length} series</div>
       <div class="note-d">Ir al fallo da casi el mismo músculo que quedarte a 1–3 reps de él,
