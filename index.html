@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -845,11 +845,12 @@ function effStep(key, w){
     const s = dumbbellMinStep(effPoints(key));
     if(s > 0) return s;
   }
-  /* en una torre, el salto es el de la máquina, pasado a kg sin redondear
+  /* en una torre, el salto es el de la máquina — o el del ajuste fino si lo
+     tiene, que es justo para eso — pasado a kg sin redondear
      (el peso final se ancla a la placa exacta más adelante) */
   if(eq === 'placas'){
     const c = stackConf(key);
-    if(c) return c.step * stackFactor(c);
+    if(c) return (c.extra > 0 ? c.extra : c.step) * stackFactor(c);
   }
   return roundStep(w);
 }
@@ -993,24 +994,45 @@ function stackConf(key){
   const step = parseFloat(st.step);
   if(isNaN(step) || step <= 0) return null;
   const start = parseFloat(st.start);
+  /* ajuste fino: discos añadidos, palanca o pin giratorio que suman
+     peso ENCIMA de la placa elegida (ej. torre de 10 en 10 lb con dos
+     discos de 5,5 al costado → puedes sumar 5,5 u 11) */
+  const extra = parseFloat(st.extra);
+  const hasExtra = !isNaN(extra) && extra > 0;
+  const exMax = parseFloat(st.extraMax);
   return {
     unit: st.unit === 'lb' ? 'lb' : 'kg',
     step,
     start: (!isNaN(start) && start > 0) ? start : step,
+    extra: hasExtra ? extra : 0,
+    extraMax: hasExtra ? ((!isNaN(exMax) && exMax >= extra) ? exMax : extra) : 0,
   };
 }
 function stackFactor(conf){ return conf.unit === 'lb' ? LB_KG : 1; }
-/* peso en kg → la placa más cercana de esa torre */
+/* peso en kg → la combinación placa + ajuste fino más cercana de esa torre.
+   En empate gana la más pesada (sobrecarga), igual que en el resto del equipo. */
 function stackSnap(key, kg){
   const c = stackConf(key);
   if(!c) return null;
   const f = stackFactor(c);
-  let i = Math.round((kg / f - c.start) / c.step);
-  if(i < 0) i = 0;
-  const value = Math.round((c.start + i * c.step) * 1000) / 1000;
-  return { unit:c.unit, step:c.step, index:i + 1, value,
-           kg: Math.round(value * f * 1000) / 1000 };
+  const want = kg / f;
+  const nJ = c.extra > 0 ? Math.floor(c.extraMax / c.extra + 1e-9) : 0;
+  let best = null;
+  for(let j = 0; j <= nJ; j++){
+    const add = Math.round(j * c.extra * 1000) / 1000;
+    let i = Math.round((want - add - c.start) / c.step);
+    if(i < 0) i = 0;
+    const value = Math.round((c.start + i * c.step + add) * 1000) / 1000;
+    const d = Math.abs(value - want);
+    if(!best || d < best.d - 1e-9 || (Math.abs(d - best.d) < 1e-9 && value > best.value))
+      best = { d, unit:c.unit, step:c.step, index:i + 1, value, extra:add,
+               kg: Math.round(value * f * 1000) / 1000 };
+  }
+  delete best.d;
+  return best;
 }
+/* «Placa 3 + 5,5» — el sufijo solo cuando hay ajuste fino puesto */
+function stackExtraLabel(sn){ return sn.extra > 0 ? ` + ${fmtNum(sn.extra)}` : ''; }
 /* los primeros escalones, para compararlos con lo que dice la máquina */
 function stackPreview(key, n){
   const c = stackConf(key);
@@ -2245,7 +2267,8 @@ function applySplitImport(){
       for(const f of ['type','lo','hi','step','rest','muscle','notes','equip','points','base','bar','cap'])
         if(o[f] !== undefined) m[f] = o[f];
       if(o.stack && typeof o.stack === 'object')
-        m.stack = { unit:o.stack.unit ?? null, step:o.stack.step ?? null, start:o.stack.start ?? null };
+        m.stack = { unit:o.stack.unit ?? null, step:o.stack.step ?? null, start:o.stack.start ?? null,
+                    extra:o.stack.extra ?? null, extraMax:o.stack.extraMax ?? null };
       if(!TYPE_LABEL.hasOwnProperty(String(m.type))) m.type = 'normal';
       if(m.equip != null && !EQUIP[m.equip]) m.equip = guessEquip(k);
       m.notes = String(m.notes || '').slice(0,300);
@@ -2792,7 +2815,28 @@ function equipConfigHTML(key, meta){
             <span style="color:var(--dim)">${u}</span>
           </div>
         </div>
+        <div class="line">
+          <div><div class="l-t">Ajuste fino</div><div class="l-d">Discos añadidos, palanca o pin extra: de cuánto en cuánto suma</div></div>
+          <div class="l-v">
+            <input type="number" inputmode="decimal" step="any" min="0" placeholder="—"
+              value="${meta.stack && meta.stack.extra != null ? meta.stack.extra : ''}" aria-label="Salto del ajuste fino"
+              oninput="setExStack('${key}','extra',this.value)">
+            <span style="color:var(--dim)">${u}</span>
+          </div>
+        </div>
+        <div class="line">
+          <div><div class="l-t">Hasta</div><div class="l-d">Lo máximo que el ajuste fino puede sumar</div></div>
+          <div class="l-v">
+            <input type="number" inputmode="decimal" step="any" min="0" placeholder="—"
+              value="${meta.stack && meta.stack.extraMax != null ? meta.stack.extraMax : ''}" aria-label="Máximo del ajuste fino"
+              oninput="setExStack('${key}','extraMax',this.value)">
+            <span style="color:var(--dim)">${u}</span>
+          </div>
+        </div>
       </div>
+      <div class="hint">El ajuste fino son esos discos al costado, la palanca o el pin giratorio que suman peso
+        ENCIMA de la placa. Ej.: torre de 10 en 10 lb con dos discos de 5,5 → ajuste fino 5,5, hasta 11.
+        El coach progresará por ese salto chico y te dirá «placa 3 + 5,5» en vez de inventar placas que no existen.</div>
       <div class="hint" id="stackhint">${ c
         ? `Así queda la torre: <b>${prev.map(fmtNum).join(' · ')} …</b> ${u}. Compárala con los números de la
            máquina — si no cuadran, corrige el salto. Este ejercicio se anota y se muestra en ${u}, aunque el
@@ -3006,7 +3050,7 @@ function loadStripHTML(xi){
     return wrap(`
       <div class="load-row">
         <span class="load-l">Pon el pin en</span>
-        <span class="load-v">Placa ${p.stack.index} · <b>${fmtNum(p.stack.value)} ${p.stack.unit}</b> <span class="chev">›</span></span>
+        <span class="load-v">Placa ${p.stack.index}${stackExtraLabel(p.stack)} · <b>${fmtNum(p.stack.value)} ${p.stack.unit}</b> <span class="chev">›</span></span>
       </div>
       <div style="display:flex;justify-content:center;padding:10px 0 2px">${stackSVG(p.stack.index, Math.max(p.stack.index + 4, 12), { h:140 })}</div>`);
   }
@@ -3056,10 +3100,11 @@ function showLoad(xi){
 
   if(p.kind === 'placas'){
     openModal(`
-      <h2>Placa ${p.stack.index} · ${fmtNum(p.stack.value)} ${p.stack.unit}</h2>
+      <h2>Placa ${p.stack.index}${stackExtraLabel(p.stack)} · ${fmtNum(p.stack.value)} ${p.stack.unit}</h2>
       <p class="muted">${title} · serie de trabajo</p>
       <div style="display:flex;justify-content:center;margin:6px 0 4px">${stackSVG(p.stack.index, Math.max(p.stack.index + 4, 14), { h:190 })}</div>
       <div class="hint">Cuenta ${p.stack.index} placa${p.stack.index === 1 ? '' : 's'} desde arriba.
+        ${p.stack.extra > 0 ? `Y pon el ajuste fino (los discos, la palanca o el pin extra) en <b>+${fmtNum(p.stack.extra)} ${p.stack.unit}</b>.` : ''}
         La torre empieza en ${fmtNum(p.stack.value - (p.stack.index-1)*p.stack.step)} y sube de
         ${fmtNum(p.stack.step)} en ${fmtNum(p.stack.step)} ${p.stack.unit}.
         ${p.exact ? '' : `El objetivo era ${fmtWEx(key, p.target)} ${uLabelEx(key)}; esta es la placa más cercana.`}</div>
@@ -3544,8 +3589,9 @@ function machineSnapshot(m){
   const out = {}; let any = false;
   for(const f of MACHINE_FIELDS){
     let v = m[f];
-    if(f === 'stack') v = (v && (v.unit != null || v.step != null || v.start != null))
-      ? { unit: v.unit ?? null, step: v.step ?? null, start: v.start ?? null } : null;
+    if(f === 'stack') v = (v && (v.unit != null || v.step != null || v.start != null || v.extra != null))
+      ? { unit: v.unit ?? null, step: v.step ?? null, start: v.start ?? null,
+          extra: v.extra ?? null, extraMax: v.extraMax ?? null } : null;
     if(v !== null && v !== undefined){ out[f] = v; any = true; }
   }
   return any ? out : null;
@@ -3573,7 +3619,8 @@ function applyGymMachines(g){
     m.step   = (mc && mc.step   != null) ? mc.step   : null;
     m.cap    = (mc && mc.cap    != null) ? mc.cap    : null;
     m.stack  = (mc && mc.stack)
-      ? { unit: mc.stack.unit ?? null, step: mc.stack.step ?? null, start: mc.stack.start ?? null }
+      ? { unit: mc.stack.unit ?? null, step: mc.stack.step ?? null, start: mc.stack.start ?? null,
+          extra: mc.stack.extra ?? null, extraMax: mc.stack.extraMax ?? null }
       : { unit:null, step:null, start:null };
   }
 }
@@ -4940,7 +4987,7 @@ function warmStepHTML(key, label, value, w, work){
     body = `<div style="display:flex;justify-content:center;padding:6px 0 2px">
         ${stackSVG(p.stack.index, Math.max(p.stack.index + 4, 12), { h:104 })}</div>
       <div class="load-row"><span class="load-l">Pon el pin en</span>
-        <span class="load-v">Placa <b>${p.stack.index}</b></span></div>`;
+        <span class="load-v">Placa <b>${p.stack.index}</b>${stackExtraLabel(p.stack)}</span></div>`;
   } else if(p && (p.kind === 'barra' || p.kind === 'discos')){
     const lbl = p.points === 1 ? 'En un solo lado' : (p.points === 2 ? 'Por lado' : `En cada pitón`);
     body = (p.points === 2 ? barbellSVG(p.perPoint, { h:62, scale:0.52 })

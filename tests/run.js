@@ -1664,6 +1664,63 @@ chk(viewSplit().includes('toggleSplitFailOk') && viewSplit().includes('Al fallo 
     'la ficha del split tiene el toggle');
 view = { name:'home' };
 
+/* =====================================================================
+   AJUSTE FINO DE LA TORRE: discos añadidos, palanca o pin giratorio
+   ===================================================================== */
+suite('Torres con ajuste fino — placa N + extra, no «placa 27»');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+/* el jalón al pecho real: 10 en 10 lb desde 10, con dos discos de 5,5 al lado */
+exMeta('jalon pecho').equip = 'placas';
+Object.assign(exMeta('jalon pecho').stack, { unit:'lb', step:10, start:10, extra:5.5, extraMax:11 });
+let snp = stackSnap('jalon pecho', 25.5 * KGxLB);
+chk(snp.index === 2 && snp.extra === 5.5 && snp.value === 25.5,
+    '25,5 lb = placa 2 (20) + un disco de 5,5 — no una placa inventada');
+snp = stackSnap('jalon pecho', 31 * KGxLB);
+chk(snp.index === 2 && snp.extra === 11 && snp.value === 31,
+    '31 lb = placa 2 + los dos discos (11): el extra puede pasar del salto de la torre');
+snp = stackSnap('jalon pecho', 30 * KGxLB);
+chk(snp.index === 3 && snp.extra === 0, '30 lb exactas siguen siendo la placa 3 sin extra');
+chk(Math.abs(effStep('jalon pecho', 20) - 5.5*KGxLB) < 1e-6,
+    'el salto del coach pasa a ser el fino (5,5 lb), no el de la torre (10)');
+chk(stackExtraLabel(stackSnap('jalon pecho', 25.5*KGxLB)) === ' + 5,5', 'la etiqueta dice «+ 5,5»');
+
+/* el coach progresa por el salto fino */
+sess('jalon pecho', [S(Math.round(20*KGxLB*1000)/1000, 12), S(Math.round(20*KGxLB*1000)/1000, 12)]);
+s = computeSuggestion('jalon pecho');
+chk(Math.abs(s.w - 25.5*KGxLB) < 0.001, 'de 20 lb el coach salta a 25,5 (placa 2 + disco), no a 30');
+
+/* el pin giratorio: torre de 15 en 15, el pin suma 0, 5 o 10 */
+exMeta('prensa sentada').equip = 'placas';
+Object.assign(exMeta('prensa sentada').stack, { unit:'kg', step:15, start:15, extra:5, extraMax:10 });
+snp = stackSnap('prensa sentada', 35);
+chk(snp.index === 2 && snp.extra === 5 && snp.value === 35, '35 kg = placa 2 (30) + pin en 5');
+snp = stackSnap('prensa sentada', 40);
+chk(snp.index === 2 && snp.extra === 10 && snp.value === 40, '40 kg = placa 2 + pin en 10');
+chk(effStep('prensa sentada', 30) === 5, 'y el salto del coach es el del pin (5)');
+
+/* sin «hasta», el máximo es un solo escalón del fino */
+exMeta('polea lateral').equip = 'placas';
+Object.assign(exMeta('polea lateral').stack, { unit:'kg', step:5, start:5, extra:2.5 });
+snp = stackSnap('polea lateral', 12.5);
+chk(snp.index === 2 && snp.extra === 2.5, 'palanca de 2,5: placa 2 + 2,5');
+chk(stackSnap('polea lateral', 10).extra === 0, 'y los pesos de placa exacta no usan la palanca');
+
+/* sin ajuste fino, todo sigue exactamente igual que antes */
+exMeta('remo torre').equip = 'placas';
+Object.assign(exMeta('remo torre').stack, { unit:'kg', step:5, start:5 });
+snp = stackSnap('remo torre', 27);
+chk(snp.index === 5 && snp.value === 25 && snp.extra === 0 && stackExtraLabel(snp) === '',
+    'una torre normal ni se entera del cambio');
+
+/* el ajuste fino viaja: foto del gimnasio y perfil de split */
+chk(machineSnapshot(exMeta('jalon pecho')).stack.extra === 5.5,
+    'la foto por gimnasio guarda el ajuste fino');
+db.splits = [{ id:'sf1', name:'S', active:true, created:new Date().toISOString(), exconf:{} }];
+db.routines = [{ id:'rf1', name:'D', split:'sf1', exercises:[{ id:'x', name:'Jalon Pecho', key:'jalon pecho' }] }];
+const pfx = splitProfile('sf1');
+chk(pfx.split.exmeta['jalon pecho'].stack.extra === 5.5, 'y el perfil de split también lo lleva');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
