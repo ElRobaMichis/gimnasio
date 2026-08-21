@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -2913,6 +2913,23 @@ function stepOptionsHTML(cur){
   return html;
 }
 function openSplitConf(){ view.splitConf = true; render(); }
+/* con la sesión en curso, cambiar las series del split ajusta las filas ya
+   creadas: crecen con filas vacías, y solo se quitan colas SIN anotar */
+function syncActiveSets(key){
+  if(!db.active) return;
+  const want = splitSetsOverride(key);
+  if(!want) return;
+  for(const ex of db.active.exercises){
+    if(ex.key !== key) continue;
+    while(ex.sets.length < want) ex.sets.push({ w:'', r:'', rir:'' });
+    while(ex.sets.length > want){
+      const last = ex.sets[ex.sets.length - 1];
+      if(last.done || (last.w !== '' && last.w !== undefined) ||
+         (last.r !== '' && last.r !== undefined)) break;   /* lo anotado jamás se borra */
+      ex.sets.pop();
+    }
+  }
+}
 /* escribir la config por split del ejercicio (rango, series, descanso) */
 function setSplitConf(key, field, val){
   const sp = db.splits.find(x => x.id === ctxSplitId());
@@ -2924,6 +2941,7 @@ function setSplitConf(key, field, val){
   else oc[field] = v;
   if(!Object.keys(oc).length) delete sp.exconf[key];
   refreshActiveSugg(key);
+  if(field === 'sets') syncActiveSets(key);
   save();
 }
 function setExNotes(key, val){ exMeta(key).notes = val.slice(0,300); save(); }
@@ -4432,7 +4450,9 @@ function startSession(rid, deload){
     exercises: r.exercises.map(ex => {
       let sugg = computeSuggestion(ex.key);
       if(deload) sugg = deloadSugg(ex.key, sugg);
-      const n = sugg ? sugg.sets : 1;
+      /* sin historial no hay sugerencia, pero las series fijadas en el
+         split mandan igual: un ejercicio nuevo con «3 series» sale con 3 */
+      const n = sugg ? sugg.sets : (splitSetsOverride(ex.key) || 1);
       return { key:ex.key, name:ex.name, sugg,
                sets: Array.from({length:Math.max(1,n)}, () => ({w:'', r:'', rir:''})) };
     })
@@ -4639,7 +4659,7 @@ function sessionAddExercise(ev){
   if(!exMeta(key).muscle){ const g = guessMuscle(finalName); if(g) exMeta(key).muscle = g; }
   if(!exMeta(key).equip){ const e = guessEquip(finalName); if(e) exMeta(key).equip = e; }
   const sugg = computeSuggestion(key);
-  const n = sugg ? sugg.sets : 1;
+  const n = sugg ? sugg.sets : (splitSetsOverride(key) || 1);
   db.active.exercises.push({ key, name: finalName, sugg,
     sets: Array.from({length: Math.max(1, n)}, () => ({w:'', r:'', rir:''})) });
   if(window.__keepRoutine){

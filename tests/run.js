@@ -1721,6 +1721,53 @@ db.routines = [{ id:'rf1', name:'D', split:'sf1', exercises:[{ id:'x', name:'Jal
 const pfx = splitProfile('sf1');
 chk(pfx.split.exmeta['jalon pecho'].stack.extra === 5.5, 'y el perfil de split también lo lleva');
 
+/* =====================================================================
+   LAS SERIES FIJADAS TAMBIÉN VALEN SIN HISTORIAL (el bug de la pareja)
+   ===================================================================== */
+suite('Series fijadas — la sesión abre con las filas correctas');
+resetDB();
+db.splits = [{ id:'sx', name:'Importado', active:true, created:new Date().toISOString(),
+  exconf:{ 'back squat': { lo:4, hi:7, sets:3 }, 'hip thrust': { sets:4 } } }];
+db.routines = [{ id:'rx', name:'Lower', split:'sx', exercises:[
+  { id:'a', name:'Back Squat', key:'back squat' },
+  { id:'b', name:'Hip Thrust', key:'hip thrust' },
+  { id:'c', name:'Crunch', key:'crunch' }] }];
+/* el escenario exacto: split recién importado, CERO historial */
+startSession('rx');
+chk(db.active.exercises[0].sets.length === 3, 'ejercicio nuevo con 3 series fijadas → 3 filas, no 1');
+chk(db.active.exercises[1].sets.length === 4, 'y el de 4 series abre con sus 4 filas');
+chk(db.active.exercises[2].sets.length === 1, 'sin series fijadas ni historial, sí queda 1 (como antes)');
+
+/* agregar a media sesión un ejercicio nuevo con series fijadas */
+db.splits[0].exconf['face pull'] = { sets:2 };
+window.__keepRoutine = false;
+document.getElementById('sessnewex').value = 'Face Pull';
+sessionAddExercise({ preventDefault(){} });
+chk(db.active.exercises[3].sets.length === 2, 'agregado a media sesión también respeta sus 2 series');
+
+/* cambiar las series con la sesión en curso ajusta las filas */
+view = { name:'exercise', key:'back squat', exname:'Back Squat', rid:'rx' };
+setSplitConf('back squat', 'sets', '2');
+chk(db.active.exercises[0].sets.length === 2, 'bajar de 3 a 2 quita la fila vacía sobrante');
+setSplitConf('back squat', 'sets', '4');
+chk(db.active.exercises[0].sets.length === 4, 'y subir a 4 agrega filas vacías al vuelo');
+/* pero lo ya anotado jamás se borra */
+db.active.exercises[0].sets[3] = { w:'60', r:'5', rir:'' };
+db.active.exercises[0].sets[2] = { w:'60', r:'5', rir:'' };
+setSplitConf('back squat', 'sets', '2');
+chk(db.active.exercises[0].sets.length === 4, 'bajar a 2 con series anotadas en la 3 y 4 NO las borra');
+db.active = null;
+
+/* con historial de 3 series y fijadas 2, la sesión abre con 2 */
+db.history.push({ id:'hh', routineId:'rx', routineName:'Lower', date:new Date().toISOString(), duration:60,
+  entries:[{ key:'crunch', name:'Crunch', sets:[S(0,12), S(0,12), S(0,12)] }] });
+exMeta('crunch').type = 'corporal';
+db.splits[0].exconf['crunch'] = { sets:2 };
+view = { name:'home' };
+startSession('rx');
+chk(db.active.exercises[2].sets.length === 2, 'historial de 3 series + fijadas 2 → la sesión abre con 2');
+db.active = null;
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
