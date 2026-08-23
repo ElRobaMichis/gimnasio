@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.9.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -647,6 +647,7 @@ function normalize(d){
   if(d.settings.rest === undefined) d.settings.rest = 'auto';
   if(d.settings.screenOn === undefined) d.settings.screenOn = 'on';
   if(d.settings.notify === undefined) d.settings.notify = 'off';
+  if(d.settings.health === undefined) d.settings.health = 'off';
   if(d.settings.unit !== 'lb') d.settings.unit = 'kg';
   d.routines = Array.isArray(d.routines) ? d.routines : [];
   d.history  = Array.isArray(d.history)  ? d.history  : [];
@@ -4148,6 +4149,16 @@ function viewSettings(){
       <button class="tog ${screenOn?'on':''}" role="switch" aria-checked="${screenOn}" aria-label="Pantalla encendida"
         onclick="setScreenOn('${screenOn ? 'off' : 'on'}')"><i></i></button>
     </div>
+    <div class="line">
+      <div><div class="l-t">Guardar en Apple Salud</div><div class="l-d">Al terminar, un botón registra la sesión en Salud vía Atajos · solo iPhone/iPad</div></div>
+      <button class="tog ${db.settings.health === 'on' ? 'on' : ''}" role="switch" aria-checked="${db.settings.health === 'on'}"
+        aria-label="Guardar en Apple Salud" onclick="toggleHealth()"><i></i></button>
+    </div>
+    ${ db.settings.health === 'on' ? `
+    <button class="line" onclick="healthInfo()">
+      <div class="l-t">¿Cómo se crea el atajo «Hierro»?</div>
+      <div class="chev">›</div>
+    </button>` : '' }
     <div class="hint">Automático: Fuerza 3:00 · Hipertrofia 1:30 · Ambas 2:00.
       En iPhone las notificaciones requieren la app instalada en la pantalla de inicio (iOS 16.4+).</div>
 
@@ -4865,7 +4876,8 @@ function finishSession(){
       <p class="muted">${fmtDur(rec.duration)} · ${entries.reduce((a,e)=>a+e.sets.length,0)} series suaves.
         Esta sesión no toca tu progresión ni tus récords: la próxima sesión normal retoma
         exactamente donde ibas, con el cuerpo más fresco.</p>
-      <button class="btn" onclick="closeModal(); go({name:'home'})">Listo</button>`);
+      <button class="btn" onclick="closeModal(); go({name:'home'})">Listo</button>
+      ${healthBtnHTML(rec.duration)}`);
     return;
   }
   openModal(`
@@ -4877,11 +4889,60 @@ function finishSession(){
       <div class="note-d">${prs.join('<br>')}</div></div>` : ''}
     ${failNote}
     <button class="btn" onclick="closeModal(); go({name:'history'})">Ver historial</button>
+    ${healthBtnHTML(rec.duration)}
     <button class="btn ghost" style="margin-top:8px" onclick="closeModal(); go({name:'home'})">Volver al inicio</button>`);
 }
 
 function setGoal(k){ db.settings.goal = k; save(); render(); }
 function setRest(v){ db.settings.rest = v; save(); }
+
+/* =====================================================================
+   APPLE SALUD (vía Atajos)
+   HealthKit no tiene API web: ninguna página puede escribir en Salud.
+   El puente honesto es la app Atajos: un atajo llamado «Hierro» con la
+   acción «Registrar entrenamiento», invocado por URL con los minutos de
+   la sesión como entrada. Un toque al terminar y el entrenamiento queda
+   en Salud como fuerza tradicional, con su duración real.
+   ===================================================================== */
+function healthShortcutURL(min){
+  return 'shortcuts://run-shortcut?name=' + encodeURIComponent('Hierro')
+       + '&input=text&text=' + encodeURIComponent(String(min));
+}
+function logToHealth(min){
+  try{ location.href = healthShortcutURL(min); }catch(e){}
+}
+/* el botón del resumen de sesión: solo si el usuario activó la función */
+function healthBtnHTML(sec){
+  if(db.settings.health !== 'on') return '';
+  const min = Math.max(1, Math.round(sec / 60));
+  return `<button class="btn quiet" style="margin-top:8px" onclick="logToHealth(${min})">
+    Guardar en Apple Salud · ${min} min</button>`;
+}
+function toggleHealth(){
+  db.settings.health = db.settings.health === 'on' ? 'off' : 'on';
+  save(); render();
+  if(db.settings.health === 'on') healthInfo();   /* la primera vez, enseñar a crear el atajo */
+}
+function healthInfo(){
+  openModal(`
+    <h2>El atajo «Hierro» para Apple Salud</h2>
+    <p class="muted">Se crea UNA vez en la app Atajos de tu iPhone. Después, al terminar cada sesión
+      tendrás un botón que la guarda en Salud con su duración real.</p>
+    <div class="sect">Cómo crearlo</div>
+    <p><b>1.</b> Abre la app <b>Atajos</b> → pestaña Atajos → <b>+</b> (nuevo atajo).</p>
+    <p><b>2.</b> Nómbralo exactamente <b>Hierro</b> (toca el título de arriba). Tiene que llamarse así:
+      es el nombre que esta app invoca.</p>
+    <p><b>3.</b> Agrega la acción <b>«Ajustar fecha»</b>. Déjala en <b>Restar</b>, toca el número y en la
+      barra de variables elige <b>Entrada del atajo</b>; la unidad en <b>min</b> y la fecha en <b>Fecha actual</b>.
+      (Queda: “Restar [Entrada del atajo] min a Fecha actual”.)</p>
+    <p><b>4.</b> Agrega la acción <b>«Registrar entrenamiento»</b>. Tipo: <b>Fuerza tradicional</b>.
+      Muestra más y pon <b>Inicio</b> = la <b>Fecha ajustada</b> del paso anterior y <b>Fin</b> = <b>Fecha actual</b>.</p>
+    <p><b>5.</b> Listo. La primera vez que lo uses, iOS te pedirá permiso para escribir en Salud — acéptalo.</p>
+    <div class="hint">Cómo funciona: el botón abre Atajos pasándole los minutos de tu sesión; el atajo
+      calcula la hora de inicio y registra el entrenamiento. Es un toque, no automático — Apple no permite
+      que una app web escriba en Salud directamente (por eso Hevy puede: es app nativa). Solo iPhone/iPad.</div>
+    <button class="btn" style="margin-top:16px" onclick="closeModal()">Entendido</button>`);
+}
 
 /* ---------- cambio de unidad kg ⇄ lb ---------- */
 function askUnitSwitch(target){

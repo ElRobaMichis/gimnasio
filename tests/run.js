@@ -1768,6 +1768,41 @@ startSession('rx');
 chk(db.active.exercises[2].sets.length === 2, 'historial de 3 series + fijadas 2 → la sesión abre con 2');
 db.active = null;
 
+/* =====================================================================
+   APPLE SALUD VÍA ATAJOS
+   ===================================================================== */
+suite('Apple Salud — el botón, el atajo y su URL');
+resetDB();
+chk(db.settings.health === 'off', 'apagado por defecto: nadie ve botones que no pidió');
+chk(healthShortcutURL(62) === 'shortcuts://run-shortcut?name=Hierro&input=text&text=62',
+    'la URL invoca el atajo «Hierro» con los minutos como entrada');
+chk(healthBtnHTML(3720) === '', 'con la función apagada, el resumen no enseña el botón');
+db.settings.health = 'on';
+chk(healthBtnHTML(3720).includes('62 min') && healthBtnHTML(3720).includes('logToHealth(62)'),
+    'encendida: botón con los minutos reales de la sesión (62)');
+chk(healthBtnHTML(20).includes('logToHealth(1)'), 'una sesión cortísima redondea a mínimo 1 min');
+/* el resumen de sesión lo incluye */
+db.routines.push({ id:'r1', name:'T', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Curl', key:'curl' }] });
+startSession('r1');
+db.active.exercises[0].sets[0] = { w:'20', r:'10', rir:'' };
+finishSession();
+chk(els['modalhost'].innerHTML.includes('Guardar en Apple Salud'), 'el resumen al terminar trae el botón');
+closeModal();
+/* y la descarga también (una descarga sigue siendo entrenamiento) */
+startSession('r1', true);
+db.active.exercises[0].sets[0] = { w:'18', r:'8', rir:'' };
+finishSession();
+chk(els['modalhost'].innerHTML.includes('Guardar en Apple Salud'), 'el resumen de descarga también');
+closeModal();
+/* ajustes: toggle + guía */
+view = { name:'settings' };
+chk(viewSettings().includes('toggleHealth') && viewSettings().includes('healthInfo()'),
+    'ajustes tiene el toggle y la guía del atajo');
+db.settings.health = 'off';
+chk(!viewSettings().includes('healthInfo()'), 'apagado, la guía se esconde');
+view = { name:'home' };
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
