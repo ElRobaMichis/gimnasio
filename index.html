@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.9.2';
+const APP_VERSION = '1.9.3';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -4941,17 +4941,21 @@ function healthInfo(){
       <b>Entrenamiento tradicional de fuerza</b>, y llénala así:
       · <b>Fecha</b> → la variable <b>Fecha ajustada</b> (la salida del paso 2).
       · <b>Duración</b> → toca el número y elige <b>Entrada de atajo</b>, en <b>minutos</b>.
-      · Calorías y Distancia: déjalas vacías.</p>
+      · <b>Calorías → 0</b> (o 1 si no acepta el 0) y <b>Distancia → 0 km</b>. NO las dejes en
+      blanco: vacías, la acción truena con «ocurrió un problema…» — verificado en iOS 26.</p>
     <p><b>5.</b> El permiso de Salud: córrelo UNA vez con ▶ dentro de Atajos para que iOS te
       pida permiso de escribir en Salud — acéptalo. (Esa corrida de prueba puede registrar un
-      entrenamiento vacío: bórralo desde la app Salud.) Después ya funciona desde aquí.</p>
+      entrenamiento corto: bórralo desde la app Salud.) Después ya funciona desde aquí.</p>
     <div class="sect">Si sale «ocurrió un problema…»</div>
-    <p class="tiny">Es el permiso de Salud, casi siempre. En orden: <b>1)</b> Ajustes del iPhone →
-      Privacidad y seguridad → <b>Salud</b> → <b>Atajos</b> → activa la escritura de
-      <b>Entrenamientos</b>. <b>2)</b> Si ya estaba activa: abre el atajo → botón <b>ⓘ</b> →
-      Privacidad → <b>Restablecer privacidad</b> → córrelo de nuevo y acepta. <b>3)</b> Si persiste,
-      reinicia el iPhone (Salud guarda en caché los permisos). <b>4)</b> Último recurso: pon
-      <b>Distancia = 0 km</b> en la acción — dejarla vacía falla en algunas versiones de iOS.</p>
+    <p class="tiny"><b>1)</b> Revisa Calorías y Distancia: con esos campos en blanco la acción
+      falla — ponles 0. <b>2)</b> El permiso: Ajustes del iPhone → Privacidad y seguridad →
+      <b>Salud</b> → <b>Atajos</b> → activa la escritura de <b>Entrenamientos</b>. <b>3)</b> Si ya
+      estaba activa: abre el atajo → botón <b>ⓘ</b> → Privacidad → <b>Restablecer privacidad</b> →
+      córrelo de nuevo y acepta. <b>4)</b> Si persiste, reinicia el iPhone (Salud guarda en caché
+      los permisos).</p>
+    <p class="tiny" style="margin-top:8px">Un detalle de la hora: toca el botón al terminar, en el
+      resumen — así inicio y fin quedan exactos. Si lo tocas más tarde, la duración registrada
+      sigue siendo la correcta; solo la hora de inicio se corre hacia el momento del toque.</p>
     <div class="hint">Cómo funciona: el botón abre Atajos pasándole los minutos de tu sesión; el atajo
       calcula la hora de inicio y registra el entrenamiento. Es un toque, no automático — Apple no permite
       que una app web escriba en Salud directamente (por eso Hevy puede: es app nativa). Solo iPhone/iPad.</div>

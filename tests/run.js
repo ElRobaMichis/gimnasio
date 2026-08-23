@@ -1808,6 +1808,8 @@ chk(guia.includes('Sustraer') && guia.includes('Duración') && guia.includes('Fe
     'la guía usa los nombres reales de iOS 26 (Sustraer, Fecha, Duración)');
 chk(guia.includes('Recibir') && guia.includes('Texto'),
     'y avisa de marcar Texto en el bloque «Recibir» para que entre el dato');
+chk(guia.includes('0 km') && guia.includes('NO las dejes en blanco'),
+    'y exige Calorías/Distancia con valor: en blanco la acción falla (verificado en iPhone real)');
 closeModal();
 view = { name:'home' };
 
