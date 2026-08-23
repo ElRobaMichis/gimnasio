@@ -1801,6 +1801,14 @@ chk(viewSettings().includes('toggleHealth') && viewSettings().includes('healthIn
     'ajustes tiene el toggle y la guía del atajo');
 db.settings.health = 'off';
 chk(!viewSettings().includes('healthInfo()'), 'apagado, la guía se esconde');
+/* la guía describe los Atajos reales de iOS 26: Sustraer + Fecha/Duración */
+healthInfo();
+const guia = els['modalhost'].innerHTML;
+chk(guia.includes('Sustraer') && guia.includes('Duración') && guia.includes('Fecha ajustada'),
+    'la guía usa los nombres reales de iOS 26 (Sustraer, Fecha, Duración)');
+chk(guia.includes('Recibir') && guia.includes('Texto'),
+    'y avisa de marcar Texto en el bloque «Recibir» para que entre el dato');
+closeModal();
 view = { name:'home' };
 
 /* ---------- resultado ---------- */

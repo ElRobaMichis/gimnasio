@@ -524,7 +524,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -4929,15 +4929,22 @@ function healthInfo(){
     <p class="muted">Se crea UNA vez en la app Atajos de tu iPhone. Después, al terminar cada sesión
       tendrás un botón que la guarda en Salud con su duración real.</p>
     <div class="sect">Cómo crearlo</div>
-    <p><b>1.</b> Abre la app <b>Atajos</b> → pestaña Atajos → <b>+</b> (nuevo atajo).</p>
-    <p><b>2.</b> Nómbralo exactamente <b>Hierro</b> (toca el título de arriba). Tiene que llamarse así:
-      es el nombre que esta app invoca.</p>
-    <p><b>3.</b> Agrega la acción <b>«Ajustar fecha»</b>. Déjala en <b>Restar</b>, toca el número y en la
-      barra de variables elige <b>Entrada del atajo</b>; la unidad en <b>min</b> y la fecha en <b>Fecha actual</b>.
-      (Queda: “Restar [Entrada del atajo] min a Fecha actual”.)</p>
-    <p><b>4.</b> Agrega la acción <b>«Registrar entrenamiento»</b>. Tipo: <b>Fuerza tradicional</b>.
-      Muestra más y pon <b>Inicio</b> = la <b>Fecha ajustada</b> del paso anterior y <b>Fin</b> = <b>Fecha actual</b>.</p>
-    <p><b>5.</b> Listo. La primera vez que lo uses, iOS te pedirá permiso para escribir en Salud — acéptalo.</p>
+    <p><b>1.</b> Abre la app <b>Atajos</b> → <b>+</b> (nuevo atajo) y nómbralo exactamente
+      <b>Hierro</b> (toca el título de arriba). Tiene que llamarse así: es el nombre que esta app invoca.</p>
+    <p><b>2.</b> Busca la acción <b>«Ajustar fecha»</b> y agrégala. En pantalla se ve como
+      “<b>Sustraer [número] de [Fecha]</b>”: toca el número y elige la variable
+      <b>Entrada de atajo</b>, la unidad en <b>minutos</b>, y la fecha en <b>Fecha actual</b>.</p>
+    <p><b>3.</b> Arriba aparecerá un bloque “<b>Recibir … Si no hay entrada: Continuar</b>”.
+      Si dice “Recibir <b>No</b>”, tócalo y marca <b>Texto</b> (o “Cualquiera”): así entra el
+      dato que esta app le manda.</p>
+    <p><b>4.</b> Agrega la acción <b>«Registrar entrenamiento»</b>, tipo
+      <b>Entrenamiento tradicional de fuerza</b>, y llénala así:
+      · <b>Fecha</b> → la variable <b>Fecha ajustada</b> (la salida del paso 2).
+      · <b>Duración</b> → toca el número y elige <b>Entrada de atajo</b>, en <b>minutos</b>.
+      · Calorías y Distancia: déjalas vacías.</p>
+    <p><b>5.</b> Listo. Pruébalo desde aquí al terminar una sesión (no con ▶ dentro de Atajos:
+      a mano no lleva minutos de entrada). La primera vez iOS pedirá permiso para escribir en
+      Salud — acéptalo.</p>
     <div class="hint">Cómo funciona: el botón abre Atajos pasándole los minutos de tu sesión; el atajo
       calcula la hora de inicio y registra el entrenamiento. Es un toque, no automático — Apple no permite
       que una app web escriba en Salud directamente (por eso Hevy puede: es app nativa). Solo iPhone/iPad.</div>
