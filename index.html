@@ -573,6 +573,64 @@
     display:flex;align-items:center;justify-content:center;gap:8px;
   }
   .btn.health svg{width:15px;height:15px;fill:currentColor;stroke:none}
+
+  /* ---------- historial: el panel arriba, el diario abajo ---------- */
+  .hp-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  .hp-n{display:flex;align-items:baseline;gap:8px;margin-top:6px}
+  .hp-n b{font-size:44px;font-weight:700;font-stretch:116%;letter-spacing:-.05em;line-height:.9;
+    color:var(--bone);font-variant-numeric:tabular-nums}
+  .hp-n i{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--dim);padding-bottom:4px}
+  .hp-sub{font-size:12.5px;color:var(--ash);line-height:1.5;margin-top:9px}
+  .hp-sub b{color:var(--up);font-weight:600}
+  .hp-bars{display:flex;align-items:flex-end;gap:5px;height:74px;margin-top:15px}
+  .hp-bars span{flex:1;background:rgba(127,211,168,.55);border-radius:4px 4px 0 0;display:block;min-height:2px}
+  .hp-bars span.now{background:transparent;border:1px dashed rgba(127,211,168,.6);border-bottom:0}
+  .hp-ax{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:7px}
+  .hp-lift{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);width:100%}
+  .hp-lift .n{flex:1;min-width:0;font-size:12.5px;color:var(--bone);letter-spacing:-.01em;text-align:left}
+  .hp-lift .n i{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--up);margin-top:4px}
+  .hp-lift .n i.flat{color:var(--dim)}
+  .hp-lift svg{width:78px;height:24px;flex:none}
+  .hp-lift .v{width:58px;flex:none;text-align:right;font-family:var(--mono);font-size:12.5px;
+    color:var(--ash);font-variant-numeric:tabular-nums}
+  .hp-lift .v i{font-style:normal;font-size:8.5px;color:var(--dim);display:block;margin-top:3px}
+
+  .hd-wk{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    margin:20px 0 2px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+  .hd-wk .r{font-family:var(--mono);font-size:9.5px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  details.hd{border-bottom:1px solid var(--line)}
+  details.hd summary{list-style:none;cursor:pointer}
+  details.hd summary::-webkit-details-marker{display:none}
+  .hd-row{display:flex;align-items:center;gap:11px;padding:12px 0;width:100%}
+  .hd-row .d{width:30px;flex:none;text-align:center}
+  .hd-row .d b{display:block;font-family:var(--mono);font-size:15px;color:var(--ash);
+    font-variant-numeric:tabular-nums;line-height:1;font-weight:400}
+  .hd-row .d i{display:block;font-style:normal;font-family:var(--mono);font-size:8px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:3px}
+  .hd-row .g{flex:1;min-width:0}
+  .hd-row .n{font-size:14.5px;font-weight:600;letter-spacing:-.015em;color:var(--bone);
+    display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .hd-row .m{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:5px;letter-spacing:.04em}
+  .hd-row .v{font-family:var(--mono);font-size:12.5px;color:var(--ash);flex:none;
+    font-variant-numeric:tabular-nums;text-align:right}
+  .hd-row .v i{font-style:normal;font-size:9px;color:var(--dim);display:block;margin-top:3px}
+  details.hd.pr .hd-row{border-left:2px solid var(--hold);margin-left:-20px;padding-left:18px}
+  details.hd.pr .hd-row .n{color:var(--hold)}
+  .hd-chip{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;
+    border:1px solid rgba(215,164,75,.5);color:var(--hold);border-radius:3px;padding:1px 4px;flex:none}
+  .hd-chip.q{border-color:var(--line-2);color:var(--dim)}
+  .hd-body{padding:2px 0 16px}
+  .hd-vs{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .hd-vs .t{font-size:11.5px;color:var(--dim)}
+  .hd-vs .t b{font-weight:600}
+  .hd-vs .t b.up{color:var(--up)}
+  .hd-acts{display:flex;gap:16px;align-items:center;margin-top:14px}
+  .hd-acts .ed{border:1px solid var(--line-2);border-radius:10px;padding:9px 14px;
+    font-size:12.5px;color:var(--bone);font-weight:500}
+  .hd-acts .dz{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--danger);text-decoration:underline;text-underline-offset:3px}
 </style>
 </head>
 <body>
@@ -603,7 +661,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -1919,7 +1977,7 @@ function weekStats(){
     sessions++;
     for(const e of h.entries){
       sets += e.sets.length;
-      for(const st of e.sets) vol += st.w * st.r;
+      vol += entryVolume(e.key, e.sets);
     }
   }
   return { sessions, sets, vol };
@@ -2076,7 +2134,7 @@ function viewSplits(){
       <div class="card-top">
         <div>
           <div class="ex-title" style="font-size:17px">${esc(sp.name)} <i class="dot up" style="display:inline-block;margin-left:6px;transform:none"></i></div>
-          <div class="last">${days.length} día${days.length===1?'':'s'}${sp.created ? ` · desde el ${fmtDateShort(sp.created)}` : ''} · ${ses.length} sesion${ses.length===1?'':'es'}</div>
+          <div class="last">${days.length} día${days.length===1?'':'s'}${sp.created ? ` · desde el ${fmtDateShort(sp.created)}` : ''} · ${nSesiones(ses.length)}</div>
         </div>
         <div class="chev">›</div>
       </div>
@@ -2095,7 +2153,7 @@ function viewSplits(){
     <button class="rowitem" onclick="go({name:'split', id:'${sp.id}'})">
       <span class="grow">
         <span class="row-name" style="display:block">${esc(sp.name)}</span>
-        <span class="row-sub" style="display:block">${days.length} día${days.length===1?'':'s'} · ${ses.length} sesion${ses.length===1?'':'es'}${ult ? ` · hasta el ${fmtDateShort(ult)}` : ''}</span>
+        <span class="row-sub" style="display:block">${days.length} día${days.length===1?'':'s'} · ${nSesiones(ses.length)}${ult ? ` · hasta el ${fmtDateShort(ult)}` : ''}</span>
       </span>
       <span class="chev">›</span>
     </button>`;
@@ -2135,7 +2193,7 @@ function splitHeadHTML(){
         <button aria-label="Borrar split" onclick="deleteSplit('${sp.id}')">${svgIcon('trash')}</button>
       </div>
     </div>
-    <div class="meta">${sp.active ? 'En curso' : 'Guardado'} · ${ses.length} sesion${ses.length===1?'':'es'}${ult ? ` · hasta el ${fmtDateShort(ult)}` : ''}</div>
+    <div class="meta">${sp.active ? 'En curso' : 'Guardado'} · ${nSesiones(ses.length)}${ult ? ` · hasta el ${fmtDateShort(ult)}` : ''}</div>
     <div class="knurl"></div>`;
 }
 
@@ -3528,42 +3586,205 @@ function volumeCardHTML(){
     ${imb}`;
 }
 
+/* =====================================================================
+   HISTORIAL — el panel arriba, el diario abajo
+   Primero la respuesta a «¿cómo voy?»: la semana en curso y la fuerza de
+   tus levantamientos con su curva. Después «¿qué hice el martes?»: las
+   sesiones agrupadas por semana, con los récords marcados.
+   ===================================================================== */
+/* el lunes de la semana de una fecha */
+function weekStart(d){
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+function weekLabel(ws){
+  const diff = Math.round((weekStart(new Date()) - ws) / (7 * 864e5));
+  if(diff === 0) return 'Esta semana';
+  if(diff === 1) return 'Semana pasada';
+  const fin = new Date(ws); fin.setDate(fin.getDate() + 6);
+  const f = d => d.toLocaleDateString('es', { day:'numeric', month:'short' }).replace('.', '');
+  return `${f(ws)} – ${f(fin)}`;
+}
+/* volumen semana a semana, la última es la que está en curso */
+function weeklyVolumes(n){
+  const base = weekStart(new Date()), out = [];
+  for(let i = n - 1; i >= 0; i--){
+    const a = new Date(base); a.setDate(a.getDate() - i * 7);
+    const b = new Date(a);    b.setDate(b.getDate() + 7);
+    let vol = 0, ses = 0;
+    for(const h of db.history){
+      const t = new Date(h.date);
+      if(t >= a && t < b){ ses++; vol += sessionVolume(h.entries); }
+    }
+    out.push({ start:a, vol, ses, current: i === 0 });
+  }
+  return out;
+}
+/* tus levantamientos principales: los que más repites, con su 1RM estimado */
+function topLifts(n){
+  const cut = new Date(Date.now() - 70 * 864e5).toISOString();
+  const per = new Map();
+  for(const h of db.history){
+    if(h.deload || h.date < cut) continue;
+    for(const e of h.entries){
+      if(exMeta(e.key).type !== 'normal') continue;
+      const v = bestE1RM(e.sets);
+      if(!(v > 0)) continue;
+      if(!per.has(e.key)) per.set(e.key, { key:e.key, name:e.name, vals:[], first:h.date, last:h.date });
+      const o = per.get(e.key);
+      o.vals.push(v); o.last = h.date;
+      if(h.date < o.first) o.first = h.date;
+    }
+  }
+  return [...per.values()]
+    .filter(o => o.vals.length >= 3)
+    .sort((a, b) => b.vals.length - a.vals.length ||
+                    b.vals[b.vals.length-1] - a.vals[a.vals.length-1])
+    .slice(0, n || 3);
+}
+/* la sesión anterior del mismo día del split, para comparar */
+function prevSameRoutine(h){
+  let best = null;
+  for(const x of db.history){
+    if(x.id === h.id || x.deload || x.date >= h.date) continue;
+    const same = x.routineId ? x.routineId === h.routineId : x.routineName === h.routineName;
+    if(same && (!best || x.date > best.date)) best = x;
+  }
+  return best;
+}
+
+function histPanelHTML(){
+  const wk = weeklyVolumes(9);
+  const cur = wk[wk.length - 1];
+  const cerradas = wk.slice(0, -1).filter(w => w.vol > 0);
+  const media = cerradas.length ? cerradas.reduce((a, w) => a + w.vol, 0) / cerradas.length : 0;
+  const max = Math.max(...wk.map(w => w.vol), 1);
+
+  let sub;
+  if(!cur.ses){
+    sub = media > 0
+      ? `Todavía no entrenas esta semana. Tu media de las últimas ${cerradas.length} es <b>${fmtInt(fromKg(media))} ${uLabel()}</b>.`
+      : `Todavía no entrenas esta semana.`;
+  } else if(media > 0){
+    const pct = Math.round(cur.vol / media * 100);
+    sub = `${nSesiones(cur.ses)} · vas por el <b>${pct} %</b> de tu media
+           (${fmtInt(fromKg(media))} ${uLabel()}).`;
+  } else {
+    sub = `${nSesiones(cur.ses)}. Tu primera semana de registro: desde aquí se mide todo lo demás.`;
+  }
+
+  const barras = wk.map(w => `<span class="${w.current ? 'now' : ''}"
+    style="height:${Math.max(2, Math.round(w.vol / max * 100))}%"
+    title="${fmtInt(fromKg(w.vol))} ${uLabel()}"></span>`).join('');
+
+  const lifts = topLifts(3).map(o => {
+    const ahora = o.vals[o.vals.length - 1], antes = o.vals[0];
+    const d = ahora - antes;
+    const sem = Math.max(1, Math.round((new Date(o.last) - new Date(o.first)) / (7 * 864e5)));
+    const signo = d >= 0 ? '+' : '−';
+    return `<button class="hp-lift" onclick="openExerciseByKey('${o.key}')">
+      <span class="n">${esc(exBaseName(o.name))}
+        <i class="${Math.abs(d) < 0.05 ? 'flat' : ''}">${Math.abs(d) < 0.05
+          ? `sin cambios en ${sem} semana${sem===1?'':'s'}`
+          : `${signo}${fmtE1RM(o.key, Math.abs(d))} en ${sem} semana${sem===1?'':'s'}`}</i></span>
+      ${sparkSVG(o.vals.slice(-8), '#D7A44B', { w:78, h:20, p:4, r:3.2 })}
+      <span class="v">${fmtE1RM(o.key, ahora)}<i>${uLabelEx(o.key)}</i></span>
+    </button>`;
+  }).join('');
+
+  return `
+    <div style="margin-top:18px">
+      <div class="hp-lbl">Peso movido · semana en curso</div>
+      <div class="hp-n"><b>${fmtInt(fromKg(cur.vol))}</b><i>${uLabel()}</i></div>
+      <div class="hp-sub">${sub}</div>
+      ${ max > 1 ? `<div class="hp-bars">${barras}</div>
+      <div class="hp-ax"><span>Hace ${wk.length - 1} semanas</span><span>En curso</span></div>` : '' }
+    </div>
+    ${ lifts ? `<div class="sect">Tu fuerza · 1RM estimado</div>${lifts}
+      <div class="hint">Toca cualquiera para ver su ficha y su gráfica completa.</div>` : '' }
+    ${ volumeCardHTML() }`;
+}
+
+function histRowHTML(h){
+  const nSets = h.entries.reduce((a, e) => a + e.sets.length, 0);
+  const vol = sessionVolume(h.entries);
+  const prs = Array.isArray(h.prs) ? h.prs : [];
+  const prKeys = new Set(prs.map(x => x.key));
+  const d = new Date(h.date);
+  const dia = d.toLocaleDateString('es', { weekday:'short' }).replace('.', '');
+  const prev = prevSameRoutine(h);
+  const prevVol = prev ? sessionVolume(prev.entries) : 0;
+  let vs = '';
+  if(!h.deload && prevVol > 0 && vol > 0){
+    const dif = vol - prevVol, up = dif >= 0;
+    vs = `<div class="hd-vs">
+      <span class="t">Contra tu ${esc(h.routineName)} anterior</span>
+      <span class="t"><b class="${up ? 'up' : ''}">${up ? '+' : '−'}${fmtInt(Math.abs(fromKg(dif)))} ${uLabel()}</b>
+        · ${up ? '+' : '−'}${Math.abs(Math.round(dif / prevVol * 100))} %</span>
+    </div>`;
+  }
+  return `
+    <details class="hd${prs.length ? ' pr' : ''}">
+      <summary>
+        <div class="hd-row">
+          <span class="d"><b>${d.getDate()}</b><i>${dia}</i></span>
+          <span class="g">
+            <span class="n">${esc(h.routineName)}
+              ${prs.length ? `<span class="hd-chip">${prs.length} PR</span>` : ''}
+              ${h.deload ? '<span class="hd-chip q">Descarga</span>' : ''}</span>
+            <span class="m">${h.duration ? fmtDurShort(h.duration).toUpperCase() + ' · ' : ''}${nSets} SERIES</span>
+          </span>
+          <span class="v">${vol > 0 ? fmtInt(fromKg(vol)) : nSets}<i>${vol > 0 ? uLabel() : 'series'}</i></span>
+        </div>
+      </summary>
+      <div class="hd-body">
+        ${receiptHTML(h.entries, prKeys)}
+        ${vs}
+        <div class="hd-acts">
+          <button class="ed" onclick="editSession('${h.id}')">Editar sesión</button>
+          <button class="dz" onclick="deleteSession('${h.id}')">Borrar</button>
+        </div>
+      </div>
+    </details>`;
+}
+
+function moreHistory(){ view.histLimit = (view.histLimit || 40) + 40; render(); }
+
+function histDiaryHTML(){
+  const todas = [...db.history].sort((a, b) => a.date < b.date ? 1 : -1);
+  const limite = view.histLimit || 40;
+  const visibles = todas.slice(0, limite);
+  let html = '', semanaActual = null;
+  for(const h of visibles){
+    const ws = weekStart(h.date), k = ws.getTime();
+    if(k !== semanaActual){
+      semanaActual = k;
+      const dentro = todas.filter(x => weekStart(x.date).getTime() === k);
+      const vol = dentro.reduce((a, x) => a + sessionVolume(x.entries), 0);
+      html += `<div class="hd-wk">
+        <span class="hp-lbl">${weekLabel(ws)}</span>
+        <span class="r">${nSesiones(dentro.length)}${
+          vol > 0 ? ` · ${fmtInt(fromKg(vol))} ${uLabel()}` : ''}</span></div>`;
+    }
+    html += histRowHTML(h);
+  }
+  const faltan = todas.length - visibles.length;
+  return html + (faltan > 0
+    ? `<button class="btn quiet sm" style="margin-top:18px" onclick="moreHistory()">
+         Ver ${nSesiones(faltan)} más</button>`
+    : '');
+}
+
 function viewHistory(){
   if(!db.history.length) return `<div class="empty">
     <div class="big">Sin sesiones</div>
     <p>Todavía no has entrenado.</p>
     <p class="muted">Cuando termines tu primera sesión, la verás aquí con su volumen y duración.</p></div>`;
-
-  const items = [...db.history].reverse().map(h => {
-    const nSets = h.entries.reduce((a,e) => a + e.sets.length, 0);
-    const vol = h.entries.reduce((a,e) => a + e.sets.reduce((b,s) => b + s.w*s.r, 0), 0);
-    return `
-    <details class="hist">
-      <summary>
-        <div class="log">
-          <div class="grow">
-            <div class="log-n">${esc(h.routineName)}${h.deload ? ' <span class="pill hold">Descarga</span>' : ''}</div>
-            <div class="log-m">${fmtDate(h.date)}${h.duration ? ` · ${fmtDur(h.duration)}` : ''} · ${nSets} series</div>
-          </div>
-          ${vol ? `<div class="log-v">${fmtNum(Math.round(fromKg(vol)))} <i>${uLabel()}</i></div>` : `<div class="chev">▾</div>`}
-        </div>
-      </summary>
-      <div class="body">
-        ${h.entries.map(e => `
-          <div class="exline">
-            <span>${exTitleHTML(e.name)}</span>
-            <span class="sets">${e.sets.map(s => fmtSet(e.key, s)).join(' · ')}</span>
-          </div>`).join('')}
-        <div class="row" style="margin-top:14px;gap:9px">
-          <button class="btn quiet sm" onclick="editSession('${h.id}')">Editar</button>
-          <button class="btn danger sm" onclick="deleteSession('${h.id}')">Borrar</button>
-        </div>
-      </div>
-    </details>`;
-  }).join('');
-  return `${volumeCardHTML()}
+  return `${histPanelHTML()}
     <div class="sect">Sesiones</div>
-    ${items}`;
+    ${histDiaryHTML()}`;
 }
 
 /* ---------- editar / borrar sesiones ---------- */
@@ -4890,6 +5111,8 @@ function bestMetricBefore(key){
    recibo de trabajo. Todo sale de datos que la app ya calculaba.
    ===================================================================== */
 /* miles con espacio fino: 8 528 se lee de un vistazo */
+/* «1 sesión» / «3 sesiones»: el singular lleva acento y el plural no */
+function nSesiones(n){ return `${n} sesi${n === 1 ? 'ón' : 'ones'}`; }
 function fmtInt(n){
   return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
@@ -4946,9 +5169,10 @@ function agoLong(iso){
   return ` de hace ${m} ${m === 1 ? 'mes' : 'meses'}`;
 }
 /* la curva: una serie, trazo de 2 px, relleno tenue y el último punto marcado */
-function sparkSVG(vals, color){
+function sparkSVG(vals, color, opts){
   if(!Array.isArray(vals) || vals.length < 2) return '';
-  const W = 196, H = 44, P = 8;
+  const o = opts || {};
+  const W = o.w || 196, H = o.h || 44, P = o.p || 8;
   const min = Math.min(...vals), max = Math.max(...vals);
   const span = (max - min) || 1;
   const x = i => Math.round((P + i * ((W - P*2) / (vals.length - 1))) * 10) / 10;
@@ -4964,7 +5188,7 @@ function sparkSVG(vals, color){
     <polygon points="${pts} ${x(vals.length-1)},${H+4} ${x(0)},${H+4}" fill="url(#${id})"/>
     <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${lx}" cy="${ly}" r="4.5" fill="${color}" stroke="#08080A" stroke-width="2"/>
+    <circle cx="${lx}" cy="${ly}" r="${o.r || 4.5}" fill="${color}" stroke="#08080A" stroke-width="2"/>
   </svg>`;
 }
 /* la serie que acompaña al récord: la misma métrica, sesión a sesión */
@@ -4994,6 +5218,38 @@ function prPrevHTML(pr){
   if(pr.assist) return `antes ${fmtWEx(pr.key, pr.prev)}`;
   if(pr.unit === 's' || pr.unit === 'reps') return `antes ${fmtNum(Math.round(pr.prev*10)/10)}`;
   return `antes ${fmtE1RM(pr.key, pr.prev)}`;
+}
+
+/* las series de un ejercicio en una línea: «85 × 8 · 8 · 7», agrupando por
+   peso en vez de repetirlo en cada serie */
+function setsLine(key, sets){
+  const meta = exMeta(key);
+  if(meta.type === 'tiempo') return sets.map(st => fmtSet(key, st)).join(' · ');
+  const grupos = [];
+  for(const st of sets){
+    const ult = grupos[grupos.length - 1];
+    if(ult && Math.abs(ult.w - st.w) < 1e-9) ult.r.push(st.r);
+    else grupos.push({ w:st.w, r:[st.r] });
+  }
+  const txt = grupos.map(g => (g.w === 0)
+    ? `${g.r.join(' · ')} reps`
+    : `${fmtWEx(key, g.w)} × ${g.r.join(' · ')}`).join('   ');
+  const rirs = sets.map(st => st.rir).filter(x => x !== undefined && x !== null);
+  return txt + (rirs.length === sets.length && rirs.length ? ` · RIR ${rirs.join('·')}` : '');
+}
+/* el detalle impreso: un renglón por ejercicio con su volumen, y sus series debajo */
+function receiptHTML(entries, prKeys){
+  return entries.map(e => {
+    const v = entryVolume(e.key, e.sets);
+    const esPR = !!(prKeys && prKeys.has(e.key));
+    return `<div class="fin-row${esPR ? ' pr' : ''}">
+        <span class="nm">${esc(exBaseName(e.name))}</span>
+        ${esPR ? '<span class="fin-mark">PR</span>' : ''}
+        <span class="dots"></span>
+        <span class="vl">${v > 0 ? fmtInt(fromKg(v)) : '—'}</span>
+      </div>
+      <div class="fin-sets">${setsLine(e.key, e.sets)}</div>`;
+  }).join('');
 }
 
 /* la pantalla completa que sustituye al modal de cierre */
@@ -5073,18 +5329,7 @@ function finishScreenHTML(rec, prs, failNote){
   }
 
   /* ---- el recibo ---- */
-  const prKeys = new Set(prs.map(p => p.key));
-  const filas = rec.entries.map(e => {
-    const v = entryVolume(e.key, e.sets);
-    const esPR = prKeys.has(e.key);
-    return `<div class="fin-row${esPR ? ' pr' : ''}">
-        <span class="nm">${esc(exBaseName(e.name))}</span>
-        ${esPR ? '<span class="fin-mark">PR</span>' : ''}
-        <span class="dots"></span>
-        <span class="vl">${v > 0 ? fmtInt(fromKg(v)) : '—'}</span>
-      </div>
-      <div class="fin-sets">${e.sets.map(st => fmtSet(e.key, st)).join(' · ')}</div>`;
-  }).join('');
+  const filas = receiptHTML(rec.entries, new Set(prs.map(p => p.key)));
   const totalTxt = vol > 0
     ? `${fmtInt(fromKg(vol))}<i> ${uLabel()}</i>`
     : `${fmtInt(sessionReps(rec.entries))}<i> reps</i>`;
@@ -5155,6 +5400,10 @@ function finishSession(){
     entries
   };
   if(isDeload) rec.deload = true;
+  /* los récords se guardan CON la sesión: así el historial puede marcarlos
+     sin recalcular todo el pasado cada vez que se abre la pantalla */
+  if(prs.length) rec.prs = prs.map(x => ({ key:x.key, name:x.name, now:x.now,
+                                           prev:x.prev, unit:x.unit, assist:!!x.assist }));
   /* nota educativa: sesión mayormente al fallo (RIR 0) — salvo que el split
      esté marcado «al fallo a propósito»: ahí es el programa, no un descuido */
   const rrF = db.routines.find(x => x.id === rec.routineId);
@@ -5864,7 +6113,7 @@ function applyHevyImport(){
   }
 
   /* tipos y grupos musculares de lo recién importado */
-  migrateTypes();
+  migrateTypes(); migratePRs();
 
   /* reconstruir el estado adaptativo reproduciendo todo el historial en orden */
   db.progress = {};
@@ -5983,6 +6232,42 @@ function afterRender(){
 }
 
 /* migración: detectar asistidos/corporales en historial ya importado */
+/* el historial anterior a 2.1 no guarda sus récords: se reconstruyen una vez
+   recorriendo las sesiones en orden y llevando la mejor marca viva de cada
+   ejercicio — una sola pasada, sin volver a mirar atrás en cada sesión */
+function migratePRs(){
+  if(!db.history.length) return;
+  if(db.history.every(h => h.prs !== undefined)) return;
+  const best = new Map();
+  const ordenadas = [...db.history].sort((a,b) => a.date < b.date ? -1 : 1);
+  for(const h of ordenadas){
+    const prs = [];
+    for(const e of h.entries){
+      if(!e.sets.length) continue;
+      const meta = exMeta(e.key);
+      const assist = meta.type === 'asistido';
+      let now;
+      if(assist){
+        const { lo } = effRange(e.key);
+        now = Math.min(...e.sets.filter(st => st.r >= lo).map(st => st.w), Infinity);
+        if(now === Infinity) continue;
+      } else {
+        now = ['corporal','tiempo'].includes(meta.type)
+          ? Math.max(0, ...e.sets.map(st => st.r)) : bestE1RM(e.sets);
+        if(!(now > 0)) continue;
+      }
+      const prev = best.get(e.key);
+      const mejora = prev !== undefined && (assist ? now < prev - 1e-9 : now > prev);
+      if(mejora && !h.deload){
+        prs.push({ key:e.key, name:e.name, now, prev, assist,
+          unit: meta.type === 'tiempo' ? 's' : (meta.type === 'corporal' ? 'reps' : uLabelEx(e.key)) });
+      }
+      if(prev === undefined || (assist ? now < prev : now > prev)) best.set(e.key, now);
+    }
+    h.prs = prs;
+  }
+  save();
+}
 function migrateTypes(){
   const traits = new Map();
   for(const h of db.history) for(const e of h.entries){
@@ -6054,7 +6339,7 @@ function migrateTypes(){
     if(document.visibilityState === 'visible' && db.active) acquireWake();
   });
   setInterval(checkIdleSession, 60*1000);
-  migrateTypes();
+  migrateTypes(); migratePRs();
   render();
   if(!db.settings.goal){
     openModal(`

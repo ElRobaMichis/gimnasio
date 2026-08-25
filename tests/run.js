@@ -1910,6 +1910,78 @@ chk(sparkSVG([1], '#D7A44B') === '', 'con un solo punto no se dibuja nada');
 chk(sparkSVG([1,2,3], '#D7A44B').includes('circle'), 'con dos o más, línea y punto final marcado');
 chk(fmtInt(8528) === '8 528' && fmtInt(950) === '950', 'los miles se separan con espacio fino');
 
+/* =====================================================================
+   HISTORIAL: el panel arriba, el diario abajo
+   ===================================================================== */
+suite('Historial — récords guardados con la sesión');
+resetDB();
+db.routines.push({ id:'rh', name:'Torso', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Banca', key:'banca' }] });
+sess('banca', [S(60,10)]);
+startSession('rh');
+db.active.exercises[0].sets[0] = { w:'65', r:'10', rir:'' };
+finishSession(); closeModal();
+let ult = db.history[db.history.length-1];
+chk(Array.isArray(ult.prs) && ult.prs.length === 1 && ult.prs[0].key === 'banca',
+    'la sesión guarda SUS récords: el historial ya no tiene que recalcularlos');
+chk(ult.prs[0].now > ult.prs[0].prev, 'con la marca nueva y la anterior');
+/* el historial viejo se repara solo, en una pasada */
+db.history.forEach(h => { delete h.prs; });
+migratePRs();
+chk(db.history.every(h => Array.isArray(h.prs)), 'migratePRs deja todas las sesiones con su lista');
+chk(db.history[db.history.length-1].prs.length === 1, 'y reconstruye el récord que hubo');
+chk(db.history[0].prs.length === 0, 'la primera vez de un ejercicio no es récord: no hay contra qué');
+
+suite('Historial — el panel');
+resetDB();
+db.routines.push({ id:'rp', name:'Pierna', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Sentadilla', key:'sentadilla' }] });
+for(let i = 6; i >= 0; i--) sess('sentadilla', [S(60+i, 10), S(60+i, 10)], i*7 + 2);
+view = { name:'history' };
+let pan = histPanelHTML();
+chk(pan.includes('Peso movido') && pan.includes('semana en curso'), 'el titular es la semana en curso');
+chk(pan.includes('hp-bars') && (pan.match(/<span class="(now)?"/g)||[]).length >= 8,
+    'con las últimas 9 semanas en barras');
+chk(pan.includes('class="now"'), 'y la semana en curso va punteada: aún no termina');
+chk(pan.includes('Tu fuerza') && pan.includes('sentadilla') && pan.includes('polyline'),
+    'debajo, tus levantamientos con su curva de 1RM');
+chk(pan.includes('openExerciseByKey'), 'y cada uno lleva a su ficha');
+/* semanas y volúmenes */
+const wv = weeklyVolumes(9);
+chk(wv.length === 9 && wv[8].current === true, 'weeklyVolumes: 8 cerradas + la que corre');
+chk(weekStart('2026-08-26T12:00:00Z').getDay() === 1, 'la semana empieza en lunes');
+chk(weekLabel(weekStart(new Date())) === 'Esta semana', 'la semana actual se llama por su nombre');
+
+suite('Historial — el diario');
+const dia = histDiaryHTML();
+chk(dia.includes('hd-wk') && dia.includes('sesi'), 'las sesiones van agrupadas por semana con su resumen');
+chk(nSesiones(1) === '1 sesión' && nSesiones(3) === '3 sesiones', 'y el singular lleva su acento');
+chk(dia.includes('hd-row') && dia.includes('class="d"'), 'cada sesión es una fila con su día del mes');
+chk(dia.includes('fin-row') && dia.includes('fin-sets'), 'y al abrirla, el mismo recibo del cierre');
+chk(dia.includes('Editar sesión') && dia.includes('class="dz"'),
+    'editar es botón y borrar es enlace: no compiten');
+/* las series se agrupan por peso */
+chk(setsLine('sentadilla', [S(60,10), S(60,10), S(60,9)]) === '60 × 10 · 10 · 9',
+    '«60 × 10 · 10 · 9» en vez de repetir el peso tres veces');
+chk(setsLine('sentadilla', [S(60,10), S(50,12)]).includes('60 × 10') &&
+    setsLine('sentadilla', [S(60,10), S(50,12)]).includes('50 × 12'),
+    'si el peso cambia, se abre otro grupo');
+chk(setsLine('sentadilla', [S(60,10,2), S(60,9,1)]).includes('RIR 2·1'), 'el RIR se anota si lo registraste');
+exMeta('domin').type = 'corporal';
+chk(setsLine('domin', [S(0,12), S(0,11)]) === '12 · 11 reps', 'en peso corporal manda la rep, no el cero');
+
+suite('Historial — no se dibuja lo que no cabe');
+resetDB();
+db.routines.push({ id:'rq', name:'T', split:(db.splits[0]||{}).id, exercises:[] });
+for(let i = 0; i < 45; i++) sess('press', [S(50,10)], 60 - i);
+view = { name:'history' };
+chk((histDiaryHTML().match(/details class="hd/g)||[]).length === 40,
+    'de entrada se pintan 40 sesiones, no 400');
+chk(histDiaryHTML().includes('Ver 5 sesiones más'), 'y un botón para traer las que faltan');
+moreHistory();
+chk((histDiaryHTML().match(/details class="hd/g)||[]).length === 45, 'que las trae');
+view = { name:'home' };
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
