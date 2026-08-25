@@ -550,7 +550,7 @@
   .fin-row .nm{font-size:12.5px;color:var(--bone);letter-spacing:-.01em}
   .fin-row .dots{flex:1;border-bottom:1px dotted rgba(255,255,255,.16);transform:translateY(-3px);min-width:12px}
   .fin-row .vl{font-family:var(--mono);font-size:11.5px;color:var(--ash);white-space:nowrap;font-variant-numeric:tabular-nums}
-  .fin-row.pr .nm,.fin-row.pr .vl{color:var(--hold)}
+  .fin-row.is-pr .nm,.fin-row.is-pr .vl{color:var(--hold)}
   .fin-sets{font-family:var(--mono);font-size:10px;color:var(--dim);margin:-2px 0 4px;letter-spacing:.04em}
   .fin-mark{
     font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--hold);
@@ -596,9 +596,17 @@
     color:var(--ash);font-variant-numeric:tabular-nums}
   .hp-lift .v i{font-style:normal;font-size:8.5px;color:var(--dim);display:block;margin-top:3px}
 
-  .hd-wk{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-    margin:20px 0 2px;padding-bottom:7px;border-bottom:1px solid var(--line)}
-  .hd-wk .r{font-family:var(--mono);font-size:9.5px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .hd-wk{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+    margin:30px 0 2px;padding-bottom:9px;border-bottom:1px solid var(--line-2)}
+  .hd-wk.first{margin-top:12px}
+  .hd-wk .l b{display:block;font-size:14px;font-weight:600;letter-spacing:-.015em;color:var(--bone)}
+  .hd-wk .l i{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:5px}
+  .hd-wk .r{text-align:right;flex:none;white-space:nowrap}
+  .hd-wk .r b{display:block;font-family:var(--mono);font-size:11.5px;font-weight:400;color:var(--ash);
+    font-variant-numeric:tabular-nums}
+  .hd-wk .r i{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
+    color:var(--dim);margin-top:5px;font-variant-numeric:tabular-nums}
   details.hd{border-bottom:1px solid var(--line)}
   details.hd summary{list-style:none;cursor:pointer}
   details.hd summary::-webkit-details-marker{display:none}
@@ -615,8 +623,11 @@
   .hd-row .v{font-family:var(--mono);font-size:12.5px;color:var(--ash);flex:none;
     font-variant-numeric:tabular-nums;text-align:right}
   .hd-row .v i{font-style:normal;font-size:9px;color:var(--dim);display:block;margin-top:3px}
-  details.hd.pr .hd-row{border-left:2px solid var(--hold);margin-left:-20px;padding-left:18px}
-  details.hd.pr .hd-row .n{color:var(--hold)}
+  /* el filete ámbar envuelve fila Y detalle: al abrirse siguen siendo lo mismo.
+     La clase se llama is-pr y no pr porque .pr ya existe (el 1RM de la ficha)
+     y convertiría este <details> en una fila de dos columnas. */
+  details.hd.is-pr{border-left:2px solid var(--hold);margin-left:-20px;padding-left:18px}
+  details.hd.is-pr .hd-row .n{color:var(--hold)}
   .hd-chip{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;
     border:1px solid rgba(215,164,75,.5);color:var(--hold);border-radius:3px;padding:1px 4px;flex:none}
   .hd-chip.q{border-color:var(--line-2);color:var(--dim)}
@@ -661,7 +672,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -3599,13 +3610,24 @@ function weekStart(d){
   x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
   return x;
 }
+/* «Esta semana», «Semana pasada», «Hace 3 semanas»: lo primero que uno
+   quiere saber al bajar por la lista es a qué distancia está mirando */
 function weekLabel(ws){
   const diff = Math.round((weekStart(new Date()) - ws) / (7 * 864e5));
-  if(diff === 0) return 'Esta semana';
+  if(diff <= 0) return 'Esta semana';
   if(diff === 1) return 'Semana pasada';
+  if(diff < 9) return `Hace ${diff} semanas`;
+  const m = Math.round(diff / 4.345);
+  return `Hace ${m} ${m === 1 ? 'mes' : 'meses'}`;
+}
+/* y debajo, las fechas exactas: «1 – 7 sep», «28 ago – 3 sep» */
+function weekRange(ws){
   const fin = new Date(ws); fin.setDate(fin.getDate() + 6);
-  const f = d => d.toLocaleDateString('es', { day:'numeric', month:'short' }).replace('.', '');
-  return `${f(ws)} – ${f(fin)}`;
+  const mismoMes = ws.getMonth() === fin.getMonth();
+  const f = (d, conMes) => d.toLocaleDateString('es',
+    conMes ? { day:'numeric', month:'short' } : { day:'numeric' }).replace('.', '');
+  const anio = ws.getFullYear() !== new Date().getFullYear() ? ` ${ws.getFullYear()}` : '';
+  return `${f(ws, !mismoMes)} – ${f(fin, true)}${anio}`;
 }
 /* volumen semana a semana, la última es la que está en curso */
 function weeklyVolumes(n){
@@ -3726,7 +3748,7 @@ function histRowHTML(h){
     </div>`;
   }
   return `
-    <details class="hd${prs.length ? ' pr' : ''}">
+    <details class="hd${prs.length ? ' is-pr' : ''}">
       <summary>
         <div class="hd-row">
           <span class="d"><b>${d.getDate()}</b><i>${dia}</i></span>
@@ -3763,10 +3785,10 @@ function histDiaryHTML(){
       semanaActual = k;
       const dentro = todas.filter(x => weekStart(x.date).getTime() === k);
       const vol = dentro.reduce((a, x) => a + sessionVolume(x.entries), 0);
-      html += `<div class="hd-wk">
-        <span class="hp-lbl">${weekLabel(ws)}</span>
-        <span class="r">${nSesiones(dentro.length)}${
-          vol > 0 ? ` · ${fmtInt(fromKg(vol))} ${uLabel()}` : ''}</span></div>`;
+      html += `<div class="hd-wk${html ? '' : ' first'}">
+        <span class="l"><b>${weekLabel(ws)}</b><i>${weekRange(ws)}</i></span>
+        <span class="r"><b>${nSesiones(dentro.length)}</b>${
+          vol > 0 ? `<i>${fmtInt(fromKg(vol))} ${uLabel()}</i>` : ''}</span></div>`;
     }
     html += histRowHTML(h);
   }
@@ -5242,7 +5264,7 @@ function receiptHTML(entries, prKeys){
   return entries.map(e => {
     const v = entryVolume(e.key, e.sets);
     const esPR = !!(prKeys && prKeys.has(e.key));
-    return `<div class="fin-row${esPR ? ' pr' : ''}">
+    return `<div class="fin-row${esPR ? ' is-pr' : ''}">
         <span class="nm">${esc(exBaseName(e.name))}</span>
         ${esPR ? '<span class="fin-mark">PR</span>' : ''}
         <span class="dots"></span>

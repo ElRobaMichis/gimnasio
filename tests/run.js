@@ -1960,6 +1960,22 @@ chk(dia.includes('hd-row') && dia.includes('class="d"'), 'cada sesión es una fi
 chk(dia.includes('fin-row') && dia.includes('fin-sets'), 'y al abrirla, el mismo recibo del cierre');
 chk(dia.includes('Editar sesión') && dia.includes('class="dz"'),
     'editar es botón y borrar es enlace: no compiten');
+/* regresión: la clase «pr» global (el 1RM de la ficha) es display:flex y
+   partía el <details> en dos columnas — el detalle salía al lado, no debajo */
+resetDB();
+db.history.push({ id:'hx', routineId:'rz', routineName:'T', date:new Date().toISOString(),
+  duration:3600, entries:[{ key:'banca', name:'Banca', sets:[S(60,10)] }],
+  prs:[{ key:'banca', name:'Banca', now:80, prev:75, unit:'kg', assist:false }] });
+const fila = histRowHTML(db.history[0]);
+chk(fila.includes('class="hd is-pr"') && !fila.includes('class="hd pr"'),
+    'la sesión con récord NO usa la clase global «pr»: el detalle va debajo, no al lado');
+chk(receiptHTML(db.history[0].entries, new Set(['banca'])).includes('fin-row is-pr'),
+    'y el recibo tampoco');
+/* las semanas se nombran por distancia, con sus fechas debajo */
+const hace3 = weekStart(new Date(Date.now() - 21*864e5));
+chk(weekLabel(hace3) === 'Hace 3 semanas', 'una semana vieja dice a cuánto está');
+chk(weekLabel(weekStart(new Date(Date.now() - 7*864e5))) === 'Semana pasada', 'y la anterior, por su nombre');
+chk(/\d/.test(weekRange(hace3)) && weekRange(hace3).includes('–'), 'debajo van las fechas exactas');
 /* las series se agrupan por peso */
 chk(setsLine('sentadilla', [S(60,10), S(60,10), S(60,9)]) === '60 × 10 · 10 · 9',
     '«60 × 10 · 10 · 9» en vez de repetir el peso tres veces');
