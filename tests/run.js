@@ -1971,6 +1971,13 @@ chk(fila.includes('class="hd is-pr"') && !fila.includes('class="hd pr"'),
     'la sesión con récord NO usa la clase global «pr»: el detalle va debajo, no al lado');
 chk(receiptHTML(db.history[0].entries, new Set(['banca'])).includes('fin-row is-pr'),
     'y el recibo tampoco');
+/* saber si está abierta o cerrada, y dónde acaba cada una */
+chk(fila.includes('hd-cv'), 'cada fila lleva su galón: se ve si está plegada o abierta');
+const hoja = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+chk(hoja.includes('details.hd[open]{') && hoja.includes('border-radius:14px'),
+    'abierta se vuelve tarjeta con borde: con tres abiertas no se mezclan');
+chk(hoja.includes('details.hd[open] .hd-cv{transform:rotate(90deg)'), 'y el galón gira al abrir');
+chk(hoja.includes('prefers-reduced-motion') , 'con su respeto al movimiento reducido');
 /* las semanas se nombran por distancia, con sus fechas debajo */
 const hace3 = weekStart(new Date(Date.now() - 21*864e5));
 chk(weekLabel(hace3) === 'Hace 3 semanas', 'una semana vieja dice a cuánto está');

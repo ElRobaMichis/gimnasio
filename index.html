@@ -610,6 +610,17 @@
   details.hd{border-bottom:1px solid var(--line)}
   details.hd summary{list-style:none;cursor:pointer}
   details.hd summary::-webkit-details-marker{display:none}
+  /* abierta, la sesión se vuelve tarjeta: con varias abiertas a la vez hay que
+     ver de un golpe dónde empieza una y termina la otra */
+  details.hd[open]{
+    background:var(--surface);border:1px solid var(--line-2);border-radius:14px;
+    margin:12px -12px;padding:0 12px;
+  }
+  details.hd[open] .hd-row{padding:14px 0 10px}
+  details.hd[open] .hd-body{padding-top:4px}
+  .hd-cv{color:var(--dim);font-size:15px;line-height:1;flex:none;transition:transform .16s ease}
+  details.hd[open] .hd-cv{transform:rotate(90deg);color:var(--ash)}
+  @media (prefers-reduced-motion:reduce){ .hd-cv{transition:none} }
   .hd-row{display:flex;align-items:center;gap:11px;padding:12px 0;width:100%}
   .hd-row .d{width:30px;flex:none;text-align:center}
   .hd-row .d b{display:block;font-family:var(--mono);font-size:15px;color:var(--ash);
@@ -628,6 +639,7 @@
      y convertiría este <details> en una fila de dos columnas. */
   details.hd.is-pr{border-left:2px solid var(--hold);margin-left:-20px;padding-left:18px}
   details.hd.is-pr .hd-row .n{color:var(--hold)}
+  details.hd[open].is-pr{margin-left:-12px;padding-left:12px;border-left:2px solid var(--hold)}
   .hd-chip{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;
     border:1px solid rgba(215,164,75,.5);color:var(--hold);border-radius:3px;padding:1px 4px;flex:none}
   .hd-chip.q{border-color:var(--line-2);color:var(--dim)}
@@ -672,7 +684,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '2.1.1';
+const APP_VERSION = '2.1.2';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -3759,6 +3771,7 @@ function histRowHTML(h){
             <span class="m">${h.duration ? fmtDurShort(h.duration).toUpperCase() + ' · ' : ''}${nSets} SERIES</span>
           </span>
           <span class="v">${vol > 0 ? fmtInt(fromKg(vol)) : nSets}<i>${vol > 0 ? uLabel() : 'series'}</i></span>
+          <span class="hd-cv" aria-hidden="true">›</span>
         </div>
       </summary>
       <div class="hd-body">
