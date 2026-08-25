@@ -1813,6 +1813,103 @@ chk(guia.includes('0 km') && guia.includes('NO las dejes en blanco'),
 closeModal();
 view = { name:'home' };
 
+/* =====================================================================
+   CIERRE DE SESIÓN: el titular y su recibo
+   ===================================================================== */
+suite('Cierre — el titular siempre tiene noticia que dar');
+resetDB();
+db.settings.health = 'off';
+db.routines.push({ id:'rf', name:'Torso', split:(db.splits[0]||{}).id, exercises:[
+  { id:'a', name:'Curl', key:'curl' }, { id:'b', name:'Press', key:'press' }] });
+/* dos récords el mismo día: gana el titular la mejora MAYOR, no la primera */
+sess('curl',  [S(20,10)]);          /* e1RM 26,7 */
+sess('press', [S(50,10)]);          /* e1RM 66,7 */
+startSession('rf');
+db.active.exercises[0].sets[0] = { w:'21', r:'10', rir:'' };   /* +5 %  */
+db.active.exercises[1].sets[0] = { w:'60', r:'10', rir:'' };   /* +20 % */
+finishSession();
+let fin = els['modalhost'].innerHTML;
+chk(fin.includes('Nuevo récord · Press'), 'el titular es el récord con mayor mejora (Press, +20 %)');
+chk(fin.includes('También hoy') && fin.includes('Curl'), 'el otro récord baja a «También hoy»');
+chk(fin.includes('1RM estimado') && fin.includes('sobre tu marca'), 'la cifra viene explicada');
+chk(fin.includes('<svg') && fin.includes('polyline'), 'y con su curva de progresión');
+chk(fin.includes('El detalle') && fin.includes('Total movido'), 'debajo, el recibo con su total');
+chk(fin.includes('fin-mark'), 'los ejercicios con récord van marcados en el recibo');
+chk(fin.includes('Ver historial') && fin.includes('Listo'), 'las salidas siguen a mano');
+closeModal();
+
+suite('Cierre — sin récord manda el peso movido');
+resetDB();
+db.settings.health = 'off';
+db.routines.push({ id:'rv', name:'Pierna', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Sentadilla', key:'sentadilla' }] });
+startSession('rv');
+db.active.exercises[0].sets[0] = { w:'60', r:'10', rir:'' };
+addSet(0);
+db.active.exercises[0].sets[1] = { w:'60', r:'10', rir:'' };
+finishSession();
+fin = els['modalhost'].innerHTML;
+chk(fin.includes('Peso movido') && fin.includes(fmtInt(1200)), '1 200 kg movidos como titular');
+chk(!fin.includes('récord'), 'y ni se menciona la palabra récord: hoy no tocaba');
+chk(fin.includes('Tu primera vez de este día'), 'sin sesión previa, lo dice en vez de comparar');
+closeModal();
+/* la segunda vez ya hay contra qué medirse: mismo peso, una serie más
+   (subir el peso sería récord y el titular pasaría a ser ese) */
+startSession('rv');
+db.active.exercises[0].sets[0] = { w:'60', r:'10', rir:'' };
+addSet(0); db.active.exercises[0].sets[1] = { w:'60', r:'10', rir:'' };
+addSet(0); db.active.exercises[0].sets[2] = { w:'60', r:'10', rir:'' };
+finishSession();
+fin = els['modalhost'].innerHTML;
+chk(fin.includes('+' + fmtInt(600)) && fin.includes('anterior'),
+    'compara contra tu Pierna anterior (1 200 → 1 800 kg)');
+chk(!fin.includes('récord'), 'más volumen sin más peso no es récord, y no se inventa uno');
+closeModal();
+
+suite('Cierre — casos que no son kilos');
+chk(entryVolume('sentadilla', [S(60,10)]) === 600, 'volumen = peso × reps');
+exMeta('dominadas').type = 'corporal';
+exMeta('fondos a').type = 'asistido';
+exMeta('plancha').type = 'tiempo';
+chk(entryVolume('fondos a', [S(25,10)]) === 0, 'en asistidos los kg son ayuda: no cuentan como volumen');
+chk(entryVolume('plancha', [S(0,45)]) === 0, 'y en los de tiempo las «reps» son segundos');
+/* una sesión solo de peso corporal tiene titular igual: reps */
+resetDB();
+db.settings.health = 'off';
+exMeta('dominadas').type = 'corporal';
+db.routines.push({ id:'rc', name:'Core', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Dominadas', key:'dominadas' }] });
+startSession('rc');
+db.active.exercises[0].sets[0] = { w:'', r:'12', rir:'' };
+finishSession();
+fin = els['modalhost'].innerHTML;
+chk(fin.includes('12') && fin.includes('reps') && fin.includes('Total de reps'),
+    'sin peso que sumar, el titular y el total van en reps');
+closeModal();
+
+suite('Cierre — descarga y Apple Salud');
+resetDB();
+db.routines.push({ id:'rd', name:'Full', split:(db.splits[0]||{}).id,
+  exercises:[{ id:'a', name:'Banca', key:'banca' }] });
+sess('banca', [S(60,12), S(60,12)]);
+db.settings.health = 'on';
+startSession('rd', true);
+db.active.exercises[0].sets[0] = { w:'55', r:'8', rir:'' };
+finishSession();
+fin = els['modalhost'].innerHTML;
+chk(fin.includes('Descarga guardada') && !fin.includes('Nuevo récord'), 'la descarga tiene su propio encabezado');
+chk(!fin.includes('polyline'), 'y sin curva: bajar el peso a propósito no es una caída que enseñar');
+chk(fmtDurShort(3140) === '52 min' && fmtDurShort(3852) === '1 h 4 min', 'el pie no dice «52 min 0 s»');
+chk(fin.includes('Guardar en Apple Salud') && fin.includes('btn health'),
+    'el botón de Salud sale en ámbar, ya no camuflado');
+closeModal();
+db.settings.health = 'off';
+
+suite('Cierre — la curva');
+chk(sparkSVG([1], '#D7A44B') === '', 'con un solo punto no se dibuja nada');
+chk(sparkSVG([1,2,3], '#D7A44B').includes('circle'), 'con dos o más, línea y punto final marcado');
+chk(fmtInt(8528) === '8 528' && fmtInt(950) === '950', 'los miles se separan con espacio fino');
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);
