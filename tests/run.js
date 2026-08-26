@@ -2005,6 +2005,86 @@ moreHistory();
 chk((histDiaryHTML().match(/details class="hd/g)||[]).length === 45, 'que las trae');
 view = { name:'home' };
 
+suite('Máquinas de discos con peso propio — anotas solo los discos');
+resetDB();
+exMeta('remomaq').equip = 'discos';
+exMeta('remomaq').points = 2;
+exMeta('remomaq').base = 11.3;
+chk(discosOffset('remomaq') === 11.3, 'el peso del aparato anotado se vuelve el offset');
+chk(Math.abs(typedToKg('remomaq', 30) - 41.3) < 1e-9, 'teclear 30 son 41,3 kg reales (30 + 11,3 del carro)');
+chk(Math.abs(kgToTyped('remomaq', 41.3) - 30) < 1e-9, 'y 41,3 reales se enseñan como 30 al teclear');
+chk(kgToTyped('remomaq', 5) === 0, 'un histórico menor que el aparato no produce discos negativos');
+/* sin base anotada, nada cambia */
+exMeta('jalonx').equip = 'discos';
+chk(discosOffset('jalonx') === 0 && typedToKg('jalonx', 30) === 30,
+    'sin peso de aparato anotado, lo tecleado sigue siendo el total');
+/* en asistidos el número es AYUDA, no carga: el offset no aplica */
+exMeta('fondasist').equip = 'discos'; exMeta('fondasist').base = 20; exMeta('fondasist').type = 'asistido';
+chk(discosOffset('fondasist') === 0, 'en asistidos no se suma nada: ahí se anota la ayuda');
+
+/* al guardar la sesión, el historial recibe el peso real */
+db.active = { routineId:'', routineName:'X', start: Date.now(), exercises:[
+  { key:'remomaq', name:'Remo en máquina', sugg:null, sets:[{ w:'30', r:'10', rir:'2' }] }
+]};
+let entD = collectEntries(db.active);
+chk(Math.abs(entD[0].sets[0].w - 41.3) < 1e-9, 'la serie tecleada como 30 se guarda como 41,3');
+db.active.exercises[0].sets = [{ w:'0', r:'10', rir:'' }];
+entD = collectEntries(db.active);
+chk(Math.abs(entD[0].sets[0].w - 11.3) < 1e-9, 'teclear 0 guarda el aparato vacío (11,3)');
+/* y si hubo conversión de unidad, el offset se suma sobre el canónico */
+db.active.exercises[0].sets = [{ w:'22.05', wkg: 10, r:'8', rir:'' }];
+entD = collectEntries(db.active);
+chk(Math.abs(entD[0].sets[0].w - 21.3) < 1e-9, 'con kg canónicos (conversión de unidad) el offset se suma igual');
+
+/* el chip de volumen compara peras con peras */
+sess('remomaq', [S(41.3, 10)], 7);
+db.active.exercises[0].sets = [{ w:'30', r:'10', rir:'' }];
+const viD = vsLastInfo(0);
+chk(viD && viD.pct === 100, 'volumen vs última sesión: 30 tecleado hoy = 41,3 guardado ayer (100 %)');
+
+/* el caso reportado: base 11,3, cargó 15 por lado, tecleó 30 */
+db.gym.plates = [
+  { kg:20, pairs:2, on:true }, { kg:10, pairs:2, on:true },
+  { kg:5, pairs:2, on:true }, { kg:2.5, pairs:2, on:true }
+];
+invalidatePlates();
+const twD = targetWeight(db.active.exercises[0]);
+chk(Math.abs(twD - 41.3) < 1e-9, 'el objetivo de carga parte del peso real');
+const lpD = loadPlan('remomaq', twD);
+chk(lpD && Math.abs(lpD.perPointKg - 15) < 1e-9 && lpD.exact,
+    'y la calculadora dice 15 por lado EXACTOS — ya no «10 por lado ≈ 31,3»');
+const stripD = loadStripHTML(0);
+chk(stripD.includes('Anotas (solo discos)') && stripD.includes('>30 kg<'),
+    'la tira de carga enseña también lo que se anota: 30');
+
+/* la sugerencia del coach se guarda real pero se teclea sin la base */
+db.active.exercises[0].sugg = { w:41.3, reps:8, sets:3, type:'up', msg:'', why:'' };
+const rowD = setRowHTML(0, 0, { w:'', r:'', rir:'' }, db.active.exercises[0].sugg, 'normal');
+chk(rowD.includes('placeholder="30"'), 'el placeholder de la serie sugiere 30, listo para teclear');
+chk(weightColLabel('remomaq', 'normal') === 'kg discos', 'la columna avisa: ahí van solo los discos');
+
+/* el aviso de una sola vez */
+const noticeD = dbNoticeHTML('remomaq');
+chk(noticeD.includes('Anota solo los discos') && noticeD.includes('11,3'),
+    'la primera vez sale el aviso con el peso del aparato');
+db.settings.discosNoticeSeen = new Date().toISOString();
+chk(dbNoticeHTML('remomaq') === '', 'y una vez entendido, no vuelve');
+delete db.settings.discosNoticeSeen;
+
+/* el calentamiento también parte del peso real */
+const wpD = warmupPlan(0);
+chk(wpD && Math.abs(wpD.W - 41.3) < 1e-9, 'la escalera de calentamiento se calcula sobre 41,3, no sobre 30');
+
+/* en libras, el puente respeta la unidad activa */
+db.settings.unit = 'lb';
+exMeta('pressLb').equip = 'discos';
+exMeta('pressLb').base = toKg(10);   /* el aparato pesa 10 lb */
+chk(Math.abs(fromKgEx('pressLb', kgToTyped('pressLb', typedToKg('pressLb', 30))) - 30) < 0.01,
+    'teclear 30 lb y volver da 30 lb, sin arrastre');
+chk(fmtWEx('pressLb', typedToKg('pressLb', 30)) === '40', '30 lb en discos + 10 lb de aparato = 40 lb reales');
+db.settings.unit = 'kg';
+db.active = null;
+
 /* ---------- resultado ---------- */
 console.log('\n' + '='.repeat(50));
 console.log(fail === 0 ? `TODOS LOS TESTS OK (${pass})` : `${fail} FALLOS de ${pass + fail}`);

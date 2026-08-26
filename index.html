@@ -684,7 +684,7 @@ const LS_KEY = 'hierro.v1';
      PARCHE cuando solo se arreglan fallos.
    Tiene que ir SIEMPRE igual que CACHE en sw.js; hay un test que lo
    comprueba, porque olvidar uno de los dos es el fallo fácil. */
-const APP_VERSION = '2.1.2';
+const APP_VERSION = '2.2.0';
 let updateReady = false, updateDismissed = false;
 
 /* Aviso de versión nueva, abajo y por encima de todo.
@@ -1126,6 +1126,21 @@ function effBase(key){
   if(effEquip(key) === 'barra'){ const b = barFor(key); return b ? b.kg : 0; }
   const v = parseFloat(exMeta(key).base);
   return (!isNaN(v) && v > 0) ? v : 0;
+}
+
+/* máquinas de discos con peso propio anotado: el usuario teclea SOLO los
+   discos que pone (15 por lado → escribe 30) y la app suma el aparato al
+   guardar. Así se anota lo que se ve en la máquina, y el historial, los
+   récords y el coach trabajan con el peso que de verdad se movió.
+   typedToKg/kgToTyped son el puente entre lo tecleado y lo real. */
+function discosOffset(key){
+  if(effEquip(key) !== 'discos' || exMeta(key).type !== 'normal') return 0;
+  return effBase(key);
+}
+function typedToKg(key, n){ return toKgEx(key, n) + discosOffset(key); }
+function kgToTyped(key, kg){
+  const off = discosOffset(key);
+  return off > 0 ? Math.max(0, Math.round((kg - off)*1000)/1000) : kg;
 }
 
 /* ---------- inventario ---------- */
@@ -2923,7 +2938,9 @@ function equipConfigHTML(key, meta){
       <div class="hint">${ minStep > 0
         ? `Con ${pts === 1 ? 'un solo pitón' : (pts === 2 ? 'dos lados' : 'cuatro pitones')}, el salto más pequeño que puedes armar es <b>${fmtW(minStep)} ${uLabel()}</b>${pts > 1 ? ` — un disco de ${fmtW(minStep/pts)} en cada uno` : ''}.`
         : 'Marca algún disco en Ajustes → Mi equipo para poder calcular la carga.' }
-        ${ eq === 'discos' ? ' Dejar el peso en blanco no rompe nada: el coach compara tus series entre sí.' : '' }</div>`;
+        ${ eq === 'discos' ? (effBase(key) > 0
+          ? ` Como anotaste su peso, en la sesión escribes <b>solo los discos que pones</b> (15 por lado = 30): la app suma el aparato y tu historial guarda el peso real.`
+          : ' Dejar el peso en blanco no rompe nada: el coach compara tus series entre sí. Si lo anotas, en la sesión tecleas solo los discos y la app suma el aparato por ti.') : '' }</div>`;
   }
 
   if(eq === 'mancuerna'){
@@ -3180,30 +3197,50 @@ function weightColLabel(key, t){
   if(t === 'corporal' || t === 'tiempo') return 'lastre';
   if(t === 'asistido') return 'ayuda';
   if(effEquip(key) === 'mancuerna' && effPoints(key) === 2) return uLabelEx(key) + ' total';
+  if(discosOffset(key) > 0) return uLabelEx(key) + ' discos';
   return uLabelEx(key);
 }
 
 /* aviso de una sola vez, como el de Hevy: en mancuernas se anota el total */
 function dbNoticeHTML(key){
-  if(db.settings.dbNoticeSeen) return '';
-  if(effEquip(key) !== 'mancuerna' || effPoints(key) !== 2) return '';
-  return `<div class="note" style="margin:13px 0 0">
+  if(effEquip(key) === 'mancuerna' && effPoints(key) === 2){
+    if(db.settings.dbNoticeSeen) return '';
+    return `<div class="note" style="margin:13px 0 0">
     <div class="note-t">Anota el total de las dos mancuernas</div>
     <div class="note-d">Si agarras 10 en cada mano, escribe <b>20</b>. Así el número es el peso que de
       verdad moviste, se puede comparar con las barras y las máquinas, y la app sabe qué par bajar del
       rack. Es la misma convención que usa Hevy.</div>
     <button class="note-a" onclick="dismissDbNotice()">Entendido — no mostrar más</button>
   </div>`;
+  }
+  /* y en máquinas de discos con peso propio anotado: solo los discos */
+  if(discosOffset(key) > 0){
+    if(db.settings.discosNoticeSeen) return '';
+    return `<div class="note" style="margin:13px 0 0">
+    <div class="note-t">Anota solo los discos que pones</div>
+    <div class="note-d">Este aparato pesa <b>${fmtWEx(key, effBase(key))} ${uLabelEx(key)}</b> vacío y la
+      app lo suma sola: si cargas 15 por lado, escribe <b>30</b>. En tu historial y tus récords queda el
+      peso real que moviste (${fmtWEx(key, typedToKg(key, 30))} ${uLabelEx(key)}). Sin discos, anota <b>0</b>.</div>
+    <button class="note-a" onclick="dismissDiscosNotice()">Entendido — no mostrar más</button>
+  </div>`;
+  }
+  return '';
 }
 function dismissDbNotice(){
   db.settings.dbNoticeSeen = new Date().toISOString();
+  save(); render();
+}
+function dismissDiscosNotice(){
+  db.settings.discosNoticeSeen = new Date().toISOString();
   save(); render();
 }
 
 /* peso objetivo de hoy: lo escrito en la serie 1, o lo que sugiere el coach */
 function targetWeight(ex){
   const typed = parseFloat(ex.sets[0] && ex.sets[0].w);
-  if(!isNaN(typed) && typed > 0) return toKgEx(ex.key, typed);
+  /* en aparatos con peso propio, teclear 0 también vale: significa «vacío» */
+  if(!isNaN(typed) && (typed > 0 || (typed === 0 && discosOffset(ex.key) > 0)))
+    return typedToKg(ex.key, typed);
   if(ex.sugg && ex.sugg.w > 0) return ex.sugg.w;
   return NaN;
 }
@@ -3260,7 +3297,12 @@ function loadStripHTML(xi){
     <div class="load-row" style="margin-top:8px">
       <span class="load-l">${label}</span>
       <span class="load-v">${pointTextHTML(p.perPoint)}</span>
-    </div>`);
+    </div>
+    ${ p.kind === 'discos' && p.base > 0 ? `
+    <div class="load-row" style="margin-top:6px">
+      <span class="load-l">Anotas (solo discos)</span>
+      <span class="load-v"><b>${fmtW(p.total - p.base)} ${uLabel()}</b></span>
+    </div>` : '' }`);
 }
 
 /* el detalle: el dibujo en grande y la cuenta completa */
@@ -3326,6 +3368,7 @@ function showLoad(xi){
     <div class="list">${plateListHTML(p.perPoint, p.points) ||
       `<div class="line"><div class="l-t">Sin discos</div><div class="l-v">${p.kind === 'barra' ? 'solo la barra' : 'aparato vacío'}</div></div>`}</div>
     <div class="hint">${cuenta} = <b>${fmtW(p.total)} ${uLabel()}</b>.
+      ${ p.kind === 'discos' && p.base > 0 ? `En la app anotas <b>solo los discos</b> (${fmtW(p.total - p.base)} ${uLabel()}): el aparato se suma solo y tu historial guarda el total real.` : '' }
       ${p.exact ? '' : `El objetivo era ${fmtW(p.target)} ${uLabel()}; esto es lo más cercano que puedes armar.`}</div>
     <button class="btn" style="margin-top:18px" onclick="closeModal()">Listo</button>
     ${ p.kind === 'barra' ? `<button class="btn ghost" onclick="closeModal(); pickBar('${key}')">Cambiar de barra</button>` : '' }`);
@@ -3453,7 +3496,7 @@ function viewSession(){
     if(xi !== openIdx){
       if(exDone(ex)){
         const hecho = ex.sets.filter(st => parseInt(st.r,10) > 0)
-          .map(st => `<b>${fmtSet(ex.key, { w: toKg(parseFloat(st.w) || 0), r: parseInt(st.r,10) })}</b>`).join(' · ');
+          .map(st => `<b>${fmtSet(ex.key, { w: typedToKg(ex.key, parseFloat(st.w) || 0), r: parseInt(st.r,10) })}</b>`).join(' · ');
         return `
         <button class="ex-done" id="exb-${xi}" onclick="openSessionEx(${xi})">
           <span class="grow">
@@ -3482,6 +3525,7 @@ function viewSession(){
       else if(t === 'tiempo') firstMsg = `Primera vez. Mide los segundos que sostienes con buena técnica (ideal ${lo}–${hi} s). Toca el ▶ de cada serie para usar el cronómetro con alarma.`;
       else if(t === 'asistido') firstMsg = `Primera vez. Anota la AYUDA de la máquina o banda (en ${uLabelEx(ex.key)}). Elige una ayuda con la que logres ${lo}–${hi} reps quedándote 1–3 en reserva.`;
       else if(effEquip(ex.key) === 'mancuerna') firstMsg = `Primera vez. Anota el <b>total de las dos mancuernas</b>: si agarras 10 en cada mano, escribe ${fmtWEx(ex.key, 20)}. Busca un peso con el que hagas ${lo}–${hi} reps quedándote 1–3 en reserva.`;
+      else if(discosOffset(ex.key) > 0) firstMsg = `Primera vez. Anota <b>solo los discos</b> que pones (15 por lado = escribe 30): el aparato de ${fmtWEx(ex.key, effBase(ex.key))} ${uLabelEx(ex.key)} se suma solo y tu historial guarda el peso real. Busca una carga con la que hagas ${lo}–${hi} reps quedándote 1–3 en reserva.`;
       else firstMsg = `Primera vez con este ejercicio. Elige un peso con el que puedas hacer ${lo}–${hi} reps quedándote 1–3 en reserva (sin llegar al fallo). Desde la próxima, te sugiero la progresión.`;
     }
 
@@ -3524,7 +3568,8 @@ function viewSession(){
 function setRowHTML(xi, si, st, sugg, t){
   const tiempo = t === 'tiempo';
   const key = db.active ? db.active.exercises[xi].key : null;
-  const pw = sugg ? fmtWEx(key, sugg.w) : ((t === 'corporal' || tiempo) ? '0' : uLabelEx(key));
+  /* la sugerencia se enseña como se teclea: en discos-con-aparato, sin la base */
+  const pw = sugg ? fmtWEx(key, kgToTyped(key, sugg.w)) : ((t === 'corporal' || tiempo) ? '0' : uLabelEx(key));
   const pr = sugg ? sugg.reps : (tiempo ? 'seg' : 'reps');
   const cls = sugg ? ' sugg' : '';
   const done = !!st.done;
@@ -4838,7 +4883,7 @@ function vsLastInfo(xi){
     if(repsMode){ vol += r; done++; }
     else {
       const w = parseFloat(st.w);
-      if(!isNaN(w) && w >= 0){ vol += toKgEx(ex.key, w) * r; done++; }
+      if(!isNaN(w) && w >= 0){ vol += typedToKg(ex.key, w) * r; done++; }
     }
   }
   if(!done) return null;
@@ -5088,6 +5133,10 @@ function collectEntries(s){
       const canon = parseFloat(st.wkg);
       if(!isNaN(w)) w = !isNaN(canon) ? Math.round(canon*1000)/1000
                                       : Math.round(toKgEx(ex.key, w)*1000)/1000;
+      /* aparato con peso propio: lo tecleado son solo los discos —
+         al historial va el peso real (discos + aparato) */
+      const off = discosOffset(ex.key);
+      if(!isNaN(w) && off > 0) w = Math.round((w + off)*1000)/1000;
       const r = parseInt(st.r,10);
       const out = { w, r };
       const rir = parseInt(st.rir,10);
@@ -5602,7 +5651,8 @@ function warmupPlan(xi){
   /* peso de trabajo de hoy: lo escrito en la serie 1, o la sugerencia del coach */
   let W = NaN;
   const typed = parseFloat(ex.sets[0] && ex.sets[0].w);
-  if(!isNaN(typed) && typed > 0) W = toKg(typed);
+  if(!isNaN(typed) && (typed > 0 || (typed === 0 && discosOffset(ex.key) > 0)))
+    W = typedToKg(ex.key, typed);
   else if(ex.sugg && ex.sugg.w > 0) W = ex.sugg.w;
 
   /* ¿el músculo ya viene caliente de un ejercicio anterior de esta sesión? */
