@@ -833,11 +833,11 @@ exMeta('press db').points = 1;
 chk(weightColLabel('press db', 'normal') === 'kg', 'a una mano no hace falta: es una sola');
 exMeta('press db').points = 2;
 exMeta('barra').equip = 'barra';
-chk(weightColLabel('barra', 'normal') === 'kg', 'en barra la columna no cambia');
+chk(weightColLabel('barra', 'normal') === 'kg discos', 'en barra la columna avisa: solo los discos');
 chk(weightColLabel('press db', 'tiempo') === 'lastre', 'los ejercicios por tiempo siguen pidiendo lastre');
 
 chk(dbNoticeHTML('press db').includes('total de las dos'), 'la primera vez sale el aviso completo');
-chk(dbNoticeHTML('barra') === '', 'y solo en mancuernas');
+chk(dbNoticeHTML('barra').includes('solo los discos'), 'y en barra sale el suyo: la barra se suma sola');
 dismissDbNotice();
 chk(dbNoticeHTML('press db') === '', 'una vez lo descartas, no vuelve');
 
@@ -2074,6 +2074,49 @@ delete db.settings.discosNoticeSeen;
 /* el calentamiento también parte del peso real */
 const wpD = warmupPlan(0);
 chk(wpD && Math.abs(wpD.W - 41.3) < 1e-9, 'la escalera de calentamiento se calcula sobre 41,3, no sobre 30');
+
+suite('Barra — mismo trato: anotas solo los discos');
+resetDB();
+db.gym = defaultGym('kg'); invalidatePlates();
+db.gym.bars = [{ id:'ol', name:'Olímpica', kg:20, on:true, def:true }];
+db.gym.plates = [
+  { kg:20, pairs:2, on:true }, { kg:10, pairs:2, on:true },
+  { kg:5, pairs:2, on:true }, { kg:2.5, pairs:2, on:true }
+];
+invalidatePlates();
+exMeta('press banca').equip = 'barra';
+chk(discosOffset('press banca') === 20, 'la barra del ejercicio se vuelve el offset');
+chk(typedToKg('press banca', 5) === 25, 'teclear 5 son 25 reales (2,5 por lado + la barra)');
+chk(kgToTyped('press banca', 25) === 5, 'y 25 reales se enseñan como 5 al teclear');
+
+/* el caso reportado: tecleó 0 (barra sola) y luego 5 (2,5 por lado) */
+db.active = { routineId:'', routineName:'X', start: Date.now(), exercises:[
+  { key:'press banca', name:'Press banca', sugg:null, sets:[{ w:'0', r:'10', rir:'' }] }
+]};
+let entB = collectEntries(db.active);
+chk(entB[0].sets[0].w === 20, 'teclear 0 guarda la barra sola: 20');
+chk(targetWeight(db.active.exercises[0]) === 20, 'y la calculadora entiende «barra vacía»');
+db.active.exercises[0].sets = [{ w:'5', r:'10', rir:'' }];
+entB = collectEntries(db.active);
+chk(entB[0].sets[0].w === 25, 'teclear 5 guarda 25 reales');
+const lpB = loadPlan('press banca', targetWeight(db.active.exercises[0]));
+chk(lpB && Math.abs(lpB.perPointKg - 2.5) < 1e-9 && lpB.exact,
+    'y manda 2,5 por lado EXACTOS — ya no «la barra sola es lo más cercano a 5»');
+const stripB = loadStripHTML(0);
+chk(stripB.includes('Anotas (solo discos)') && stripB.includes('>5 kg<'),
+    'la tira de carga también enseña lo que se anota: 5');
+
+/* la sugerencia real se teclea sin la barra */
+db.active.exercises[0].sugg = { w:25, reps:8, sets:3, type:'up', msg:'', why:'' };
+chk(setRowHTML(0, 0, { w:'', r:'', rir:'' }, db.active.exercises[0].sugg, 'normal').includes('placeholder="5"'),
+    'el placeholder sugiere 5, listo para teclear');
+
+/* sin barra disponible no hay offset: lo tecleado vuelve a ser el total */
+db.gym.bars = [];
+chk(discosOffset('press banca') === 0 && typedToKg('press banca', 25) === 25,
+    'sin barra en el inventario, nada cambia');
+db.gym.bars = [{ id:'ol', name:'Olímpica', kg:20, on:true, def:true }];
+db.active = null;
 
 /* en libras, el puente respeta la unidad activa */
 db.settings.unit = 'lb';
